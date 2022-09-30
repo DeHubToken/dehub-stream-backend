@@ -18,7 +18,10 @@ function makeRandomIV(length) {
 }
 
 const encryptMsgWithAES128 = (plainText, key) => {
-    const textBuffer = Buffer.from(Buffer.from(plainText).toString("base64"));
+    // plainText = plainText.toString('utf8').replace("@", "")
+    // const textBuffer = Buffer.from(Buffer.from(plainText).toString("base64"));
+    // console.log("---plainText", Buffer.from(plainText).toString("base64"));
+    const textBuffer = Buffer.from(plainText);
     const iv = makeRandomIV(ivLen);
     const ivBuffer = Buffer.from(crypto.createHash('md5').update(iv).digest('hex'), "hex");
     const keyBuffer = Buffer.from(crypto.createHash('md5').update(key).digest('hex'), "hex");
@@ -39,7 +42,8 @@ const decryptMsgWithAES128 = (encryptedText, key) => {
     let decipheredContent = decipher.update(encryptedText.substr(ivLen, encryptedText.length - ivLen), 'base64', 'utf8');
     decipheredContent += decipher.final('utf8');
     console.log("-decrypted:", decipheredContent);
-    decipheredContent = Buffer.from(decipheredContent, "base64").toString("utf8")
+    // decipheredContent = Buffer.from(decipheredContent, "base64").toString("utf8")
+    // decipheredContent = decipheredContent.replace("...", "@")
     return decipheredContent;
 }
 const encryptWithSourceKey = (plainText, sourceKey) => {
@@ -53,8 +57,8 @@ const decryptWithSourceKey = (encryptedText, sourceKey) => {
 
 const getSecurityKeyFrom = (sourceKey) => {
     const normalSourceKey = sourceKey.toLowerCase();
-    // const changedKey = normalSourceKey.substr(4, 3) + "?" + normalSourceKey.substr(10, 7) + "!" + normalSourceKey.substr(23, 6).toUpperCase();
-    const changedKey = normalSourceKey.substr(4, 3);
+    const changedKey = normalSourceKey.substr(4, 3) + "?" + normalSourceKey.substr(10, 5) + "!";  // + normalSourceKey.substr(23, 6).toUpperCase();
+    // const changedKey = normalSourceKey.substr(4, 3);
     console.log("---changed: ", changedKey);
     return reverseString(changedKey);
 }

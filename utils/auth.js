@@ -10,8 +10,8 @@ const isValidAccount = async (address, timestamp, sig) => {
             .verifyMessage(signedMsg, sig)
             .toLowerCase();
         // console.log("---user sign", signedAddress);
-        if (signedAddress != address && process.env.RUN_MODE!="dev") return false;
-        const accountItem = await Account.findOne({address}).lean();
+        if (signedAddress.toLowerCase() != address.toLowerCase() && process.env.RUN_MODE!="dev") return false;
+        const accountItem = await Account.findOne({address: address.toLowerCase()}).lean();
         if(accountItem) return accountItem;
         else return false;
     }
