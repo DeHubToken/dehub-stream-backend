@@ -3,17 +3,45 @@ const { Account } = require('../models/Account');
 const path = require("path");
 const fs = require('fs');
 require("dotenv").config();
-const { ethers } = require('ethers');
+const { ethers, FixedNumber } = require('ethers');
 const { splitSignature } = require('@ethersproject/bytes');
 const { isValidAccount, reqParam } = require('../utils/auth');
 const { decryptWithSourceKey, encryptWithSourceKey } = require('../utils/encrypt');
-
-const config = require('../config')();
+const { paramNames } = require('../config/constants');
+const { mintNft } = require('./mintNft');
+const { Token } = require('../models/Token');
 const expireTime = 86400000;
-module.exports = BaseController.extend({
-    name: 'ApiController',
-    api_acount: async function (req, res, next) {
-        return res.json({});
+const ApiController = {
+    getServerTime: async function (req, res, next) {
+        return res.json({ status: true, data: Math.floor(Date.now() / 1000), note: 's' });
+    },
+    signWithWallet: async function (req, res, next) {
+        const address = reqParam(req, paramNames.address);
+        const rawSig = reqParam(req, paramNames.sig);
+        const timestamp = reqParam(req, paramNames.timestamp);
+        if (!rawSig || !address || !timestamp)
+            return res.json({ error: true, msg: "sig or address not exist" });
+        const signedMsg = `${address.toLowerCase()}-${timestamp}`;
+        console.log("---signed msg", signedMsg, rawSig);
+        // const toSign = ethers.utils
+        //     .keccak256(
+        //         ethers.utils.defaultAbiCoder.encode(["string"], [signedMsg])
+        //     )
+        //     .slice(2);
+        try {
+            const signedAddress = ethers.utils
+                .verifyMessage(signedMsg, rawSig)
+                .toLowerCase();
+            console.log("---user sign", signedAddress);
+            if (signedAddress != address) return res.json({ status: false, error: true, error_msg: "sign error" });
+            const account = await Account.findOneAndUpdate({ address: signedAddress }, { loginDate: new Date() }, { upsert: true, new: true, setDefaultsOnInsert: true }).lean();
+            if (!account) return res.json({ status: false, error: true, error_msg: "not found account" });
+            console.log(account);
+            return res.json({ status: true, result: { address: signedAddress, loginDate: account.loginDate } });
+        } catch (e) {
+            console.log("signature error", e);
+            return res.json({ error: true, msg: "sign error" });
+        }
     },
     registerUserInfo: async function (req, res, next) {
         const address = req.query.address || req.body.address || req.params.address;
@@ -25,10 +53,10 @@ module.exports = BaseController.extend({
         // const username = req.query.username || req.body.username || req.params.username;        
         if (!rawSig || !address || !timestamp || !encryptedUsername || !encryptedEmail)
             return res.json({ error: true, msg: "sig or address not exist" });
-        if (Number(timestamp)<Date.now()-expireTime)
+        if (Number(timestamp) < Date.now() - expireTime)
             return res.json({ error: true, msg: "expired!" });
         let signedMsg = `${address.toLowerCase()}-${timestamp}`;
-        console.log("---signed msg", signedMsg, rawSig);        
+        console.log("---signed msg", signedMsg, rawSig);
         try {
             // signedMsg = ethers.utils
             // .keccak256(
@@ -67,10 +95,10 @@ module.exports = BaseController.extend({
         const address = reqParam(req, "address");
         const rawSig = reqParam(req, "sig");
         const timestamp = reqParam(req, "timestamp");
-        
+
         if (!rawSig || !address || !timestamp)
             return res.json({ error: true, msg: "sig or parameters not exist" });
-        if (Number(timestamp)<Date.now()-expireTime)
+        if (Number(timestamp) < Date.now() - expireTime)
             return res.json({ error: true, msg: "expired!" });
         const result = await isValidAccount(address, timestamp, rawSig);
         if (!result) return res.json({ status: false, error: true, error_msg: "should login first" });
@@ -79,5 +107,50 @@ module.exports = BaseController.extend({
         const data1 = encryptWithSourceKey(result.username, rawSig);
         const data2 = encryptWithSourceKey(result.email, rawSig);
         return res.json({ status: true, result: { data1, data2 } });
+    },
+    getSignedDataForUserMint: async function (req, res, next) {
+        const { mintCount, rawSig } = req.body;
+        if (!rawSig || mintCount < 1)
+            return res.json({ error: true, msg: "sig error" });
+        const signedMintCount = `Mint ${mintCount}`;
+        const toSignForMint = ethers.utils
+            .keccak256(
+                ethers.utils.defaultAbiCoder.encode(["string"], [signedMintCount])
+            )
+            .slice(2);
+        try {
+            const signedAddress = ethers.utils
+                .verifyMessage(toSignForMint, rawSig)
+                .toLowerCase();
+            console.log("---user mint", signedAddress);
+            const result = await mintNft(signedAddress, mintCount);
+            return res.json(result);
+        } catch (e) {
+            console.log("signature error");
+            return res.json({ error: true, msg: "sign error" });
+        }
+    },
+    getAllNfts: async function (req, res, next) {
+        const skip = req.body.skip || req.query.skip || 0;
+        const limit = req.body.limit || req.query.limit || 1000;
+        const filter = { $or: [{ status: "minted" }, { status: null }] };
+        const tokenTemplate = {
+            name: 1,
+            description: 1,
+            tokenId: 1,
+            imageUrl: 1,
+            videoUrl: 1,
+            owner: 1,
+            minter: 1,
+            _id: 0,
+        };
+        const totalCount = await Token.find(filter, tokenTemplate).count();
+        const all = await Token.find(filter, tokenTemplate)
+            .sort({ updatedAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .lean();
+        return res.json({ result: { items: all, totalCount, skip, limit } });
     }
-});
+}
+module.exports = { ApiController };

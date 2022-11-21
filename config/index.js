@@ -1,23 +1,23 @@
-let config = {
-    kovan_port: 9002,
+
+require('dotenv').config();
+// import dotenv from 'dotenv'
+// dotenv.config();
+const config = {
     port: 9004,
     socket: 9003,
-    base_url: 'http://127.0.0.1:9004',
-    kovan_base_url: 'http://127.0.0.1:9002',
+    baseUrl: 'http://127.0.0.1:9004',
+
+    devPort: 9002,
+    devBaseUrl: 'http://127.0.0.1:9002',
     mongo: {
         host: '127.0.0.1',
         port: 27017,
-        db_name: 'web3_simple_db'
+        dbName: 'streaming_nft_db'
     },
-    kovan_mongo: {
-        host: '127.0.0.1',
-        port: 27017,
-        db_name: 'web3_simple_db_kovan'
-    },
-    web3SimpleGraphQLURL: 'https://api.thegraph.com/subgraphs/name/web3simple/web3simple-market',
-    voteAmount: 10
+    graphQlUrl: 'https://api.thegraph.com/subgraphs/name/streaming-nft/streaming-nft',
+    expireSigninTime: 7200, // 2 hours
+    isDevMode: process.env.RUN_MODE != 'dev'
 };
-require('dotenv').config()
-module.exports = function () {
-    return config;
+module.exports = {
+    config,
 };

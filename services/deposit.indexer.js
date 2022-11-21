@@ -37,7 +37,7 @@ async function TxEventListener(from, tokenAddress, amount, logInfo) {
 mongoose.set('useFindAndModify', false);
 mongoose.set('useCreateIndex', true);
 /// -- transfer listener
-mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/' + config.mongo.db_name,
+mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/' + config.mongo.dbName,
     { useNewUrlParser: true, useUnifiedTopology: true })
     .then(async () => {
         console.log(' -- starting deposit indexer...');

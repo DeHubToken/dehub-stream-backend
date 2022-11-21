@@ -14,7 +14,7 @@ let AccountSchema = new Schema({
     rewardBalance: Number,
     // Total claimed amount
     balance: Number,
-    loginDate: Date,
+    lastLoginTimestamp: Number,
     username: String,
     email: String
 }, { timestamps: true });
