@@ -120,3 +120,6 @@ dist
 .yarn/install-state.gz
 .pnp.*
 /logs
+# uploaded images and videos
+/assets/videos
+/assets/images

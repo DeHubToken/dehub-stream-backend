@@ -7,9 +7,10 @@ const { ethers, FixedNumber } = require('ethers');
 const { splitSignature } = require('@ethersproject/bytes');
 const { isValidAccount, reqParam } = require('../utils/auth');
 const { decryptWithSourceKey, encryptWithSourceKey } = require('../utils/encrypt');
-const { paramNames } = require('../config/constants');
-const { mintNft } = require('./mintNft');
+const { paramNames, errorMsgs } = require('../config/constants');
 const { Token } = require('../models/Token');
+const { checkFileType } = require('../utils/format');
+const { signatureForMintingNFT } = require('./mintNft');
 const expireTime = 86400000;
 const ApiController = {
     getServerTime: async function (req, res, next) {
@@ -109,26 +110,17 @@ const ApiController = {
         return res.json({ status: true, result: { data1, data2 } });
     },
     getSignedDataForUserMint: async function (req, res, next) {
-        const { mintCount, rawSig } = req.body;
-        if (!rawSig || mintCount < 1)
-            return res.json({ error: true, msg: "sig error" });
-        const signedMintCount = `Mint ${mintCount}`;
-        const toSignForMint = ethers.utils
-            .keccak256(
-                ethers.utils.defaultAbiCoder.encode(["string"], [signedMintCount])
-            )
-            .slice(2);
-        try {
-            const signedAddress = ethers.utils
-                .verifyMessage(toSignForMint, rawSig)
-                .toLowerCase();
-            console.log("---user mint", signedAddress);
-            const result = await mintNft(signedAddress, mintCount);
-            return res.json(result);
-        } catch (e) {
-            console.log("signature error");
-            return res.json({ error: true, msg: "sign error" });
-        }
+
+        const { from, name, description, } = req.body;
+        const uploadedFiles = req.files.files;
+        if (uploadedFiles?.length < 2) return res.json({ error: true, msg: "upload image and video file" });
+        const videoFile = uploadedFiles[0];
+        if (!checkFileType(videoFile)) return res.json({ error: true, msg: errorMsgs.not_supported_video });
+        const imageFile = uploadedFiles[1];
+        if (!checkFileType(imageFile, 'image')) return res.json({ error: true, msg: errorMsgs.not_supported_image });
+        
+        const result = await signatureForMintingNFT(videoFile, imageFile, name, description);
+        return res.json(result);
     },
     getAllNfts: async function (req, res, next) {
         const skip = req.body.skip || req.query.skip || 0;

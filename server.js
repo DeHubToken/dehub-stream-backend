@@ -62,7 +62,11 @@ mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/
             app.get('/404', function (req, res, next) {
                 res.send("404 Error");
             });
-
+            app.use((err, req, res, next) => {
+                console.log('------error', err);
+                res.status(err.status || 500);
+                res.send('500 Error');
+              });
             app.listen(config.port, function () {
                 console.log('[' + new Date().toLocaleString() + '] ' + 'Server listening ' + config.baseUrl);
             });

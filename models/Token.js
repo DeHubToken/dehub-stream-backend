@@ -15,8 +15,8 @@ let TokenSchema = new Schema({
     tokenId: Number,
     price: Number,
     metaDataUrl: String,
-    imageUrl: String,
-    videoUrl: String,
+    imageUrl: String, //related path
+    videoUrl: String, //related path
     site: String, //
     contractAddress: String,
     minter: String,
@@ -39,8 +39,8 @@ TokenSchema.pre("save", function (next) {
                 if (error) return next(error);
                 doc.tokenId = counter.seq;
                 if (!doc.name) doc.name = `${NFT_NAME_PREFIX} #${doc.tokenId}`;
-                if (!doc.imageUrl) doc.imageUrl = `${process.env.DEFAULT_DOMAIN}/nfts/images/${doc.tokenId}.png`;
-                if (!doc.videoUrl) doc.videoUrl = `${process.env.DEFAULT_DOMAIN}/streams/${doc.tokenId}.mp4`;
+                if (!doc.imageUrl) doc.imageUrl = `nfts/images/${doc.tokenId}.png`;
+                if (!doc.videoUrl) doc.videoUrl = `streams/${doc.tokenId}.mp4`;
                 next();
             }
         );

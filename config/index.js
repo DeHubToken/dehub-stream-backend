@@ -16,7 +16,7 @@ const config = {
     },
     graphQlUrl: 'https://api.thegraph.com/subgraphs/name/streaming-nft/streaming-nft',
     expireSigninTime: 7200, // 2 hours
-    isDevMode: process.env.RUN_MODE != 'dev'
+    isDevMode: process.env.RUN_MODE != 'dev',
 };
 module.exports = {
     config,
