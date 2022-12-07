@@ -21,6 +21,7 @@ let TokenSchema = new Schema({
     contractAddress: String,
     minter: String,
     owner: String,
+    streamInfo: Object,
     status: {
         type: String,
         default: "signed",

@@ -111,16 +111,24 @@ const ApiController = {
     },
     getSignedDataForUserMint: async function (req, res, next) {
 
-        const { from, name, description, } = req.body;
+        const { from, name, description, streamInfo} = req.body;
+        console.log(streamInfo);
         const uploadedFiles = req.files.files;
         if (uploadedFiles?.length < 2) return res.json({ error: true, msg: "upload image and video file" });
         const videoFile = uploadedFiles[0];
         if (!checkFileType(videoFile)) return res.json({ error: true, msg: errorMsgs.not_supported_video });
         const imageFile = uploadedFiles[1];
         if (!checkFileType(imageFile, 'image')) return res.json({ error: true, msg: errorMsgs.not_supported_image });
+        try{
+            const result = await signatureForMintingNFT(videoFile, imageFile, name, description, JSON.parse(streamInfo));
+            return res.json(result);
+        }
+        catch(err)
+        {
+            console.log('-----getSignedDataForUserMint error', err);
+            return res.json({result:false, error: 'Uploading was failed'});
+        }
         
-        const result = await signatureForMintingNFT(videoFile, imageFile, name, description);
-        return res.json(result);
     },
     getAllNfts: async function (req, res, next) {
         const skip = req.body.skip || req.query.skip || 0;

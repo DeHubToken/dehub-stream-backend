@@ -1,0 +1,33 @@
+{
+  "name": "Stream NFT #1",
+  "symbol": "STN",
+  "description": "Stream NFT is used for streaming service.",
+  "seller_fee_basis_points": 300,
+  "image": "http://",
+  "external_url": "http://",
+  "attributes": [
+    {
+      "trait_type": "prop1",
+      "value": 80
+    },
+    {
+      "trait_type": "prop2",
+      "value": 40
+    }
+  ],
+  "properties": {
+    "files": [
+      {
+        "uri": "http://",
+        "type": "image/png"
+      }
+    ],
+    "category": "image",
+    "creators": [
+      {
+        "address": "0xa2340",
+        "share": 100
+      }
+    ]
+  }
+}

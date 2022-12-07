@@ -8,7 +8,7 @@ const { moveFile } = require("../utils/file");
 
 const signer = new ethers.Wallet(process.env.SIGNER_KEY);
 
-const signatureForMintingNFT = async (videoFile, imageFile, name, description) => {
+const signatureForMintingNFT = async (videoFile, imageFile, name, description, streamInfo) => {
   const collectionAddress = process.env.DEFAULT_COLLECTION?.toLowerCase();
 
   // 1. create pending token
@@ -17,6 +17,7 @@ const signatureForMintingNFT = async (videoFile, imageFile, name, description) =
     contractAddress: collectionAddress,
     name,
     description,
+    streamInfo
   });
   // 2. move file to main assets directory  
   const videoExt = videoFile.mimetype.toString().substr(videoFile.mimetype.toString().indexOf("/") + 1);
@@ -30,9 +31,10 @@ const signatureForMintingNFT = async (videoFile, imageFile, name, description) =
   moveFile(`${path.dirname(__dirname)}/${imageFile.path}`, imagePath);
 
   // 3. signature for minting token
+  const mintCount = 1;
   const messageHash = ethers.utils.solidityKeccak256(
-    ["address", "uint256", "uint256"],
-    [collectionAddress, tokenItem.tokenId, timestamp]
+    ["address", "uint256", "uint256", "uint256"],
+    [collectionAddress, tokenItem.tokenId, mintCount, timestamp]
   );
   const { r, s, v } = splitSignature(
     await signer.signMessage(ethers.utils.arrayify(messageHash))

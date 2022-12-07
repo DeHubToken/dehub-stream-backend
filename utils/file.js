@@ -4,7 +4,10 @@ const moveFile = (srcFilePath, destFilePath) => {
     var dest = fs.createWriteStream(destFilePath);
 
     source.pipe(dest);
-    source.on('end', function () {  console.log('----copied') });
+    source.on('end', function () {
+        console.log('----copied');
+        fs.unlink(srcFilePath, error => { if (error) console.log('delete file error!') });        
+    });
     source.on('error', function (err) { console.log('----not copied', err) });
     // return new Promise((resolve, reject) => {
     //     source.on('end', resolve);
