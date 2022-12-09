@@ -1,33 +1,26 @@
 const mongoose = require("mongoose")
 require('dotenv').config()
 const ethers = require('ethers');
-const { BigNumber } = ethers
+// const { BigNumber } = ethers
+// const fs = require('fs');
 // const Token = require('../models/Token')
 
 const ContractAbi = require('../abis/StreamNft.json');
 const { config } = require("../config");
 const { Token } = require("../models/Token");
-const { EXPIRED_TIME_FOR_MINTING } = require("../shared/contants");
-const IDCounter = require("../models/IDCounter");
+// const { EXPIRED_TIME_FOR_MINTING } = require("../shared/contants");
+// const IDCounter = require("../models/IDCounter");
 // const privatekey = require("../privatekey");
 const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_ENDPOINT);
 
 const NFTContract = new ethers.Contract(process.env.DEFAULT_COLLECTION, ContractAbi, provider)
 
-const MINT_STATUS = {
-    minted: 'minted',
-    signed: 'signed',
-    pending: 'pending'
-}
+// const MINT_STATUS = {
+//     minted: 'minted',
+//     signed: 'signed',
+//     pending: 'pending'
+// }
 const zeroAddress = '0x0000000000000000000000000000000000000000';
-
-async function deleteExpiredTokenItems() {
-    const deletedTokenIds = await Token.find({ status: MINT_STATUS.signed, createdAt: { $lt: new Date(new Date() - EXPIRED_TIME_FOR_MINTING) } }).distinct('tokenId');
-    await IDCounter.updateOne({ id: 'tokenId' }, { $push: { expiredIds: deletedTokenIds } });
-    if (!deletedTokenIds || deletedTokenIds.length < 1) return;
-    const result = await Token.deleteMany({ tokenId: { $in: deletedTokenIds } });
-    console.log(result);
-}
 
 async function TxEventListener(from, to, tokenId, logInfo) {
     // const { transactionHash, logIndex } = logInfo
@@ -59,7 +52,6 @@ async function TxEventListener(from, to, tokenId, logInfo) {
 mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/' + config.mongo.dbName,
     { useNewUrlParser: true, useUnifiedTopology: true, useFindAndModify: false }).then(async () => {
         console.log(' -- starting mint indexer...');
-        await deleteExpiredTokenItems();
         NFTContract.on('Transfer', TxEventListener)
         // await getPastEvent('Transfer')
     });

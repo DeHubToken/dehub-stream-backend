@@ -7,12 +7,12 @@ const { NFT_NAME_PREFIX } = require("../shared/contants");
 let TokenSchema = new Schema({
     symbol: String,
     address: String,  // collection address
-    name: String,
+    name: { type: String, index: true },
     decimals: Number, // 1
     chainId: Number,  // 56
     logoURI: String,
     ts: String, //totalsupply
-    tokenId: Number,
+    tokenId: { type: Number, unique: true },
     price: Number,
     metaDataUrl: String,
     imageUrl: String, //related path
@@ -25,12 +25,15 @@ let TokenSchema = new Schema({
     videoExt: String,
     imageExt: String,
     description: String,
+    videoDuration: { type: Number, index: true }, // in second unit
+    videoFilePath: { type: String },
     status: {
         type: String,
         default: "signed",
         enum: ["signed", "pending", "minted"],
     },
 }, { timestamps: true });
+
 
 TokenSchema.pre("save", function (next) {
     let doc = this;
