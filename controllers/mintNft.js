@@ -10,6 +10,8 @@ const signer = new ethers.Wallet(process.env.SIGNER_KEY);
 
 const signatureForMintingNFT = async (videoFile, imageFile, name, description, streamInfo) => {
   const collectionAddress = process.env.DEFAULT_COLLECTION?.toLowerCase();
+  const videoExt = videoFile.mimetype.toString().substr(videoFile.mimetype.toString().indexOf("/") + 1);
+  const imageExt = imageFile.mimetype.toString().substr(imageFile.mimetype.toString().indexOf("/") + 1);
 
   // 1. create pending token
   const timestamp = Math.floor(Date.now() / 1000);
@@ -17,15 +19,15 @@ const signatureForMintingNFT = async (videoFile, imageFile, name, description, s
     contractAddress: collectionAddress,
     name,
     description,
-    streamInfo
+    streamInfo,
+    videoExt,
+    imageExt,
   });
   // 2. move file to main assets directory  
-  const videoExt = videoFile.mimetype.toString().substr(videoFile.mimetype.toString().indexOf("/") + 1);
   const videoPath = `${path.dirname(__dirname)}/assets/videos/${tokenItem.tokenId}.${videoExt}`;
   console.log('-----video path', videoPath);
   moveFile(`${path.dirname(__dirname)}/${videoFile.path}`, videoPath);
-
-  const imageExt = imageFile.mimetype.toString().substr(imageFile.mimetype.toString().indexOf("/") + 1);
+  
   const imagePath = `${path.dirname(__dirname)}/assets/images/${tokenItem.tokenId}.${imageExt}`;
   console.log('-----image path', imagePath);
   moveFile(`${path.dirname(__dirname)}/${imageFile.path}`, imagePath);

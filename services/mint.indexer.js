@@ -7,6 +7,8 @@ const { BigNumber } = ethers
 const ContractAbi = require('../abis/StreamNft.json');
 const { config } = require("../config");
 const { Token } = require("../models/Token");
+const { EXPIRED_TIME_FOR_MINTING } = require("../shared/contants");
+const IDCounter = require("../models/IDCounter");
 // const privatekey = require("../privatekey");
 const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_ENDPOINT);
 
@@ -17,26 +19,39 @@ const MINT_STATUS = {
     signed: 'signed',
     pending: 'pending'
 }
-
 const zeroAddress = '0x0000000000000000000000000000000000000000';
+
+async function deleteExpiredTokenItems() {
+    const deletedTokenIds = await Token.find({ status: MINT_STATUS.signed, createdAt: { $lt: new Date(new Date() - EXPIRED_TIME_FOR_MINTING) } }).distinct('tokenId');
+    await IDCounter.updateOne({ id: 'tokenId' }, { $push: { expiredIds: deletedTokenIds } });
+    if (!deletedTokenIds || deletedTokenIds.length < 1) return;
+    const result = await Token.deleteMany({ tokenId: { $in: deletedTokenIds } });
+    console.log(result);
+}
+
 async function TxEventListener(from, to, tokenId, logInfo) {
-    const { transactionHash, logIndex } = logInfo
+    // const { transactionHash, logIndex } = logInfo
 
     const tokenIdInt = parseInt(tokenId.toString());
-    if (from.toString().toLowerCase() != zeroAddress) return;
     const toAddress = to.toString().toLowerCase();
-    console.log('--minted',NFTContract.address.toLowerCase(), tokenIdInt, toAddress,) ;
-    let mintedToken;
+    let updateData = { owner: toAddress };
+    
+    if (from.toString().toLowerCase() === zeroAddress)
+        {
+            updateData = { ...updateData, minter: toAddress, status: 'minted' };
+            console.log('--minted', NFTContract.address.toLowerCase(), tokenIdInt, toAddress);
+        }
+    let updatedTokenItem;
     try {
-        mintedToken = await Token.findOneAndUpdate({ contractAddress: NFTContract.address.toLowerCase(), tokenId: tokenIdInt, }, { minter: toAddress, owner: toAddress, status: 'minted' }, { new: true, upsert: true });
+        updatedTokenItem = await Token.findOneAndUpdate({ contractAddress: NFTContract.address.toLowerCase(), tokenId: tokenIdInt, }, updateData, { new: true, upsert: true });
     } catch (error) {
         console.log("--- token find error");
     }
-    if (!mintedToken) {
+    if (!updatedTokenItem) {
         console.log("Not found record");
         return
     } else {
-
+        console.log(`### transfer: ${tokenId} ${from.toString().toLowerCase()}->${toAddress}`);
     }
 }
 
@@ -44,6 +59,7 @@ async function TxEventListener(from, to, tokenId, logInfo) {
 mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/' + config.mongo.dbName,
     { useNewUrlParser: true, useUnifiedTopology: true, useFindAndModify: false }).then(async () => {
         console.log(' -- starting mint indexer...');
+        await deleteExpiredTokenItems();
         NFTContract.on('Transfer', TxEventListener)
         // await getPastEvent('Transfer')
     });

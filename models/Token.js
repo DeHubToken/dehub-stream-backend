@@ -22,6 +22,9 @@ let TokenSchema = new Schema({
     minter: String,
     owner: String,
     streamInfo: Object,
+    videoExt: String,
+    imageExt: String,
+    description: String,
     status: {
         type: String,
         default: "signed",
@@ -40,8 +43,8 @@ TokenSchema.pre("save", function (next) {
                 if (error) return next(error);
                 doc.tokenId = counter.seq;
                 if (!doc.name) doc.name = `${NFT_NAME_PREFIX} #${doc.tokenId}`;
-                if (!doc.imageUrl) doc.imageUrl = `nfts/images/${doc.tokenId}.png`;
-                if (!doc.videoUrl) doc.videoUrl = `streams/${doc.tokenId}.mp4`;
+                if (!doc.imageUrl) doc.imageUrl = `nfts/images/${doc.tokenId}.${doc.imageExt ? doc.imageExt : 'png'}`;
+                if (!doc.videoUrl) doc.videoUrl = `streams/video/${doc.tokenId}`;
                 next();
             }
         );

@@ -11,6 +11,7 @@ const { paramNames, errorMsgs } = require('../config/constants');
 const { Token } = require('../models/Token');
 const { checkFileType } = require('../utils/format');
 const { signatureForMintingNFT } = require('./mintNft');
+const nftMetaDataTemplate = require('../data_structure/nft_metadata_template.json');
 const expireTime = 86400000;
 const ApiController = {
     getServerTime: async function (req, res, next) {
@@ -111,24 +112,23 @@ const ApiController = {
     },
     getSignedDataForUserMint: async function (req, res, next) {
 
-        const { from, name, description, streamInfo} = req.body;
-        console.log(streamInfo);
+        const { from, name, description, streamInfo } = req.body;
+        console.log(name, description, streamInfo);
         const uploadedFiles = req.files.files;
         if (uploadedFiles?.length < 2) return res.json({ error: true, msg: "upload image and video file" });
         const videoFile = uploadedFiles[0];
         if (!checkFileType(videoFile)) return res.json({ error: true, msg: errorMsgs.not_supported_video });
         const imageFile = uploadedFiles[1];
         if (!checkFileType(imageFile, 'image')) return res.json({ error: true, msg: errorMsgs.not_supported_image });
-        try{
+        try {
             const result = await signatureForMintingNFT(videoFile, imageFile, name, description, JSON.parse(streamInfo));
             return res.json(result);
         }
-        catch(err)
-        {
+        catch (err) {
             console.log('-----getSignedDataForUserMint error', err);
-            return res.json({result:false, error: 'Uploading was failed'});
+            return res.json({ result: false, error: 'Uploading was failed' });
         }
-        
+
     },
     getAllNfts: async function (req, res, next) {
         const skip = req.body.skip || req.query.skip || 0;
@@ -151,6 +151,41 @@ const ApiController = {
             .limit(limit)
             .lean();
         return res.json({ result: { items: all, totalCount, skip, limit } });
+    },
+    getMetaData: async function (req, res, next) {
+        const tokenId = req.params.id;
+        if (!tokenId) return json({});
+        const tokenTemplate = {
+            name: 1,
+            description: 1,
+            tokenId: 1,
+            imageUrl: 1,
+            videoUrl: 1,
+            owner: 1,
+            minter: 1,
+            streamInfo: 1,
+            type: 1,
+            _id: 0,
+        };
+        const filter = { tokenId: parseInt(tokenId) };
+        const tokenItem = await Token.findOne(filter, tokenTemplate).lean();
+        if (!tokenItem) return json({});
+        const result = JSON.parse(JSON.stringify(nftMetaDataTemplate));
+        nftMetaDataTemplate.name = tokenItem.name;
+        nftMetaDataTemplate.description = tokenItem.description;
+        nftMetaDataTemplate.image = process.env.DEFAULT_DOMAIN + '/' + tokenItem.imageUrl;
+        const mediaUrlPrefix =process.env.DEFAULT_DOMAIN + '/';
+        nftMetaDataTemplate.external_url = mediaUrlPrefix + tokenItem.videoUrl;
+
+        if (!tokenItem.symbol) delete nftMetaDataTemplate.symbol;
+        if (!tokenItem.streamInfo) delete nftMetaDataTemplate.attributes;
+        else {
+            nftMetaDataTemplate.attributes = [];
+            Object.keys(tokenItem.streamInfo).map(e => {
+                nftMetaDataTemplate.attributes.push({ trait_type: e, value: tokenItem.streamInfo[e] });
+            })
+        }
+        return res.json(nftMetaDataTemplate);
     }
 }
 module.exports = { ApiController };

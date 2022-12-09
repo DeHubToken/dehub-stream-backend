@@ -14,20 +14,5 @@
       "trait_type": "prop2",
       "value": 40
     }
-  ],
-  "properties": {
-    "files": [
-      {
-        "uri": "http://",
-        "type": "image/png"
-      }
-    ],
-    "category": "image",
-    "creators": [
-      {
-        "address": "0xa2340",
-        "share": 100
-      }
-    ]
-  }
+  ]
 }

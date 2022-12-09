@@ -63,4 +63,8 @@ router.get("/all_nfts", async function (req, res, next) {
     return ApiController.getAllNfts(req, res, next);
 });
 
+router.get("/nft_metadata/:id", async function (req, res, next) {
+    return ApiController.getMetaData(req, res, next);
+});
+
 module.exports = router;

@@ -12,6 +12,7 @@ let app = express();
 let { config } = require('./config');
 let home_route = require('./routes/home_route');
 let api_route = require('./routes/api_route');
+let stream_route = require('./routes/stream_route');
 
 app.set('view engine', 'ejs');
 
@@ -50,8 +51,10 @@ mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/
             };
 
             app.use('/', attachDB, home_route);
-            
+
             app.use('/api', attachDB, api_route);
+
+            app.use('/streams', attachDB, stream_route);
 
             /**
              * Error Routes
@@ -61,12 +64,12 @@ mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/
             });
             app.get('/404', function (req, res, next) {
                 res.send("404 Error");
-            });
+            }); 1
             app.use((err, req, res, next) => {
                 console.log('------error', err);
                 res.status(err.status || 500);
                 res.send('500 Error');
-              });
+            });
             app.listen(config.port, function () {
                 console.log('[' + new Date().toLocaleString() + '] ' + 'Server listening ' + config.baseUrl);
             });
