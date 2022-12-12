@@ -3,25 +3,30 @@ const { Account } = require('../models/Account');
 const path = require("path");
 const fs = require('fs');
 require("dotenv").config();
-const { ethers, FixedNumber } = require('ethers');
-const { splitSignature } = require('@ethersproject/bytes');
 const { isValidAccount, reqParam } = require('../utils/auth');
-const { decryptWithSourceKey, encryptWithSourceKey } = require('../utils/encrypt');
-const { paramNames, errorMsgs } = require('../config/constants');
 const { Token } = require('../models/Token');
-const { checkFileType } = require('../utils/format');
-const { signatureForMintingNFT } = require('./mintNft');
 const nftMetaDataTemplate = require('../data_structure/nft_metadata_template.json');
-const expireTime = 86400000;
-const limitBuffer = 2 * 1024 * 1024; // 2M
+const { defaultImageFilePath } = require('../utils/file');
+const { WatchHistory } = require('../models/WatchHistory');
+const limitBuffer = 1 * 1024 * 1024; // 2M
 const initialBuffer = 80 * 1024; // first 60k is free
+const extraSpace = 90 * 1000; // ignore this space time while watching video
 const StreamController = {
     getStream: async function (req, res, next) {
-        const tokenId = req.params.id;
+        let tokenId = req.params.id;
         const signParams = req.query;
         // { sig: '', timestamp: '0', account: 'undefined' } when not connecting with wallet
         if (!tokenId) return res.json({ error: 'error!' });
-        const videoPath = `${path.dirname(__dirname)}/assets/videos/${parseInt(tokenId)}.mp4`;
+        try {
+            tokenId = parseInt(tokenId);
+        }
+        catch (e) {
+            return res.json({ error: 'error!' });
+        }
+        const tokenItem = await Token.findOne({ tokenId }).lean();
+        if (!tokenItem) return res.json({ error: 'no stream!' });
+
+        const videoPath = `${path.dirname(__dirname)}/assets/videos/${tokenId}.mp4`;
         const videoStat = fs.statSync(videoPath);
         const fileSize = videoStat.size;
         const videoRange = req.headers.range;
@@ -42,6 +47,17 @@ const StreamController = {
                     chunksize = limitBuffer + 1;
                     end = start + chunksize - 1;
                 }
+                // check signature for not start
+                const result = await isValidAccount(signParams?.account, signParams?.timestamp, signParams.sig);
+                // return res.json({ error: 'error!' });  // for testing
+                if (!result) {
+                    console.log(result);
+                    // return res.json({ error: 'error!' });      
+                    return res.status(500).send('error!');
+                    // chunksize = 100;
+                    // end = start + chunksize - 1;              
+                }
+
             }
 
             console.log('---signParams', signParams, req.headers.range, end, oldChunkSize, chunksize);
@@ -55,6 +71,17 @@ const StreamController = {
 
             res.writeHead(206, header);
             file.pipe(res);
+            if (signParams?.account) {
+                const nowTime = new Date();
+                WatchHistory.updateOne(
+                    { tokenId, watcherAddress: signParams?.account, exitedAt: { $gt: new Date(nowTime - extraSpace * 1000) } },
+                    { exitedAt: nowTime }, { upsert: true, new: true, setDefaultsOnInsert: true }).then(result => {                        
+                        if (result && result.upserted && result.upserted.length > 0) {
+                            Token.updateOne({ tokenId }, { $inc: { views: 1 } }).then();
+                            console.log('----update views nft', tokenId);
+                        }
+                    }).catch(e => console.log('---'));
+            }
             // } else {
             //     const head = {
             //         'Content-Length': fileSize,
@@ -63,6 +90,52 @@ const StreamController = {
             //     res.writeHead(200, head);
             //     fs.createReadStream(videoPath).pipe(res);
         }
-    }
+    },
+    getImage: async function (req, res, next) {
+        const id = req.params.id;
+        if (!id) return res.json({ error: 'not image' });
+        const tokenItem = await Token.findOne({ tokenId: parseInt(id) }, { tokenId: 1, imageExt: 1 }).lean();
+        if (tokenItem) {
+            const imageLocalFilePath = defaultImageFilePath(parseInt(id), tokenItem.imageExt);
+            console.log(imageLocalFilePath);
+            return res.sendFile(imageLocalFilePath);
+        }
+        return res.json({ error: 'no token' });
+    },
+    getMetaData: async function (req, res, next) {
+        const tokenId = req.params.id;
+        if (!tokenId) return json({});
+        const tokenTemplate = {
+            name: 1,
+            description: 1,
+            tokenId: 1,
+            imageUrl: 1,
+            videoUrl: 1,
+            owner: 1,
+            minter: 1,
+            streamInfo: 1,
+            type: 1,
+            _id: 0,
+        };
+        const filter = { tokenId: parseInt(tokenId) };
+        const tokenItem = await Token.findOne(filter, tokenTemplate).lean();
+        if (!tokenItem) return json({});
+        const result = JSON.parse(JSON.stringify(nftMetaDataTemplate));
+        nftMetaDataTemplate.name = tokenItem.name;
+        nftMetaDataTemplate.description = tokenItem.description;
+        nftMetaDataTemplate.image = process.env.DEFAULT_DOMAIN + '/' + tokenItem.imageUrl;
+        const mediaUrlPrefix = process.env.DEFAULT_DOMAIN + '/';
+        nftMetaDataTemplate.external_url = mediaUrlPrefix + tokenItem.videoUrl;
+
+        if (!tokenItem.symbol) delete nftMetaDataTemplate.symbol;
+        if (!tokenItem.streamInfo) delete nftMetaDataTemplate.attributes;
+        else {
+            nftMetaDataTemplate.attributes = [];
+            Object.keys(tokenItem.streamInfo).map(e => {
+                nftMetaDataTemplate.attributes.push({ trait_type: e, value: tokenItem.streamInfo[e] });
+            })
+        }
+        return res.json(nftMetaDataTemplate);
+    },
 }
 module.exports = { StreamController };

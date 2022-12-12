@@ -27,6 +27,9 @@ let TokenSchema = new Schema({
     description: String,
     videoDuration: { type: Number, index: true }, // in second unit
     videoFilePath: { type: String },
+    likes: {type: Number, index: true},
+    views: {type: Number, index: true},
+    comments: {type: Number, index: true},
     status: {
         type: String,
         default: "signed",

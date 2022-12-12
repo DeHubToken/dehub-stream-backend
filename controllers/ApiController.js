@@ -1,4 +1,3 @@
-let BaseController = require('./BaseController');
 const { Account } = require('../models/Account');
 const path = require("path");
 const fs = require('fs');
@@ -11,8 +10,24 @@ const { paramNames, errorMsgs } = require('../config/constants');
 const { Token } = require('../models/Token');
 const { checkFileType } = require('../utils/format');
 const { signatureForMintingNFT } = require('./mintNft');
-const nftMetaDataTemplate = require('../data_structure/nft_metadata_template.json');
+const { removeDuplicatedObject } = require('../utils/validation');
+const { WatchHistory } = require('../models/WatchHistory');
+const { config } = require('../config');
 const expireTime = 86400000;
+const tokenTemplate = {
+    name: 1,
+    description: 1,
+    tokenId: 1,
+    imageUrl: 1,
+    videoUrl: 1,
+    owner: 1,
+    minter: 1,
+    streamInfo: 1,
+    videoDuration: 1,
+    videoExt: 1,
+    views: 1,
+    _id: 0,
+};
 const ApiController = {
     getServerTime: async function (req, res, next) {
         return res.json({ status: true, data: Math.floor(Date.now() / 1000), note: 's' });
@@ -133,7 +148,22 @@ const ApiController = {
     getAllNfts: async function (req, res, next) {
         const skip = req.body.skip || req.query.skip || 0;
         const limit = req.body.limit || req.query.limit || 1000;
-        const filter = { $or: [{ status: "minted" }, { status: null }] };
+        const filter = { status: "minted" };
+        const totalCount = await Token.find(filter, tokenTemplate).count();
+        const all = await Token.find(filter, tokenTemplate)
+            .sort({ updatedAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .lean();
+        return res.json({ result: { items: all, totalCount, skip, limit } });
+    },
+    getMyNfts: async function (req, res, next) {
+        const skip = req.body.skip || req.query.skip || 0;
+        const limit = req.body.limit || req.query.limit || 1000;
+        const owner = req.body.owner || req.query.owner;
+        if (!owner) return res.json({ error: 'no owner field!' });
+        const filter = { status: 'minted', $or: [{ owner: owner.toLowerCase() }, { minter: owner.toLowerCase() }] };
+
         const tokenTemplate = {
             name: 1,
             description: 1,
@@ -142,6 +172,8 @@ const ApiController = {
             videoUrl: 1,
             owner: 1,
             minter: 1,
+            streamInfo: 1,
+            videoDuration: 1,
             _id: 0,
         };
         const totalCount = await Token.find(filter, tokenTemplate).count();
@@ -152,40 +184,88 @@ const ApiController = {
             .lean();
         return res.json({ result: { items: all, totalCount, skip, limit } });
     },
-    getMetaData: async function (req, res, next) {
-        const tokenId = req.params.id;
-        if (!tokenId) return json({});
-        const tokenTemplate = {
-            name: 1,
-            description: 1,
-            tokenId: 1,
-            imageUrl: 1,
-            videoUrl: 1,
-            owner: 1,
-            minter: 1,
-            streamInfo: 1,
-            type: 1,
-            _id: 0,
-        };
-        const filter = { tokenId: parseInt(tokenId) };
-        const tokenItem = await Token.findOne(filter, tokenTemplate).lean();
-        if (!tokenItem) return json({});
-        const result = JSON.parse(JSON.stringify(nftMetaDataTemplate));
-        nftMetaDataTemplate.name = tokenItem.name;
-        nftMetaDataTemplate.description = tokenItem.description;
-        nftMetaDataTemplate.image = process.env.DEFAULT_DOMAIN + '/' + tokenItem.imageUrl;
-        const mediaUrlPrefix =process.env.DEFAULT_DOMAIN + '/';
-        nftMetaDataTemplate.external_url = mediaUrlPrefix + tokenItem.videoUrl;
+    getFilteredNfts: async function (req, res, next) {
+        try {
+            let { search, page, unit, sortMode, bulkIdList, verifiedOnly, isSales, minter } = req.query
+            const searchQuery = {};
+            if (!unit) unit = 20;
+            if (unit > 100) unit = 100;
 
-        if (!tokenItem.symbol) delete nftMetaDataTemplate.symbol;
-        if (!tokenItem.streamInfo) delete nftMetaDataTemplate.attributes;
-        else {
-            nftMetaDataTemplate.attributes = [];
-            Object.keys(tokenItem.streamInfo).map(e => {
-                nftMetaDataTemplate.attributes.push({ trait_type: e, value: tokenItem.streamInfo[e] });
-            })
+            let sortRule = { createdAt: -1 };
+            searchQuery['$match'] = {};
+            switch (sortMode) {
+                case 'trends':
+                    sortRule = { views: -1 };
+                    break;
+                case 'new':
+                    searchQuery['$match'] = { createdAt: { $gt: new Date(new Date() - config.recentTimeDiff) } }
+                    break;
+                case 'mostLiked':
+                    sortRule = { likes: -1 };
+                    break;
+            }
+
+            if (!page) page = 0;
+            let aggregateQuery = []
+            if (minter) searchQuery['$match'] = { minter: minter.toLowerCase() };
+            if (search) {
+                var re = new RegExp(search, "gi")
+                searchQuery['$match'] = { ...searchQuery['$match'], $or: [{ name: re }, { description: re }, { minter: re }, { owner: re }] }
+                aggregateQuery = [searchQuery]
+            }
+            if (bulkIdList) {
+                let idList = bulkIdList.split("-");
+                if (idList.length > 0) {
+                    idList = idList.map(e => "0x" + e);
+                    searchQuery['$match'] = { id: { $in: idList } }
+                }
+            }
+
+            if ((verifiedOnly + '').toLowerCase() === 'true' || verifiedOnly === '1') {
+                searchQuery['$match'] = { ...searchQuery['$match'], verified: true };
+            }
+            // searchQuery["$sort"] = sortRule;
+            aggregateQuery = [searchQuery];
+            aggregateQuery = !searchQuery['$match'] ? [{ $sort: sortRule }] : [...aggregateQuery, { $sort: sortRule }];
+            if (unit) aggregateQuery = [...aggregateQuery, { $limit: parseInt(unit * page + unit * 1) }];
+            if (page) aggregateQuery = [...aggregateQuery, { $skip: parseInt(unit * page) }];
+            aggregateQuery.push({ $project: tokenTemplate });
+            let filteredNfts = await Token.aggregate(aggregateQuery);
+            const tmpResult = filteredNfts;
+            const ret = removeDuplicatedObject(tmpResult, 'tokenId');
+            ret.map(e => {
+                e.imageUrl = process.env.DEFAULT_DOMAIN + "/" + e.imageUrl;
+                e.videoUrl = process.env.DEFAULT_DOMAIN + "/" + e.videoUrl;
+                delete e.duplicatedCnt;
+            });
+            res.send({ result: ret });
+        } catch (e) {
+            console.log('   ...', new Date(), ' -- index/tokens-search err: ', e);
+            res.status(500)
+            res.send({ error: e.message })
         }
-        return res.json(nftMetaDataTemplate);
+    },
+    getMyWatchedNfts: async function (req, res, next) {
+        let watcherAddress = req.query.watcherAddress || req.query.watcherAddress;
+        if (!watcherAddress) return res.json({ error: 'not define watcherAddress' });
+        watcherAddress = watcherAddress.toLowerCase();
+        const watchedTokenIds = await WatchHistory.find({ watcherAddress }).limit(20).distinct('tokenId');
+        if (!watchedTokenIds || watchedTokenIds.length < 1) return res.json({ result: [] });
+        const myWatchedNfts = await Token.find({ tokenId: { $in: watchedTokenIds } }, tokenTemplate);
+        myWatchedNfts.map(e => {
+            e.imageUrl = process.env.DEFAULT_DOMAIN + "/" + e.imageUrl;
+            e.videoUrl = process.env.DEFAULT_DOMAIN + "/" + e.videoUrl;
+        });
+        return res.json({ result: myWatchedNfts });
+    },
+    getNftInfo: async function (req, res, next) {
+        let tokenId = req.query.id || req.query.id || req.params?.id;
+        if (!tokenId) return res.json({ error: 'not define tokenId' });
+        const nftInfo = await Token.findOne({ tokenId }, tokenTemplate).lean();
+        if (!nftInfo) return res.json({ error: 'no nft' });
+        nftInfo.imageUrl = process.env.DEFAULT_DOMAIN + "/" + nftInfo.imageUrl;
+        nftInfo.videoUrl = process.env.DEFAULT_DOMAIN + "/" + nftInfo.videoUrl;
+        return res.json({ result: nftInfo });
     }
 }
 module.exports = { ApiController };

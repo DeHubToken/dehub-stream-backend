@@ -13,6 +13,7 @@ let { config } = require('./config');
 let home_route = require('./routes/home_route');
 let api_route = require('./routes/api_route');
 let stream_route = require('./routes/stream_route');
+let nft_data_route = require('./routes/nft_metadata_route');
 
 app.set('view engine', 'ejs');
 
@@ -55,6 +56,8 @@ mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/
             app.use('/api', attachDB, api_route);
 
             app.use('/streams', attachDB, stream_route);
+
+            app.use('/nfts', attachDB, nft_data_route);
 
             /**
              * Error Routes

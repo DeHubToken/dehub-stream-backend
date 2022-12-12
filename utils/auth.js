@@ -3,6 +3,7 @@ const ethers = require('ethers');
 const { Account } = require("../models/Account");
 const { config } = require("../config");
 
+const expireSecond = 60 * 2; // 2 hours
 /**
  * if user signature and timestamp is correct, returns account data, if not => false
  * @param {*} address 
@@ -22,11 +23,13 @@ const isValidAccount = async (address, timestamp, sig) => {
          * in case of development mode, we don't check signature and timestamp
          */
         const nowTime = Math.floor(Date.now() / 1000);
-        if ((nowTime < timestamp || signedAddress.toLowerCase() != address.toLowerCase()) && !config.isDevMode) return false;
-        const accountItem = await Account.findOne({ address: address.toLowerCase() }).lean();
-        if (!config.isDevMode && accountItem && timestamp - accountItem.lastLoginTimestamp < config.expireSigninTime)
-            accountItem;
-        else return false;
+        console.log(nowTime - expireSecond - Number(timestamp),signedAddress.toLowerCase() != address.toLowerCase());
+        if ((nowTime - expireSecond > Number(timestamp) || signedAddress.toLowerCase() != address.toLowerCase()) && !config.isDevMode) return false;
+        return true;
+        // const accountItem = await Account.findOne({ address: address.toLowerCase() }).lean();
+        // if (!config.isDevMode && accountItem && timestamp - accountItem.lastLoginTimestamp < config.expireSigninTime)
+        //     accountItem;
+        // else return false;
     }
     catch (e) {
         console.log('check account:', e);
