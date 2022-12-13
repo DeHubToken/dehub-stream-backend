@@ -40,5 +40,8 @@ router.get("/my_watched_nfts", async function (req, res, next) {
 router.get("/nft_info/:id", async function (req, res, next) {
     return ApiController.getNftInfo(req, res, next);
 });
+router.get("/account_info/:id", async function (req, res, next) {
+    return ApiController.getAccountInfo(req, res, next);
+});
 
 module.exports = router;

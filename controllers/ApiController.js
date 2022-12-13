@@ -28,6 +28,12 @@ const tokenTemplate = {
     views: 1,
     _id: 0,
 };
+const accountTemplate = {
+    username: 1,
+    balance: 1,
+    depositedBalance: 1,
+    _id: 0,
+};
 const ApiController = {
     getServerTime: async function (req, res, next) {
         return res.json({ status: true, data: Math.floor(Date.now() / 1000), note: 's' });
@@ -266,6 +272,13 @@ const ApiController = {
         nftInfo.imageUrl = process.env.DEFAULT_DOMAIN + "/" + nftInfo.imageUrl;
         nftInfo.videoUrl = process.env.DEFAULT_DOMAIN + "/" + nftInfo.videoUrl;
         return res.json({ result: nftInfo });
+    },
+    getAccountInfo: async function (req, res, next) {
+        let walletAddress = req.query.id || req.query.id || req.params?.id;
+        if (!walletAddress) return res.json({ error: 'not define wallet' });
+        const accountInfo = await Account.findOne({ address: walletAddress.toLowerCase() }, accountTemplate).lean();
+        if (!accountInfo) return res.json({ error: 'no account' });
+        return res.json({ result: accountInfo });
     }
 }
 module.exports = { ApiController };
