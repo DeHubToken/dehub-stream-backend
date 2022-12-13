@@ -6,11 +6,12 @@ const { Transaction } = require("../models/Transaction");
 const ContractAbi = require('../abis/GameVault.json');
 const { Account } = require("../models/Account");
 const { normalizeAddress } = require("../utils/format");
-const config = require('../config')();
+const { vaultContractAddresses, ChainId } = require("../config/constants");
+const { config } = require('../config');
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_ENDPOINT);
 
-const VaultContract = new ethers.Contract(process.env.VAULT_CONTRACT_ADDRESS, ContractAbi, provider)
+const VaultContract = new ethers.Contract(vaultContractAddresses[ChainId.BSC_TESTNET], ContractAbi, provider)
 
 const zeroAddress = '0x0000000000000000000000000000000000000000';
 async function TxEventListener(from, tokenAddress, amount, logInfo) {
@@ -25,7 +26,7 @@ async function TxEventListener(from, tokenAddress, amount, logInfo) {
     let account;
     try {
         await Transaction.findOneAndUpdate({ txHash: transactionHash, logIndex },
-            { amount: realAmount, from: address, tokenAddress: normalizeAddress(tokenAddress), to: normalizeAddress(VaultContract.address)},
+            { amount: realAmount, from: address, tokenAddress: normalizeAddress(tokenAddress), to: normalizeAddress(VaultContract.address) },
             { new: true, upsert: true, returnOriginal: false });
         account = await Account.findOneAndUpdate({ address: from.toString().toLowerCase() },
             { $inc: { depositedBalance: realAmount, balance: realAmount } }, { new: true, upsert: true, returnOriginal: false });

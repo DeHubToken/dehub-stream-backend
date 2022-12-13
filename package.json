@@ -7,6 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
     "mint_serve": "node ./services/mint.indexer.js",
+    "deposit_serve": "node ./services/deposit.indexer.js",
     "dev": "nodemon server"
   },
   "author": "",
