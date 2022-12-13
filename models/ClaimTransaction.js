@@ -4,11 +4,12 @@ const Schema = mongoose.Schema;
 let ClaimTransactionSchema = new Schema({
     // "address that claims token"
     receiverAddress: String,
+    tokenAddress: String,
     amount: Number,
-    timstamp: Number,
+    timestamp: Number,
     txHash: String,
     block: Number,
-    logIndex: Number,
+    logIndex: Number,    
     status: { type: String, enum:['pending', 'confirmed', 'expired'], default: 'pending'},
 }, { timestamps: true });
 

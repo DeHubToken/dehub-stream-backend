@@ -8,6 +8,7 @@ const { Account } = require("../models/Account");
 const { normalizeAddress } = require("../utils/format");
 const { vaultContractAddresses, ChainId } = require("../config/constants");
 const { config } = require('../config');
+const { ClaimTransaction } = require("../models/ClaimTransaction");
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_ENDPOINT);
 
@@ -35,6 +36,26 @@ async function TxEventListener(from, tokenAddress, amount, logInfo) {
     }
 
 }
+async function ClaimEventListener(tokenAddress, to, amount, timestamp, logInfo) {
+    const { transactionHash, logIndex } = logInfo
+    // if (from.toString().toLowerCase() != zeroAddress) return;
+    // const toAddress = to.toString().toLowerCase();
+    // console.log('--minted', tokenId, toAddress,);
+    const realAmount = Number(ethers.utils.formatUnits(amount, 18));
+    const address = normalizeAddress(to);
+    console.log("---- checked claim", address, realAmount, Number(timestamp.toString()));
+    let account;
+    try {
+        await ClaimTransaction.findOneAndUpdate({ receiverAddress: address, amount: realAmount, timestamp: Number(timestamp.toString()) },
+            { txHash: transactionHash, logIndex },
+            { new: true, upsert: true, returnOriginal: false });
+        account = await Account.findOneAndUpdate({ address },
+            { $inc: { pendingBalance: -realAmount } }, { new: true, upsert: true, returnOriginal: false });
+    } catch (error) {
+        console.log("--- token find error", error);
+    }
+
+}
 mongoose.set('useFindAndModify', false);
 mongoose.set('useCreateIndex', true);
 /// -- transfer listener
@@ -43,5 +64,6 @@ mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/
     .then(async () => {
         console.log(' -- starting deposit indexer...');
         VaultContract.on('UserDeposit', TxEventListener)
+        VaultContract.on('Claim', ClaimEventListener)
         // await getPastEvent('Transfer')
     });

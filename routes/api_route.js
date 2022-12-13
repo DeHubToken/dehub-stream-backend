@@ -43,5 +43,11 @@ router.get("/nft_info/:id", async function (req, res, next) {
 router.get("/account_info/:id", async function (req, res, next) {
     return ApiController.getAccountInfo(req, res, next);
 });
+router.get('/claim', async function (req, res, next) {
+    return ApiController.getSignDataForClaim(req, res, next);
+})
+router.post('/claim', async function (req, res, next) {
+    return ApiController.getSignDataForClaim(req, res, next);
+})
 
 module.exports = router;

@@ -13,6 +13,7 @@ const { signatureForMintingNFT } = require('./mintNft');
 const { removeDuplicatedObject } = require('../utils/validation');
 const { WatchHistory } = require('../models/WatchHistory');
 const { config } = require('../config');
+const { signatureForClaim } = require('./user');
 const expireTime = 86400000;
 const tokenTemplate = {
     name: 1,
@@ -279,6 +280,21 @@ const ApiController = {
         const accountInfo = await Account.findOne({ address: walletAddress.toLowerCase() }, accountTemplate).lean();
         if (!accountInfo) return res.json({ error: 'no account' });
         return res.json({ result: accountInfo });
-    }
+    },
+    getSignDataForClaim: async function (req, res, next) {
+        const address = reqParam(req, paramNames.address);
+        const rawSig = reqParam(req, paramNames.sig);
+        const timestamp = reqParam(req, paramNames.timestamp);
+        if (!rawSig || !address || !timestamp)
+            return res.json({ error: true, msg: "sig or address not exist" });
+        try {
+            const result = await signatureForClaim(address, rawSig, timestamp, reqParam(req, 'amount'));
+            return res.json(result);
+        }
+        catch (err) {
+            console.log('-----getSignedDataForClaim error', err);
+            return res.json({ result: false, error: 'claim was failed' });
+        }
+    },
 }
 module.exports = { ApiController };
