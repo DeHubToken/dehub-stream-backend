@@ -18,11 +18,12 @@ const signatureForClaim = async (address, sig, timestamp, amount) => {
     // const result = await isValidAccount(address, timestamp, rawSig);
     // if (!result) return { status: false, error: true, error_msg: "should login first" };
     // else {
-    const accountInfo = await Account.findOne({ address:address.toLowerCase() });
+    const filterAccountOption = { address: address.toLowerCase() };
+    const accountInfo = await Account.findOne(filterAccountOption, { balance: 1 });
     if (!accountInfo || accountInfo?.balance < Number(amount))
         return { status: false, error: true, error_msg: "insufficient balance" };
     // }
-    const curTimestamp = Math.floor(Date.now()/1000);
+    const curTimestamp = Math.floor(Date.now() / 1000);
     let bigAmount = undefined;
     try {
         bigAmount = ethers.utils.parseUnits(amount.toString(), 18);
@@ -35,7 +36,7 @@ const signatureForClaim = async (address, sig, timestamp, amount) => {
     const toSignForClaim = ethers.utils.solidityKeccak256(["address", "address", "uint256", "uint256"], [vaultContractAddresses[ChainId.BSC_TESTNET], address, bigAmount, curTimestamp]);
     let signer = new ethers.Wallet(process.env.SIGNER_KEY);
     const { r, s, v } = splitSignature(await signer.signMessage(ethers.utils.arrayify(toSignForClaim)));
-    await Account.updateOne({ address }, { $inc: { balance: -Number(amount), pendingBalance: Number(amount) } });
+    await Account.updateOne(filterAccountOption, { $inc: { balance: -Number(amount), pendingBalance: Number(amount) } });
     return { status: true, result: { amount: bigAmount.toString(), timestamp: curTimestamp, v, r, s } };
 };
 

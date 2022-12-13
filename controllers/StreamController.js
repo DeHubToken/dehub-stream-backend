@@ -8,6 +8,7 @@ const { Token } = require('../models/Token');
 const nftMetaDataTemplate = require('../data_structure/nft_metadata_template.json');
 const { defaultImageFilePath } = require('../utils/file');
 const { WatchHistory } = require('../models/WatchHistory');
+const { streamInfoKeys } = require('../config/constants');
 const limitBuffer = 1 * 1024 * 1024; // 2M
 const initialBuffer = 80 * 1024; // first 60k is free
 const extraSpace = 90 * 1000; // ignore this space time while watching video
@@ -57,6 +58,10 @@ const StreamController = {
                     // chunksize = 100;
                     // end = start + chunksize - 1;              
                 }
+                if(tokenItem?.streamInfo?.[streamInfoKeys.isLockContent]) {
+                    const lockContentAmount = Number(tokenItem?.streamInfo?.[streamInfoKeys.lockContentAmount]);
+                    
+                }
 
             }
 
@@ -73,14 +78,13 @@ const StreamController = {
             file.pipe(res);
             if (signParams?.account) {
                 const nowTime = new Date();
-                WatchHistory.updateOne(
+                const updatedResult = await WatchHistory.updateOne(
                     { tokenId, watcherAddress: signParams?.account, exitedAt: { $gt: new Date(nowTime - extraSpace * 1000) } },
-                    { exitedAt: nowTime }, { upsert: true, new: true, setDefaultsOnInsert: true }).then(result => {                        
-                        if (result && result.upserted && result.upserted.length > 0) {
-                            Token.updateOne({ tokenId }, { $inc: { views: 1 } }).then();
-                            console.log('----update views nft', tokenId);
-                        }
-                    }).catch(e => console.log('---'));
+                    { exitedAt: nowTime, lastWatchedFrame: end }, { upsert: true, new: true, setDefaultsOnInsert: true });
+                if (updatedResult && updatedResult.upserted && updatedResult.upserted.length > 0) {
+                    await Token.updateOne({ tokenId }, { $inc: { views: 1 } });
+                    console.log('----update views nft', tokenId);
+                }
             }
             // } else {
             //     const head = {
