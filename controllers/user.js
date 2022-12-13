@@ -5,7 +5,7 @@ const { splitSignature } = require("@ethersproject/bytes");
 const { Collection } = require("../models/Collection");
 const { Token } = require("../models/Token");
 const { moveFile } = require("../utils/file");
-const { isValidAccount } = require("../utils/auth");
+// const { isValidAccount } = require("../utils/auth");
 const { Account } = require("../models/Account");
 const { vaultContractAddresses, ChainId } = require("../config/constants");
 

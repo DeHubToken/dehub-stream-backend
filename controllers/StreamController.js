@@ -58,9 +58,21 @@ const StreamController = {
                     // chunksize = 100;
                     // end = start + chunksize - 1;              
                 }
-                if(tokenItem?.streamInfo?.[streamInfoKeys.isLockContent]) {
-                    const lockContentAmount = Number(tokenItem?.streamInfo?.[streamInfoKeys.lockContentAmount]);
-                    
+                if (tokenItem?.streamInfo?.[streamInfoKeys.isLockContent] || tokenItem?.streamInfo?.[streamInfoKeys.isPayPerView]) {
+                    const accountItem = await Account.findOne({ address: signParams?.account?.toLowerCase() }, { balance: 1, dhbBalance: 1 });
+                    if (tokenItem?.streamInfo?.[streamInfoKeys.isLockContent]) {
+                        const lockContentAmount = Number(tokenItem?.streamInfo?.[streamInfoKeys.lockContentAmount]);
+                        if (lockContentAmount > accountItem.dhbBalance) {
+                            return res.status(500).send('error!');
+                        }
+                    }
+                    else // per view stream
+                    {
+                        const payPerViewAmount = Number(tokenItem?.streamInfo?.[streamInfoKeys.payPerViewAmount]);
+                        if (payPerViewAmount > accountItem.balance) {
+                            return res.status(500).send('error!');
+                        }
+                    }
                 }
 
             }

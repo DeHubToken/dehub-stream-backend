@@ -3,7 +3,7 @@ const ethers = require('ethers');
 const { Account } = require("../models/Account");
 const { config } = require("../config");
 
-const expireSecond = 60 * 2; // 2 hours
+const expireSecond = 60 * 60 * 2; // 2 hours
 /**
  * if user signature and timestamp is correct, returns account data, if not => false
  * @param {*} address 
