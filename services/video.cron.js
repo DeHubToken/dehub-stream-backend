@@ -16,6 +16,10 @@ const { Token } = require("../models/Token");
 const { EXPIRED_TIME_FOR_MINTING } = require("../shared/contants");
 const IDCounter = require("../models/IDCounter");
 const { defaultVideoFilePath, defaultImageFilePath } = require("../utils/file");
+const { WatchHistory } = require("../models/WatchHistory");
+const { streamInfoKeys } = require("../config/constants");
+const { Account } = require("../models/Account");
+const { Reward } = require("../models/Reward");
 // const privatekey = require("../privatekey");
 const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_ENDPOINT);
 
@@ -57,9 +61,34 @@ async function fullVideoInfo() {
     })
 }
 
+async function processingFundsForPlayingStreams() {
+    const pendingStreamsForProcessing = await WatchHistory.find({ status: { $ne: 'confirmed' }, exitedAt: { $lt: new Date(new Date() - config.extraRecordSpaceSecond * 2 * 100) } });
+    console.log('--processing watch streams', pendingStreamsForProcessing.length);
+    for (let i = 0; i < pendingStreamsForProcessing.length; i++) {
+        const watchStream = pendingStreamsForProcessing[i];
+        const watchedTime = watchStream.exitedAt.getTime() - watchStream.createdAt.getTime();
+        console.log('----', watchStream.tokenId, watchStream.watcherAddress, watchedTime);
+        const tokenItem = await Token.findOne({ tokenId: watchStream.tokenId }, { streamInfo: 1, owner: 1 }).lean();
+        if (tokenItem.streamInfo?.[streamInfoKeys.isPayPerView]) {
+            const decBalance = Number(tokenItem.streamInfo?.[streamInfoKeys.payPerViewAmount]);
+            console.log('--pay per view', watchStream.tokenId, watchStream.watcherAddress, decBalance);
+            await Account.updateOne({ address: watchStream.watcherAddress }, { $inc: { balance: -decBalance } });
+            const rewardBalance = decBalance * 0.8;
+            if (tokenItem.owner) {
+                await Account.updateOne({ address: tokenItem.owner }, { $inc: { balance: rewardBalance, rewardBalance: rewardBalance } }, { upsert: true, new: true, setDefaultsOnInsert: true });
+                await Reward.create({ address: tokenItem.owner, rewardAmount: rewardBalance, tokenId: watchStream.tokenId, from: watchStream.watcherAddress });
+            }
+            watchStream.fundedTokenValue = decBalance;
+        }
+        watchStream.status = 'confirmed';
+        await watchStream.save();
+    }
+}
+
 async function cronLoop() {
     await fullVideoInfo();
     await deleteExpiredTokenItems();
+    await processingFundsForPlayingStreams();
     setTimeout(cronLoop, 10 * 1000);
 }
 /// -- minter listener

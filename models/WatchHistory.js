@@ -9,7 +9,8 @@ let WatchHistorySchema = new Schema({
     status: String,
     chainId: Number,
     lastWatchedFrame: Number,
-    watchedTime: Number, // in second unit
+    watchedTime: Number, // in second unit    
+    fundedTokenValue: Number,
 }, { timestamps: true });
 
 module.exports.WatchHistory = mongoose.model('watch_history', WatchHistorySchema); 

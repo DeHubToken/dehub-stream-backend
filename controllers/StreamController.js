@@ -9,9 +9,10 @@ const nftMetaDataTemplate = require('../data_structure/nft_metadata_template.jso
 const { defaultImageFilePath } = require('../utils/file');
 const { WatchHistory } = require('../models/WatchHistory');
 const { streamInfoKeys } = require('../config/constants');
+const { config } = require('../config');
 const limitBuffer = 1 * 1024 * 1024; // 2M
-const initialBuffer = 80 * 1024; // first 60k is free
-const extraSpace = 90 * 1000; // ignore this space time while watching video
+const initialBuffer = 80 * 1024; // first 80k is free
+
 const StreamController = {
     getStream: async function (req, res, next) {
         let tokenId = req.params.id;
@@ -91,7 +92,7 @@ const StreamController = {
             if (signParams?.account) {
                 const nowTime = new Date();
                 const updatedResult = await WatchHistory.updateOne(
-                    { tokenId, watcherAddress: signParams?.account, exitedAt: { $gt: new Date(nowTime - extraSpace * 1000) } },
+                    { tokenId, watcherAddress: signParams?.account, exitedAt: { $gt: new Date(nowTime - config.extraRecordSpaceSecond * 1000) } },
                     { exitedAt: nowTime, lastWatchedFrame: end }, { upsert: true, new: true, setDefaultsOnInsert: true });
                 if (updatedResult && updatedResult.upserted && updatedResult.upserted.length > 0) {
                     await Token.updateOne({ tokenId }, { $inc: { views: 1 } });
@@ -113,7 +114,7 @@ const StreamController = {
         const tokenItem = await Token.findOne({ tokenId: parseInt(id) }, { tokenId: 1, imageExt: 1 }).lean();
         if (tokenItem) {
             const imageLocalFilePath = defaultImageFilePath(parseInt(id), tokenItem.imageExt);
-            console.log(imageLocalFilePath);
+            // console.log(imageLocalFilePath);
             return res.sendFile(imageLocalFilePath);
         }
         return res.json({ error: 'no token' });

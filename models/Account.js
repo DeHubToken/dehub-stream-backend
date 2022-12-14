@@ -14,7 +14,7 @@ let AccountSchema = new Schema({
     rewardBalance: Number,
     // Total claimed amount
     balance: Number,
-    dhbBalance: Number,
+    dhbBalance: Number, // balance of wallet
     lastLoginTimestamp: Number,
     username: String,
     email: String

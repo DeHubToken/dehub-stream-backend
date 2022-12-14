@@ -6,11 +6,10 @@ let RewardSchema = new Schema({
     address: String,
     // "vote amount"
     rewardAmount: Number,
-    // token id for song nft
-    totalScore: Number,
+    // token id for stream nft
+    tokenId: Number,
     // updated timestamp
-    percent: Number,
-    score: Number,
+    from: String,
 }, { timestamps: true });
 
 module.exports.Reward = mongoose.model('rewards', RewardSchema);
