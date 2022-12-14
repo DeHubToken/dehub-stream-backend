@@ -18,7 +18,7 @@ const config = {
     isDevMode: process.env.RUN_MODE != 'dev',
     recentTimeDiff: 3 * 24 * 60 * 60 * 1000,
     extraRecordSpaceSecond: 120, // in second unit:  ignore this space time while watching video to record history
-
+    developerFee: 0.1, // developer fee for pay per view is 10 %
 };
 module.exports = {
     config,

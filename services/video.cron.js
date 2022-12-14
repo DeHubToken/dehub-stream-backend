@@ -69,14 +69,16 @@ async function processingFundsForPlayingStreams() {
         const watchedTime = watchStream.exitedAt.getTime() - watchStream.createdAt.getTime();
         console.log('----', watchStream.tokenId, watchStream.watcherAddress, watchedTime);
         const tokenItem = await Token.findOne({ tokenId: watchStream.tokenId }, { streamInfo: 1, owner: 1 }).lean();
+        // funds for pay per view stream
         if (tokenItem.streamInfo?.[streamInfoKeys.isPayPerView]) {
             const decBalance = Number(tokenItem.streamInfo?.[streamInfoKeys.payPerViewAmount]);
             console.log('--pay per view', watchStream.tokenId, watchStream.watcherAddress, decBalance);
             await Account.updateOne({ address: watchStream.watcherAddress }, { $inc: { balance: -decBalance } });
-            const rewardBalance = decBalance * 0.8;
+            const rewardBalance = decBalance * (1 - config.developerFee);
             if (tokenItem.owner) {
                 await Account.updateOne({ address: tokenItem.owner }, { $inc: { balance: rewardBalance, rewardBalance: rewardBalance } }, { upsert: true, new: true, setDefaultsOnInsert: true });
                 await Reward.create({ address: tokenItem.owner, rewardAmount: rewardBalance, tokenId: watchStream.tokenId, from: watchStream.watcherAddress });
+                await Token.updateOne({ tokenId: watchStream.tokenId }, { $inc: { totalFunds: rewardBalance } });
             }
             watchStream.fundedTokenValue = decBalance;
         }

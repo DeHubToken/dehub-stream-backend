@@ -24,6 +24,12 @@ const streamInfoKeys = {
     addBountyAmount: 'addBountyAmount'
 }
 
+const RewardType = {
+    PayPerView: 'PayPerView',
+    FirstComment: 'FirstComment',
+    FirstView: 'FirstView'
+}
+
 const ChainId = {
     MAINNET: 1,
     GORLI: 5,
@@ -62,5 +68,6 @@ module.exports = {
     streamInfoKeys,
     ChainId,
     dhbTokenAddresses,
-    vaultContractAddresses
+    vaultContractAddresses,
+    RewardType,
 }

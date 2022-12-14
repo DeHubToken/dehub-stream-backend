@@ -30,6 +30,7 @@ let TokenSchema = new Schema({
     likes: {type: Number, index: true},
     views: {type: Number, index: true},
     comments: {type: Number, index: true},
+    totalFunds: {type: Number, index: true}, // total funds received from pay per view
     status: {
         type: String,
         default: "signed",
