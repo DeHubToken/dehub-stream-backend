@@ -8,6 +8,7 @@
     "start": "node server.js",
     "mint_serve": "node ./services/mint.indexer.js",
     "deposit_serve": "node ./services/deposit.indexer.js",
+    "video_serve": "node ./services/video.cron.js",
     "dev": "nodemon server"
   },
   "author": "",

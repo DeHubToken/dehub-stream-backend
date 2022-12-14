@@ -10,6 +10,7 @@ const { defaultImageFilePath } = require('../utils/file');
 const { WatchHistory } = require('../models/WatchHistory');
 const { streamInfoKeys } = require('../config/constants');
 const { config } = require('../config');
+const { isAddress } = require('ethers/lib/utils');
 const limitBuffer = 1 * 1024 * 1024; // 2M
 const initialBuffer = 80 * 1024; // first 80k is free
 
@@ -89,7 +90,7 @@ const StreamController = {
 
             res.writeHead(206, header);
             file.pipe(res);
-            if (signParams?.account) {
+            if (signParams?.account && isAddress(signParams?.account)) {
                 const nowTime = new Date();
                 const updatedResult = await WatchHistory.updateOne(
                     { tokenId, watcherAddress: signParams?.account, exitedAt: { $gt: new Date(nowTime - config.extraRecordSpaceSecond * 1000) } },
