@@ -16,8 +16,16 @@ let AccountSchema = new Schema({
     balance: Number,
     dhbBalance: Number, // balance of wallet
     lastLoginTimestamp: Number,
-    username: String,
-    email: String
+
+    username: String,  // user profile
+    email: String,
+    avatarImageUrl: String,
+    coverImageUrl: String,
+    aboutMe: String,
+    facebookLink: String,
+    twitterLink: String,
+    discordLink: String,
+    instagramLink: String,
 }, { timestamps: true });
 
 AccountSchema.index({ address: 1 });

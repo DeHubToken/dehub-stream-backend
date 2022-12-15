@@ -11,7 +11,7 @@ const expireSecond = 60 * 60 * 2; // 2 hours
  * @param {*} sig 
  * @returns 
  */
-const isValidAccount = async (address, timestamp, sig) => {
+const isValidAccount =  (address, timestamp, sig) => {
     if (!sig || !address || !timestamp)
         return false;
     const signedMsg = `${address.toLowerCase()}-${timestamp}`;

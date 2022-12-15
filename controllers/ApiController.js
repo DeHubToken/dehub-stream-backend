@@ -6,7 +6,7 @@ const { ethers, FixedNumber } = require('ethers');
 const { splitSignature } = require('@ethersproject/bytes');
 const { isValidAccount, reqParam } = require('../utils/auth');
 const { decryptWithSourceKey, encryptWithSourceKey } = require('../utils/encrypt');
-const { paramNames, errorMsgs } = require('../config/constants');
+const { paramNames, errorMsgs, userProfileKeys } = require('../config/constants');
 const { Token } = require('../models/Token');
 const { checkFileType } = require('../utils/format');
 const { signatureForMintingNFT } = require('./mintNft');
@@ -14,6 +14,8 @@ const { removeDuplicatedObject } = require('../utils/validation');
 const { WatchHistory } = require('../models/WatchHistory');
 const { config } = require('../config');
 const { signatureForClaim } = require('./user');
+const { result } = require('underscore');
+const { moveFile } = require('../utils/file');
 const expireTime = 86400000;
 const tokenTemplate = {
     name: 1,
@@ -133,7 +135,6 @@ const ApiController = {
         return res.json({ status: true, result: { data1, data2 } });
     },
     getSignedDataForUserMint: async function (req, res, next) {
-
         const { from, name, description, streamInfo } = req.body;
         console.log(name, description, streamInfo);
         const uploadedFiles = req.files.files;
@@ -150,7 +151,6 @@ const ApiController = {
             console.log('-----getSignedDataForUserMint error', err);
             return res.json({ result: false, error: 'Uploading was failed' });
         }
-
     },
     getAllNfts: async function (req, res, next) {
         const skip = req.body.skip || req.query.skip || 0;
@@ -295,6 +295,32 @@ const ApiController = {
             console.log('-----getSignedDataForClaim error', err);
             return res.json({ result: false, error: 'claim was failed' });
         }
+    },
+    updateProfile: async function (req, res, next) {
+        let address = reqParam(req, paramNames.address);
+        const authResult = isValidAccount(address, reqParam(req, paramNames.timestamp), reqParam(req, paramNames.sig));
+        if (!authResult) return res.json({ error: true });
+        const updateAccountOptions = {};
+        Object.keys(userProfileKeys).map(key => {
+            const reqVal = reqParam(req, userProfileKeys[key]);
+            if (reqVal && reqVal !== 'undefined' && reqVal !== 'null') updateAccountOptions[key] = reqVal;
+        });
+        const coverImgFile = req.files?.coverImg?.[0];
+        const avatarImgFile = req.files?.avatarImg?.[0];
+        console.log(JSON.parse(JSON.stringify(req.body)), req.body);
+        const accountItem = await Account.findOne({ address: address.toLowerCase() }).lean();
+        if (coverImgFile) {
+            const imageExt = coverImgFile.mimetype.toString().substr(coverImgFile.mimetype.toString().indexOf("/") + 1);
+            const coverImagePath = `${path.dirname(__dirname)}/assets/covers/${address.toLowerCase()}.${imageExt}`;
+            moveFile(coverImgFile.path, coverImagePath);
+            updateAccountOptions[userProfileKeys.coverImageUrl] = `statics/covers/${address.toLowerCase()}.${imageExt}`;
+        }
+        if (avatarImgFile) {
+
+        }
+        let result = { result: true };
+        return res.json(result);
+
     },
 }
 module.exports = { ApiController };

@@ -30,6 +30,18 @@ const RewardType = {
     FirstView: 'FirstView'
 }
 
+const userProfileKeys = {
+    username: 'username',
+    email: 'email',    
+    avatarImageUrl: 'avatarImageUrl',
+    coverImageUrl: 'coverImageUrl',
+    aboutMe: 'aboutMe',
+    facebookLink: 'facebookLink',
+    twitterLink: 'twitterLink',
+    discordLink: 'discordLink',
+    instagramLink: 'instagramLink',
+}
+
 const ChainId = {
     MAINNET: 1,
     GORLI: 5,
@@ -70,4 +82,5 @@ module.exports = {
     dhbTokenAddresses,
     vaultContractAddresses,
     RewardType,
+    userProfileKeys
 }

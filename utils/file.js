@@ -10,11 +10,6 @@ const moveFile = (srcFilePath, destFilePath) => {
         fs.unlink(srcFilePath, error => { if (error) console.log('delete file error!') });
     });
     source.on('error', function (err) { console.log('----not copied', err) });
-    // return new Promise((resolve, reject) => {
-    //     source.on('end', resolve);
-    //     source.on('error', reject);
-    //     source.pipe(dest);
-    // });
 }
 
 const defaultVideoFilePath = (tokenId, videoExt = 'mp4') => {
