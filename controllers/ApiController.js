@@ -44,6 +44,7 @@ const accountTemplate = {
     [userProfileKeys.twitterLink]:1,
     [userProfileKeys.discordLink]: 1,
     [userProfileKeys.instagramLink]: 1,
+    createdAt: 1,
     _id: 0,
 };
 const ApiController = {
@@ -288,6 +289,8 @@ const ApiController = {
         if (!walletAddress) return res.json({ error: 'not define wallet' });
         const accountInfo = await Account.findOne({ address: walletAddress.toLowerCase() }, accountTemplate).lean();
         if (!accountInfo) return res.json({ error: 'no account' });
+        if (accountInfo.avatarImageUrl) accountInfo.avatarImageUrl = `${process.env.DEFAULT_DOMAIN}/${accountInfo.avatarImageUrl}`;
+        if (accountInfo.coverImageUrl) accountInfo.coverImageUrl = `${process.env.DEFAULT_DOMAIN}/${accountInfo.coverImageUrl}`;
         return res.json({ result: accountInfo });
     },
     getSignDataForClaim: async function (req, res, next) {
