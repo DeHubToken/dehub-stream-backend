@@ -14,6 +14,7 @@ let home_route = require('./routes/home_route');
 let api_route = require('./routes/api_route');
 let stream_route = require('./routes/stream_route');
 let nft_data_route = require('./routes/nft_metadata_route');
+let static_media_route = require('./routes/static_media_route');
 
 app.set('view engine', 'ejs');
 
@@ -58,6 +59,8 @@ mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/
             app.use('/streams', attachDB, stream_route);
 
             app.use('/nfts', attachDB, nft_data_route);
+
+            app.use('/statics', attachDB, static_media_route);
 
             /**
              * Error Routes

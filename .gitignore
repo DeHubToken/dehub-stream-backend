@@ -120,6 +120,11 @@ dist
 .yarn/install-state.gz
 .pnp.*
 /logs
-# uploaded images and videos
+# uploaded images and videos for nft
 /assets/videos
 /assets/images
+# uploaded cover images and avatar images for user
+/assets/covers/*
+!/assets/covers/holder.md
+/assets/avatars/*
+!/assets/avatars/holder.md
