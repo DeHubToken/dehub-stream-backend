@@ -7,7 +7,7 @@ const ContractAbi = require('../abis/GameVault.json');
 const erc20ContractAbi = require('../abis/erc20.json');
 const { Account } = require("../models/Account");
 const { normalizeAddress } = require("../utils/format");
-const { vaultContractAddresses, ChainId, dhbTokenAddresses } = require("../config/constants");
+const { vaultContractAddresses, ChainId, dhbTokenAddresses, overrideOptions } = require("../config/constants");
 const { config } = require('../config');
 const { ClaimTransaction } = require("../models/ClaimTransaction");
 
@@ -17,7 +17,6 @@ const VaultContract = new ethers.Contract(vaultContractAddresses[ChainId.BSC_TES
 const dhbContract = new ethers.Contract(dhbTokenAddresses[ChainId.BSC_TESTNET], erc20ContractAbi, provider);
 
 const zeroAddress = '0x0000000000000000000000000000000000000000';
-const overrideOptions = { new: true, upsert: true, returnOriginal: false };
 // async function DepositEventListener(from, tokenAddress, amount, logInfo) {
 //     const { transactionHash, logIndex } = logInfo
 

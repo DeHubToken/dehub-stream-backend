@@ -72,6 +72,8 @@ const vaultContractAddresses = {
     [ChainId.POLYGON_MAINNET]: '0x275617327c958bD06b5D6b871E7f491D76113dd8',
 };
 
+const overrideOptions = { new: true, upsert: true, returnOriginal: false };
+
 module.exports = {
     paramNames,
     supportedVideoTypes,
@@ -82,5 +84,6 @@ module.exports = {
     dhbTokenAddresses,
     vaultContractAddresses,
     RewardType,
-    userProfileKeys
+    userProfileKeys,
+    overrideOptions,
 }

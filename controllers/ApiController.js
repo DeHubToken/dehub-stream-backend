@@ -6,7 +6,7 @@ const { ethers, FixedNumber } = require('ethers');
 const { splitSignature } = require('@ethersproject/bytes');
 const { isValidAccount, reqParam } = require('../utils/auth');
 const { decryptWithSourceKey, encryptWithSourceKey } = require('../utils/encrypt');
-const { paramNames, errorMsgs, userProfileKeys } = require('../config/constants');
+const { paramNames, errorMsgs, userProfileKeys, overrideOptions } = require('../config/constants');
 const { Token } = require('../models/Token');
 const { checkFileType } = require('../utils/format');
 const { signatureForMintingNFT } = require('./mintNft');
@@ -35,6 +35,15 @@ const accountTemplate = {
     username: 1,
     balance: 1,
     depositedBalance: 1,
+    [userProfileKeys.avatarImageUrl]: 1,
+    [userProfileKeys.coverImageUrl]: 1,
+    [userProfileKeys.username]: 1,
+    [userProfileKeys.aboutMe]: 1,
+    [userProfileKeys.email]: 1,
+    [userProfileKeys.facebookLink]: 1,
+    [userProfileKeys.twitterLink]:1,
+    [userProfileKeys.discordLink]: 1,
+    [userProfileKeys.instagramLink]: 1,
     _id: 0,
 };
 const ApiController = {
@@ -316,8 +325,12 @@ const ApiController = {
             updateAccountOptions[userProfileKeys.coverImageUrl] = `statics/covers/${address.toLowerCase()}.${imageExt}`;
         }
         if (avatarImgFile) {
-
+            const avatarImageExt = avatarImgFile.mimetype.toString().substr(coverImgFile.mimetype.toString().indexOf("/") + 1);
+            const avatarImagePath = `${path.dirname(__dirname)}/assets/avatars/${address.toLowerCase()}.${avatarImageExt}`;
+            moveFile(avatarImgFile.path, avatarImagePath);
+            updateAccountOptions[userProfileKeys.avatarImageUrl] = `statics/avatars/${address.toLowerCase()}.${avatarImageExt}`;
         }
+        await Account.updateOne({ address: address.toLowerCase() }, updateAccountOptions, overrideOptions);
         let result = { result: true };
         return res.json(result);
 
