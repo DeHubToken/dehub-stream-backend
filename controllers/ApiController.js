@@ -328,7 +328,7 @@ const ApiController = {
             updateAccountOptions[userProfileKeys.coverImageUrl] = `statics/covers/${address.toLowerCase()}.${imageExt}`;
         }
         if (avatarImgFile) {
-            const avatarImageExt = avatarImgFile.mimetype.toString().substr(coverImgFile.mimetype.toString().indexOf("/") + 1);
+            const avatarImageExt = avatarImgFile.mimetype.toString().substr(avatarImgFile.mimetype.toString().indexOf("/") + 1);
             const avatarImagePath = `${path.dirname(__dirname)}/assets/avatars/${address.toLowerCase()}.${avatarImageExt}`;
             moveFile(avatarImgFile.path, avatarImagePath);
             updateAccountOptions[userProfileKeys.avatarImageUrl] = `statics/avatars/${address.toLowerCase()}.${avatarImageExt}`;
