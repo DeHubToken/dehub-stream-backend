@@ -14,14 +14,20 @@ const errorMsgs = {
 const streamInfoKeys = {
     isLockContent: 'isLockContent',
     lockContentContractAddress: 'lockContentContractAddress',
+    lockContentTokenSymbol: 'lockContentTokenSymbol',
     lockContentAmount: 'lockContentAmount',
+    lockContentChainIds: 'lockContentChainIds',
     isPayPerView: 'isPayPerView',
     payPerViewContractAddress: 'payPerViewContractAddress',
+    payPerViewTokenSymbol: 'payPerViewTokenSymbol',
     payPerViewAmount: 'payPerViewAmount',
+    payPerViewChainIds: 'payPerViewChainIds',
     isAddBounty: 'isAddBounty',
+    addBountyTokenSymbol: 'addBountyTokenSymbol',
     addBountyFirstXViewers: 'addBountyFirstXViewers',
     addBountyFirstXComments: 'addBountyFirstXComments',
-    addBountyAmount: 'addBountyAmount'
+    addBountyAmount: 'addBountyAmount',
+    addBountyChainId: 'addBountyChainId',
 }
 
 const RewardType = {

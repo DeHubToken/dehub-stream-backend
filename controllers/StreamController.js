@@ -51,15 +51,16 @@ const StreamController = {
                     end = start + chunksize - 1;
                 }
                 // check signature for not start
-                const result = await isValidAccount(signParams?.account, signParams?.timestamp, signParams.sig);
+                const result = isValidAccount(signParams?.account, signParams?.timestamp, signParams.sig);
                 // return res.json({ error: 'error!' });  // for testing
                 if (!result) {
-                    console.log(result);
-                    // return res.json({ error: 'error!' });      
+                    console.log(result);                    
                     return res.status(500).send('error!');
                     // chunksize = 100;
                     // end = start + chunksize - 1;              
                 }
+                let chainId = signParams?.chainId;
+                if(chainId) chainId = parseInt(chainId);
                 if (tokenItem?.streamInfo?.[streamInfoKeys.isLockContent] || tokenItem?.streamInfo?.[streamInfoKeys.isPayPerView]) {
                     const accountItem = await Account.findOne({ address: signParams?.account?.toLowerCase() }, { balance: 1, dhbBalance: 1 });
                     if (tokenItem?.streamInfo?.[streamInfoKeys.isLockContent]) {
