@@ -16,6 +16,7 @@ const { config } = require('../config');
 const { signatureForClaim } = require('./user');
 const { result } = require('underscore');
 const { moveFile } = require('../utils/file');
+const { Balance } = require('../models/Balance');
 const expireTime = 86400000;
 const tokenTemplate = {
     name: 1,
@@ -41,7 +42,7 @@ const accountTemplate = {
     [userProfileKeys.aboutMe]: 1,
     [userProfileKeys.email]: 1,
     [userProfileKeys.facebookLink]: 1,
-    [userProfileKeys.twitterLink]:1,
+    [userProfileKeys.twitterLink]: 1,
     [userProfileKeys.discordLink]: 1,
     [userProfileKeys.instagramLink]: 1,
     createdAt: 1,
@@ -285,12 +286,14 @@ const ApiController = {
         return res.json({ result: nftInfo });
     },
     getAccountInfo: async function (req, res, next) {
-        let walletAddress = req.query.id || req.query.id || req.params?.id;
+        const walletAddress = req.query.id || req.query.id || req.params?.id;
         if (!walletAddress) return res.json({ error: 'not define wallet' });
         const accountInfo = await Account.findOne({ address: walletAddress.toLowerCase() }, accountTemplate).lean();
         if (!accountInfo) return res.json({ error: 'no account' });
         if (accountInfo.avatarImageUrl) accountInfo.avatarImageUrl = `${process.env.DEFAULT_DOMAIN}/${accountInfo.avatarImageUrl}`;
         if (accountInfo.coverImageUrl) accountInfo.coverImageUrl = `${process.env.DEFAULT_DOMAIN}/${accountInfo.coverImageUrl}`;
+        const balanceData = await Balance.find({ address: walletAddress.toLowerCase() }, { chainId: 1, tokenAddress: 1, balance: 1, _id: 0 });
+        accountInfo.balances = balanceData;
         return res.json({ result: accountInfo });
     },
     getSignDataForClaim: async function (req, res, next) {

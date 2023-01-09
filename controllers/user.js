@@ -5,7 +5,7 @@ const { splitSignature } = require("@ethersproject/bytes");
 const { Collection } = require("../models/Collection");
 const { Token } = require("../models/Token");
 const { moveFile } = require("../utils/file");
-// const { isValidAccount } = require("../utils/auth");
+const { isValidAccount } = require("../utils/auth");
 const { Account } = require("../models/Account");
 const { vaultContractAddresses, ChainId } = require("../config/constants");
 
@@ -15,8 +15,8 @@ const signatureForClaim = async (address, sig, timestamp, amount) => {
 
     if (!sig || !address || !timestamp || !amount || isNaN(amount))
         return { error: true, msg: "sig or parameters not exist" };
-    // const result = await isValidAccount(address, timestamp, rawSig);
-    // if (!result) return { status: false, error: true, error_msg: "should login first" };
+    const result = isValidAccount(address, timestamp, rawSig);
+    if (!result) return { status: false, error: true, error_msg: "should login first" };
     // else {
     const filterAccountOption = { address: address.toLowerCase() };
     const accountInfo = await Account.findOne(filterAccountOption, { balance: 1 });
