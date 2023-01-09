@@ -2,7 +2,9 @@ require('dotenv').config();
 const paramNames = {
     address: 'address',
     sig: 'sig',
-    timestamp: 'timestamp'
+    timestamp: 'timestamp',
+    chainId: 'chainId',
+    tokenAddress: 'tokenAddress'
 }
 
 const supportedVideoTypes = ["/mp4"];
@@ -71,8 +73,8 @@ const dhbTokenAddresses = {
 };
 
 const vaultContractAddresses = {
-    [ChainId.BSC_TESTNET]: '0x54018da6d1184a1a48a24D28A8eD581F51f8d496',
-    [ChainId.GORLI]: '0xD0EfE999304a5BA9d48c6c75dC61a84d1C9992B9',
+    [ChainId.BSC_TESTNET]: '0xc90f5CbB3bb3e9a181b8Fed7d8a4835B291b7c9F',
+    [ChainId.GORLI]: '0x067e7613BFe063A778D1799A58Ee78419A0d9B73',
     [ChainId.MAINNET]: '0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696',
     [ChainId.BSC_MAINNET]: '0x41B90b73a88804f2aed1C4672b3dbA74eb9A92ce',    
     [ChainId.FANTOM_MAINNET]: '0xbb804a896E1A6962837c0813a5F89fDb771d808f',
@@ -101,7 +103,7 @@ const supportedTokens = [
         chainId: 5,
         address: '0x0F0fBE6FB65AaCE87D84f599924f6524b4F8d858',
         iconUrl: 'assets/icons/tokens/DHB.png',
-        deciamls: 18,
+        decimals: 18,
     },
     {
         value: 'busd',
@@ -111,7 +113,7 @@ const supportedTokens = [
         chainId: 97,
         address: '0x53D4A05DF7caAf3302184B774855EcBe2a50bD3E',
         iconUrl: 'assets/icons/tokens/BUSD.png',
-        deciamls: 18,
+        decimals: 18,
     },
     {
         value: 'usdc',
@@ -121,7 +123,7 @@ const supportedTokens = [
         chainId: 97,
         address: '0x4131fd3F1206d48A89410EE610BF1949934e0a72',
         iconUrl: 'assets/icons/tokens/USDC.png',
-        deciamls: 18,
+        decimals: 18,
     },
 ];
 

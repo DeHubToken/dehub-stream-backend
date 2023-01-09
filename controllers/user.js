@@ -7,37 +7,51 @@ const { Token } = require("../models/Token");
 const { moveFile } = require("../utils/file");
 const { isValidAccount } = require("../utils/auth");
 const { Account } = require("../models/Account");
-const { vaultContractAddresses, ChainId } = require("../config/constants");
+const { vaultContractAddresses, ChainId, supportedTokens } = require("../config/constants");
+const { Balance } = require("../models/Balance");
+const { ClaimTransaction } = require("../models/ClaimTransaction");
+const { normalizeAddress } = require("../utils/format");
+const { filter } = require("underscore");
 
 const signer = new ethers.Wallet(process.env.SIGNER_KEY);
 
-const signatureForClaim = async (address, sig, timestamp, amount) => {
+const signatureForClaim = async (address, sig, timestamp, amount, chainId, tokenAddress) => {
 
     if (!sig || !address || !timestamp || !amount || isNaN(amount))
         return { error: true, msg: "sig or parameters not exist" };
-    const result = isValidAccount(address, timestamp, rawSig);
+    console.log('------', address, sig, amount, chainId, tokenAddress)
+    const result = isValidAccount(address, timestamp, sig);
     if (!result) return { status: false, error: true, error_msg: "should login first" };
     // else {
-    const filterAccountOption = { address: address.toLowerCase() };
-    const accountInfo = await Account.findOne(filterAccountOption, { balance: 1 });
-    if (!accountInfo || accountInfo?.balance < Number(amount))
+    const filterBalanceOption = { address: address.toLowerCase(), tokenAddress: tokenAddress?.toLowerCase(), chainId };
+    // const accountInfo = await Account.findOne(filterAccountOption, { balance: 1 });
+    const balanceData = await Balance.findOne(filterBalanceOption, { balance: 1 });
+    if (!balanceData || balanceData?.balance < Number(amount))
         return { status: false, error: true, error_msg: "insufficient balance" };
     // }
     const curTimestamp = Math.floor(Date.now() / 1000);
     let bigAmount = undefined;
     try {
-        bigAmount = ethers.utils.parseUnits(amount.toString(), 18);
+        bigAmount = ethers.utils.parseUnits(amount.toString(), supportedTokens.find(e=>e.address.toLowerCase() === tokenAddress?.toLowerCase() && e.chainId === chainId).decimals);
     }
     catch (e) {
         console.log("--", e);
         return { error: true, msg: "amount error" };
     }
-
-    const toSignForClaim = ethers.utils.solidityKeccak256(["address", "address", "uint256", "uint256"], [vaultContractAddresses[ChainId.BSC_TESTNET], address, bigAmount, curTimestamp]);
+    const claimTx = await ClaimTransaction.create({
+        receiverAddress: normalizeAddress(address),
+        tokenAddress: normalizeAddress(tokenAddress),
+        timestamp: curTimestamp,
+        chainId: chainId,
+        amount        
+    });
+    const toSignForClaim = ethers.utils.solidityKeccak256(["address", "uint256", "address", "address", "uint256", "uint256", "uint256"],
+        [vaultContractAddresses[chainId], claimTx.id, address, tokenAddress, chainId,  bigAmount, curTimestamp]);    
     let signer = new ethers.Wallet(process.env.SIGNER_KEY);
     const { r, s, v } = splitSignature(await signer.signMessage(ethers.utils.arrayify(toSignForClaim)));
-    await Account.updateOne(filterAccountOption, { $inc: { balance: -Number(amount), pendingBalance: Number(amount) } });
-    return { status: true, result: { amount: bigAmount.toString(), timestamp: curTimestamp, v, r, s } };
+    // await Account.updateOne(filterBalanceOption, { $inc: { balance: -Number(amount), pendingBalance: Number(amount) } });
+    await Balance.updateOne(filterBalanceOption, { $inc: { balance: -Number(amount), pendingBalance: Number(amount) } });
+    return { status: true, result: { amount: bigAmount.toString(), timestamp: curTimestamp, id: claimTx.id, v, r, s } };
 };
 
 module.exports = {

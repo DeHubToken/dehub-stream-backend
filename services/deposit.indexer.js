@@ -3,7 +3,7 @@ require('dotenv').config()
 const ethers = require('ethers');
 const { BigNumber } = ethers
 const { Transaction } = require("../models/Transaction");
-const ContractAbi = require('../abis/GameVault.json');
+const ContractAbi = require('../abis/VaultV2.json');
 const erc20ContractAbi = require('../abis/erc20.json');
 const { Account } = require("../models/Account");
 const { normalizeAddress } = require("../utils/format");
@@ -51,7 +51,7 @@ async function DepositEventListener(from, tokenAddress, amount, logInfo) {
     }
 
 }
-async function ClaimEventListener(tokenAddress, to, amount, timestamp, logInfo) {
+async function ClaimEventListener(claimId, tokenAddress, to, amount, timestamp, logInfo) {
     const { transactionHash, logIndex } = logInfo
     // if (from.toString().toLowerCase() != zeroAddress) return;
     // const toAddress = to.toString().toLowerCase();
@@ -59,13 +59,16 @@ async function ClaimEventListener(tokenAddress, to, amount, timestamp, logInfo) 
     const realAmount = Number(ethers.utils.formatUnits(amount, 18));
     const address = normalizeAddress(to);
     console.log("---- checked claim", address, realAmount, Number(timestamp.toString()));
-    let account;
+    // let account;
     try {
-        await ClaimTransaction.findOneAndUpdate({ receiverAddress: address, amount: realAmount, timestamp: Number(timestamp.toString()) },
+        await ClaimTransaction.findOneAndUpdate({ id: claimId, chainId, tokenAddress: normalizeAddress(tokenAddress), receiverAddress: address, amount: realAmount, timestamp: Number(timestamp.toString()) },
             { txHash: transactionHash, logIndex },
             { new: true, upsert: true, returnOriginal: false });
-        account = await Account.findOneAndUpdate({ address },
-            { $inc: { pendingBalance: -realAmount } }, { new: true, upsert: true, returnOriginal: false });
+
+        await Balance.findOneAndUpdate({ address, chainId, tokenAddress },
+            { $inc: { claimedBalance: realAmount, pendingBalance: -realAmount } }, { new: true, upsert: true, returnOriginal: false });
+        // account = await Account.findOneAndUpdate({ address },
+        //     { $inc: { pendingBalance: -realAmount } }, { new: true, upsert: true, returnOriginal: false });
     } catch (error) {
         console.log("--- token find error", error);
     }

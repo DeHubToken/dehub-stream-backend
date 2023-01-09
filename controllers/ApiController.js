@@ -289,8 +289,7 @@ const ApiController = {
         const walletAddress = req.query.id || req.query.id || req.params?.id;
         if (!walletAddress) return res.json({ error: 'not define wallet' });
         let accountInfo = await Account.findOne({ address: walletAddress.toLowerCase() }, accountTemplate).lean();
-        if (accountInfo) 
-        {
+        if (accountInfo) {
             if (accountInfo.avatarImageUrl) accountInfo.avatarImageUrl = `${process.env.DEFAULT_DOMAIN}/${accountInfo.avatarImageUrl}`;
             if (accountInfo.coverImageUrl) accountInfo.coverImageUrl = `${process.env.DEFAULT_DOMAIN}/${accountInfo.coverImageUrl}`;
         }
@@ -303,10 +302,13 @@ const ApiController = {
         const address = reqParam(req, paramNames.address);
         const rawSig = reqParam(req, paramNames.sig);
         const timestamp = reqParam(req, paramNames.timestamp);
-        if (!rawSig || !address || !timestamp)
+        let chainId = reqParam(req, paramNames.chainId);
+        const tokenAddress = reqParam(req, paramNames.tokenAddress);
+        if (!rawSig || !address || !timestamp || !chainId)
             return res.json({ error: true, msg: "sig or address not exist" });
         try {
-            const result = await signatureForClaim(address, rawSig, timestamp, reqParam(req, 'amount'));
+            chainId = parseInt(chainId, 10);
+            const result = await signatureForClaim(address, rawSig, timestamp, reqParam(req, 'amount'), chainId, tokenAddress);
             return res.json(result);
         }
         catch (err) {

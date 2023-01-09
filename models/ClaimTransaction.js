@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const IDCounter = require('./IDCounter');
 const Schema = mongoose.Schema;
 
 let ClaimTransactionSchema = new Schema({

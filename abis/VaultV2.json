@@ -1,7 +1,24 @@
 [
     {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "signer",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "constructor"
+    },
+    {
         "anonymous": false,
         "inputs": [
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "id",
+                "type": "uint256"
+            },
             {
                 "indexed": false,
                 "internalType": "address",
@@ -28,6 +45,25 @@
             }
         ],
         "name": "Claim",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "previousOwner",
+                "type": "address"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "newOwner",
+                "type": "address"
+            }
+        ],
+        "name": "OwnershipTransferred",
         "type": "event"
     },
     {
@@ -70,15 +106,35 @@
                 "internalType": "address",
                 "name": "account",
                 "type": "address"
-            },
-            {
-                "indexed": false,
-                "internalType": "bool",
-                "name": "isRegistered",
-                "type": "bool"
             }
         ],
-        "name": "RegisteredNFTList",
+        "name": "SignerAdded",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "account",
+                "type": "address"
+            }
+        ],
+        "name": "SignerRemoved",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": false,
+                "internalType": "address",
+                "name": "tokenAddr",
+                "type": "address"
+            }
+        ],
+        "name": "TokenEnabled",
         "type": "event"
     },
     {
@@ -136,6 +192,35 @@
         "inputs": [
             {
                 "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "name": "allTokens",
+        "outputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "id",
+                "type": "uint256"
+            },
+            {
+                "internalType": "address",
+                "name": "token",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
                 "name": "amount",
                 "type": "uint256"
             },
@@ -166,24 +251,16 @@
         "type": "function"
     },
     {
-        "inputs": [],
-        "name": "currentGameIndex",
-        "outputs": [
-            {
-                "internalType": "uint256",
-                "name": "",
-                "type": "uint256"
-            }
-        ],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
         "inputs": [
             {
                 "internalType": "uint256",
                 "name": "amount",
                 "type": "uint256"
+            },
+            {
+                "internalType": "address",
+                "name": "tokenAddr",
+                "type": "address"
             }
         ],
         "name": "deposit",
@@ -195,16 +272,36 @@
         "inputs": [
             {
                 "internalType": "address",
-                "name": "_address",
+                "name": "tokenAddress",
                 "type": "address"
             }
         ],
-        "name": "isRegisteredNFT",
+        "name": "disableToken",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "newTokenAddr",
+                "type": "address"
+            }
+        ],
+        "name": "enableToken",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "getAllTokens",
         "outputs": [
             {
-                "internalType": "bool",
+                "internalType": "address[]",
                 "name": "",
-                "type": "bool"
+                "type": "address[]"
             }
         ],
         "stateMutability": "view",
@@ -272,50 +369,6 @@
     {
         "inputs": [],
         "name": "renounceSigner",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-    },
-    {
-        "inputs": [
-            {
-                "internalType": "address",
-                "name": "newTokenAddress",
-                "type": "address"
-            }
-        ],
-        "name": "setClaimToken",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-    },
-    {
-        "inputs": [
-            {
-                "internalType": "address",
-                "name": "_address",
-                "type": "address"
-            },
-            {
-                "internalType": "bool",
-                "name": "_isRegistered",
-                "type": "bool"
-            }
-        ],
-        "name": "setRegisterNFT",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-    },
-    {
-        "inputs": [
-            {
-                "internalType": "uint256",
-                "name": "newVoteAmount",
-                "type": "uint256"
-            }
-        ],
-        "name": "setVoteAmount",
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function"
