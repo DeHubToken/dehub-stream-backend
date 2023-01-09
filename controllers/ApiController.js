@@ -288,10 +288,13 @@ const ApiController = {
     getAccountInfo: async function (req, res, next) {
         const walletAddress = req.query.id || req.query.id || req.params?.id;
         if (!walletAddress) return res.json({ error: 'not define wallet' });
-        const accountInfo = await Account.findOne({ address: walletAddress.toLowerCase() }, accountTemplate).lean();
-        if (!accountInfo) return res.json({ error: 'no account' });
-        if (accountInfo.avatarImageUrl) accountInfo.avatarImageUrl = `${process.env.DEFAULT_DOMAIN}/${accountInfo.avatarImageUrl}`;
-        if (accountInfo.coverImageUrl) accountInfo.coverImageUrl = `${process.env.DEFAULT_DOMAIN}/${accountInfo.coverImageUrl}`;
+        let accountInfo = await Account.findOne({ address: walletAddress.toLowerCase() }, accountTemplate).lean();
+        if (accountInfo) 
+        {
+            if (accountInfo.avatarImageUrl) accountInfo.avatarImageUrl = `${process.env.DEFAULT_DOMAIN}/${accountInfo.avatarImageUrl}`;
+            if (accountInfo.coverImageUrl) accountInfo.coverImageUrl = `${process.env.DEFAULT_DOMAIN}/${accountInfo.coverImageUrl}`;
+        }
+        else accountInfo = {};
         const balanceData = await Balance.find({ address: walletAddress.toLowerCase() }, { chainId: 1, tokenAddress: 1, balance: 1, _id: 0 });
         accountInfo.balances = balanceData;
         return res.json({ result: accountInfo });
