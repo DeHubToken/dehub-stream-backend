@@ -8,9 +8,11 @@ const { Token } = require('../models/Token');
 const nftMetaDataTemplate = require('../data_structure/nft_metadata_template.json');
 const { defaultImageFilePath } = require('../utils/file');
 const { WatchHistory } = require('../models/WatchHistory');
-const { streamInfoKeys } = require('../config/constants');
+const { streamInfoKeys, supportedTokens } = require('../config/constants');
 const { config } = require('../config');
 const { isAddress } = require('ethers/lib/utils');
+const { Balance } = require('../models/Balance');
+const { updateWalletBalance } = require('./user');
 const limitBuffer = 1 * 1024 * 1024; // 2M
 const initialBuffer = 80 * 1024; // first 80k is free
 
@@ -54,25 +56,49 @@ const StreamController = {
                 const result = isValidAccount(signParams?.account, signParams?.timestamp, signParams.sig);
                 // return res.json({ error: 'error!' });  // for testing
                 if (!result) {
-                    console.log(result);                    
+                    console.log(result);
                     return res.status(500).send('error!');
                     // chunksize = 100;
                     // end = start + chunksize - 1;              
                 }
                 let chainId = signParams?.chainId;
-                if(chainId) chainId = parseInt(chainId);
+                const account = signParams?.account;
+                if (chainId) chainId = parseInt(chainId);
                 if (tokenItem?.streamInfo?.[streamInfoKeys.isLockContent] || tokenItem?.streamInfo?.[streamInfoKeys.isPayPerView]) {
-                    const accountItem = await Account.findOne({ address: signParams?.account?.toLowerCase() }, { balance: 1, dhbBalance: 1 });
+                    const userAddress = signParams?.account?.toLowerCase();
+                    const accountItem = await Account.findOne({ address: userAddress }, { balance: 1, dhbBalance: 1 });
                     if (tokenItem?.streamInfo?.[streamInfoKeys.isLockContent]) {
+                        const symbol = tokenItem?.streamInfo?.[streamInfoKeys.lockContentTokenSymbol] || 'DHB';
+                        const chainIds = tokenItem?.streamInfo?.[streamInfoKeys.lockContentChainIds] || [97];
+                        if (!chainIds.includes(chainId)) return res.status(500).send('error!');
+                        const tokenAddress = supportedTokens.find(e => e.symbol === symbol || e.chainId === chainId)?.address;
                         const lockContentAmount = Number(tokenItem?.streamInfo?.[streamInfoKeys.lockContentAmount]);
-                        if (lockContentAmount > accountItem.dhbBalance) {
+                        const balanceItem = await Balance.findOne({
+                            address: userAddress,
+                            chainId, chainId
+                        }).lean();
+                        if (balanceItem && balanceItem.updateWalletBalanceAt > new Date(Date.now() - config.extraSecondForCheckingBalance) && balanceItem.walletBalance < lockContentAmount) {
+                            // if (lockContentAmount > accountItem.dhbBalance) {
                             return res.status(500).send('error!');
+                        } else {
+                            updateWalletBalance(account, tokenAddress, chainId).then(()=>{
+                                console.log('---update wallet', account, tokenAddress, chainId);
+                            })
                         }
                     }
                     else // per view stream
                     {
                         const payPerViewAmount = Number(tokenItem?.streamInfo?.[streamInfoKeys.payPerViewAmount]);
-                        if (payPerViewAmount > accountItem.balance) {
+                        const symbol = tokenItem?.streamInfo?.[streamInfoKeys.payPerViewTokenSymbol] || 'DHB';
+                        const chainIds = tokenItem?.streamInfo?.[streamInfoKeys.payPerViewChainIds] || [97];
+                        if (!chainIds.includes(chainId)) return res.status(500).send('error!');
+                        const tokenAddress = supportedTokens.find(e => e.symbol === symbol || e.chainId === chainId)?.address;
+                        const balanceItem = await Balance.findOne({
+                            address: signParams?.account?.toLowerCase(),
+                            chainId, tokenAddress
+                        });
+
+                        if (balanceItem && balanceItem.updateWalletBalanceAt > new Date(Date.now() - config.extraSecondForCheckingBalance) && balanceItem.walletBalance < payPerViewAmount) {
                             return res.status(500).send('error!');
                         }
                     }

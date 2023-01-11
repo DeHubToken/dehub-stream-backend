@@ -2,16 +2,13 @@ require("dotenv").config();
 const path = require("path");
 const { ethers } = require("ethers");
 const { splitSignature } = require("@ethersproject/bytes");
-const { Collection } = require("../models/Collection");
-const { Token } = require("../models/Token");
-const { moveFile } = require("../utils/file");
+
 const { isValidAccount } = require("../utils/auth");
-const { Account } = require("../models/Account");
 const { vaultContractAddresses, ChainId, supportedTokens } = require("../config/constants");
 const { Balance } = require("../models/Balance");
 const { ClaimTransaction } = require("../models/ClaimTransaction");
 const { normalizeAddress } = require("../utils/format");
-const { filter } = require("underscore");
+const { getERC20TokenBalance } = require("../utils/web3");
 
 const signer = new ethers.Wallet(process.env.SIGNER_KEY);
 
@@ -32,7 +29,7 @@ const signatureForClaim = async (address, sig, timestamp, amount, chainId, token
     const curTimestamp = Math.floor(Date.now() / 1000);
     let bigAmount = undefined;
     try {
-        bigAmount = ethers.utils.parseUnits(amount.toString(), supportedTokens.find(e=>e.address.toLowerCase() === tokenAddress?.toLowerCase() && e.chainId === chainId).decimals);
+        bigAmount = ethers.utils.parseUnits(amount.toString(), supportedTokens.find(e => e.address.toLowerCase() === tokenAddress?.toLowerCase() && e.chainId === chainId).decimals);
     }
     catch (e) {
         console.log("--", e);
@@ -43,10 +40,10 @@ const signatureForClaim = async (address, sig, timestamp, amount, chainId, token
         tokenAddress: normalizeAddress(tokenAddress),
         timestamp: curTimestamp,
         chainId: chainId,
-        amount        
+        amount
     });
     const toSignForClaim = ethers.utils.solidityKeccak256(["address", "uint256", "address", "address", "uint256", "uint256", "uint256"],
-        [vaultContractAddresses[chainId], claimTx.id, address, tokenAddress, chainId,  bigAmount, curTimestamp]);    
+        [vaultContractAddresses[chainId], claimTx.id, address, tokenAddress, chainId, bigAmount, curTimestamp]);
     let signer = new ethers.Wallet(process.env.SIGNER_KEY);
     const { r, s, v } = splitSignature(await signer.signMessage(ethers.utils.arrayify(toSignForClaim)));
     // await Account.updateOne(filterBalanceOption, { $inc: { balance: -Number(amount), pendingBalance: Number(amount) } });
@@ -54,6 +51,12 @@ const signatureForClaim = async (address, sig, timestamp, amount, chainId, token
     return { status: true, result: { amount: bigAmount.toString(), timestamp: curTimestamp, id: claimTx.id, v, r, s } };
 };
 
+const updateWalletBalance = async (account, tokenAddress, chainId) => {
+    const tokenBalance = await getERC20TokenBalance(account, tokenAddress, chainId);
+    await Balance.updateOne({address: account.toLowerCase(), chainId, tokenAddress}, {walletBalance: tokenBalance, updateWalletBalanceAt: new Date()});
+}
+
 module.exports = {
     signatureForClaim,
+    updateWalletBalance,
 };
