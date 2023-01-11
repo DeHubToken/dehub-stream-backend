@@ -13,6 +13,7 @@ const { config } = require('../config');
 const { isAddress } = require('ethers/lib/utils');
 const { Balance } = require('../models/Balance');
 const { updateWalletBalance } = require('./user');
+const { isInserted } = require('../utils/db');
 const limitBuffer = 1 * 1024 * 1024; // 2M
 const initialBuffer = 80 * 1024; // first 80k is free
 
@@ -81,7 +82,7 @@ const StreamController = {
                             // if (lockContentAmount > accountItem.dhbBalance) {
                             return res.status(500).send('error!');
                         } else {
-                            updateWalletBalance(account, tokenAddress, chainId).then(()=>{
+                            updateWalletBalance(account, tokenAddress, chainId).then(() => {
                                 console.log('---update wallet', account, tokenAddress, chainId);
                             })
                         }
@@ -122,7 +123,7 @@ const StreamController = {
                 const updatedResult = await WatchHistory.updateOne(
                     { tokenId, watcherAddress: signParams?.account, exitedAt: { $gt: new Date(nowTime - config.extraRecordSpaceSecond * 1000) } },
                     { exitedAt: nowTime, lastWatchedFrame: end }, { upsert: true, new: true, setDefaultsOnInsert: true });
-                if (updatedResult && updatedResult.upserted && updatedResult.upserted.length > 0) {
+                if (isInserted(updatedResult)) {
                     await Token.updateOne({ tokenId }, { $inc: { views: 1 } });
                     console.log('----update views nft', tokenId);
                 }

@@ -7,11 +7,12 @@ const ContractAbi = require('../abis/VaultV2.json');
 const erc20ContractAbi = require('../abis/erc20.json');
 const { Account } = require("../models/Account");
 const { normalizeAddress } = require("../utils/format");
-const { vaultContractAddresses, ChainId, dhbTokenAddresses, overrideOptions, supportedNetworks, supportedTokens } = require("../config/constants");
+const { vaultContractAddresses, ChainId, dhbTokenAddresses, overrideOptions, supportedNetworks, supportedTokens, supportedTokensForLockContent } = require("../config/constants");
 const { config } = require('../config');
 const { ClaimTransaction } = require("../models/ClaimTransaction");
 const { Balance } = require("../models/Balance");
 const { getTokenByTokenAddress } = require("../utils/web3");
+const { isInserted } = require("../utils/db");
 
 const networkName = (process?.argv?.[2] || "bsctest");
 const curNetwork = supportedNetworks.find(e => e.shortName === networkName);
@@ -26,11 +27,7 @@ const VaultContract = new ethers.Contract(vaultContractAddresses[curNetwork.chai
 
 const zeroAddress = '0x0000000000000000000000000000000000000000';
 async function DepositEventListener(from, tokenAddress, amount, logInfo) {
-    const { transactionHash, logIndex } = logInfo
-
-    // if (from.toString().toLowerCase() != zeroAddress) return;
-    // const toAddress = to.toString().toLowerCase();
-    // console.log('--minted', tokenId, toAddress,);
+    const { transactionHash, logIndex } = logInfo;
     const token = getTokenByTokenAddress(tokenAddress);
     tokenAddress = normalizeAddress(tokenAddress);
     const realAmount = Number(ethers.utils.formatUnits(amount, token.decimals));
@@ -39,66 +36,60 @@ async function DepositEventListener(from, tokenAddress, amount, logInfo) {
     console.log("---- checked deposit", address, realAmount);
     // let account;
     try {
-        const result = await Transaction.findOneAndUpdate({ txHash: transactionHash, logIndex, chainId },
+        const result = await Transaction.updateOne({ txHash: transactionHash, logIndex, chainId },
             { amount: realAmount, from: address, tokenAddress: tokenAddress, to: normalizeAddress(VaultContract.address) },
-            { new: true, upsert: true, returnOriginal: false });
-        await Balance.findOneAndUpdate({ address, chainId, tokenAddress },
-            { $inc: { depositedBalance: realAmount, balance: realAmount } }, { new: true, upsert: true, returnOriginal: false });
-        // account = await Account.findOneAndUpdate({ address: from.toString().toLowerCase() },
-        //     { $inc: { depositedBalance: realAmount, balance: realAmount } }, { new: true, upsert: true, returnOriginal: false });
+            overrideOptions);
+        await Balance.updateOne({ address, chainId, tokenAddress },
+            { $inc: { depositedBalance: realAmount, balance: realAmount } }, overrideOptions);
     } catch (error) {
         console.log("--- token find error");
     }
 
 }
 async function ClaimEventListener(claimId, tokenAddress, to, amount, timestamp, logInfo) {
-    const { transactionHash, logIndex } = logInfo
-    // if (from.toString().toLowerCase() != zeroAddress) return;
-    // const toAddress = to.toString().toLowerCase();
-    // console.log('--minted', tokenId, toAddress,);
-    const realAmount = Number(ethers.utils.formatUnits(amount, 18));
+    const { transactionHash, logIndex } = logInfo;
+    const token = getTokenByTokenAddress(tokenAddress);
+    const realAmount = Number(ethers.utils.formatUnits(amount, token.decimals));
     const address = normalizeAddress(to);
     console.log("---- checked claim", address, realAmount, Number(timestamp.toString()));
     // let account;
     try {
-        await ClaimTransaction.findOneAndUpdate({ id: claimId, chainId, tokenAddress: normalizeAddress(tokenAddress), receiverAddress: address, amount: realAmount, timestamp: Number(timestamp.toString()) },
+        await ClaimTransaction.updateOne({ id: claimId, chainId, tokenAddress: normalizeAddress(tokenAddress), receiverAddress: address, amount: realAmount, timestamp: Number(timestamp.toString()) },
             { txHash: transactionHash, logIndex },
-            { new: true, upsert: true, returnOriginal: false });
+            overrideOptions);
 
-        await Balance.findOneAndUpdate({ address, chainId, tokenAddress },
-            { $inc: { claimedBalance: realAmount, pendingBalance: -realAmount } }, { new: true, upsert: true, returnOriginal: false });
-        // account = await Account.findOneAndUpdate({ address },
-        //     { $inc: { pendingBalance: -realAmount } }, { new: true, upsert: true, returnOriginal: false });
+        await Balance.updateOne({ address, chainId, tokenAddress },
+            { $inc: { claimedBalance: realAmount, pendingBalance: -realAmount } }, overrideOptions);
     } catch (error) {
         console.log("--- token find error", error);
     }
 
 }
-// async function TransferEventListener(from, to, value, logInfo) {
-//     const { transactionHash, logIndex } = logInfo
 
-//     const realAmount = Number(ethers.utils.formatUnits(value, 18));
-//     const fromAddress = normalizeAddress(from);
-//     const toAddress = normalizeAddress(to);
-//     console.log("---- checked transfer", toAddress, realAmount);
-//     let account;
-//     try {
-//         await Transaction.findOneAndUpdate({ txHash: transactionHash, logIndex },
-//             { amount: realAmount, from: fromAddress, to: toAddress, tokenAddress: normalizeAddress(dhbContract.address) },
-//             overrideOptions);
-//         let updateForFromAccount = { $inc: { dhbBalance: -realAmount } };
-//         if (toAddress === normalizeAddress(VaultContract.address)) {
-//             updateForFromAccount.$inc.balance = realAmount;
-//             updateForFromAccount.$inc.depositedBalance = realAmount;
-//         }
-//         await Account.updateOne({ address: fromAddress }, updateForFromAccount, overrideOptions);
-//         account = await Account.findOneAndUpdate({ address: toAddress }, { $inc: { dhbBalance: realAmount } }, overrideOptions);
+async function TransferEventListener(from, to, value, logInfo, tokenAddress) {
+    const { transactionHash, logIndex } = logInfo;
 
-//     } catch (error) {
-//         console.log("--- token find error");
-//     }
+    const fromAddress = normalizeAddress(from);
+    const toAddress = normalizeAddress(to);
+    tokenAddress = normalizeAddress(tokenAddress);
+    const token = getTokenByTokenAddress(tokenAddress, chainId);
+    const realAmount = Number(ethers.utils.formatUnits(value, token.decimals));
+    console.log("---- checked transfer", tokenAddress, toAddress, realAmount);
+    try {
+        const updatedResult = await Transaction.updateOne({ txHash: transactionHash, logIndex },
+            { amount: realAmount, from: fromAddress, to: toAddress, tokenAddress },
+            overrideOptions);
+        // if (isInserted(updatedResult)) {
+        await Balance.updateOne({ address: toAddress, chainId, tokenAddress },
+            { $inc: { walletBalance: realAmount } }, overrideOptions);
+        await Balance.updateOne({ address: fromAddress, chainId, tokenAddress },
+            { $inc: { walletBalance: -realAmount } }, overrideOptions);
+        // }
+    } catch (error) {
+        console.log("--- token find error");
+    }
+}
 
-// }
 
 mongoose.set('useFindAndModify', false);
 mongoose.set('useCreateIndex', true);
@@ -107,8 +98,18 @@ mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/
     { useNewUrlParser: true, useUnifiedTopology: true })
     .then(async () => {
         console.log(' -- starting deposit indexer...');
-        VaultContract.on('UserDeposit', DepositEventListener)
-        VaultContract.on('Claim', ClaimEventListener)
-        // VaultContract.on('Deposit', TransferEventListener)
-        // await getPastEvent('Transfer')
+        // fetching balance in vault
+        VaultContract.on('UserDeposit', DepositEventListener);
+        VaultContract.on('Claim', ClaimEventListener);
+        // fetching token balance for locked content
+        const tokens = supportedTokensForLockContent.filter(e => e.chainId === chainId);
+        for (i = 0; i < tokens.length; i++) {
+            const tokenItem = tokens[i];
+            const tokenContract = new ethers.Contract(tokenItem.address, erc20ContractAbi, provider);
+            const txEventFunc = async (from, to, value, logInfo) => {
+                await TransferEventListener(from, to, value, logInfo, tokenItem.address)
+            };
+            tokenContract.on('Transfer', txEventFunc);
+            // tokenContracts[i].on('Transfer', txEventListeners[i]);
+        }
     });

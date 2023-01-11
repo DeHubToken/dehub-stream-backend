@@ -76,10 +76,22 @@ const vaultContractAddresses = {
     [ChainId.BSC_TESTNET]: '0xc90f5CbB3bb3e9a181b8Fed7d8a4835B291b7c9F',
     [ChainId.GORLI]: '0x067e7613BFe063A778D1799A58Ee78419A0d9B73',
     [ChainId.MAINNET]: '0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696',
-    [ChainId.BSC_MAINNET]: '0x41B90b73a88804f2aed1C4672b3dbA74eb9A92ce',    
+    [ChainId.BSC_MAINNET]: '0x41B90b73a88804f2aed1C4672b3dbA74eb9A92ce',
     [ChainId.FANTOM_MAINNET]: '0xbb804a896E1A6962837c0813a5F89fDb771d808f',
     [ChainId.AVALANCHE_MAINNET]: '0x84514BeaaF8f9a4cbe25A9C5a7EBdd16B4FE7154',
-    [ChainId.POLYGON_MAINNET]: '0x275617327c958bD06b5D6b871E7f491D76113dd8',    
+    [ChainId.POLYGON_MAINNET]: '0x275617327c958bD06b5D6b871E7f491D76113dd8',
+};
+
+const multicallContractAddresses = {
+    [ChainId.MAINNET]: '0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696',
+    [ChainId.GORLI]: '0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696',
+    [ChainId.KOVAN]: '0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696',
+    [ChainId.BSC_MAINNET]: '0x41B90b73a88804f2aed1C4672b3dbA74eb9A92ce',
+    [ChainId.BSC_TESTNET]: '0x80d0d36d9E3Cb0Bd4561beB1d9d1cC8e1a33F5b1',
+    [ChainId.FANTOM_MAINNET]: '0xbb804a896E1A6962837c0813a5F89fDb771d808f',
+    [ChainId.AVALANCHE_MAINNET]: '0x84514BeaaF8f9a4cbe25A9C5a7EBdd16B4FE7154',
+    [ChainId.OKEX_MAINNET]: '0xdf4CDd4b8F1790f62a91Bcc4cb793159c641B1bd',
+    [ChainId.POLYGON_MAINNET]: '0x275617327c958bD06b5D6b871E7f491D76113dd8',
 };
 
 const overrideOptions = { new: true, upsert: true, returnOriginal: false };
@@ -165,4 +177,5 @@ module.exports = {
     supportedChainIdsForMinting,
     supportedChainIds,
     supportedNetworks,
+    multicallContractAddresses,
 }
