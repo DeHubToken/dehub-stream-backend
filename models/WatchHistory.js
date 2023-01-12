@@ -6,7 +6,7 @@ let WatchHistorySchema = new Schema({
     watcherAddress: { type: String, index: true},
     startedAt: { type: Date, index: true},
     exitedAt: {type: Date},
-    status: String,
+    status: String, // created, confimed, pendingForPPV, lockForPPV, failedForPPV
     chainId: Number,
     lastWatchedFrame: Number,
     watchedTime: Number, // in second unit    

@@ -8,15 +8,16 @@ let BalanceSchema = new Schema({
     // token address for locking or depositing
     tokenAddress: String,
     // "Total deposited amount"
-    depositedBalance: Number,
+    deposited: Number,
     // Total claimed amount
-    claimedBalance: Number,
+    claimed: Number,
     // pending balance
-    pendingBalance: Number,
+    pending: Number,
     // reward got
-    rewardBalance: Number,
+    reward: Number,
     // total protocol balance 
     balance: Number,
+    lockForPPV: Number,
     walletBalance: Number, // balance of wallet
     updateWalletBalanceAt: Date,
     // lastLoginTimestamp: Number,

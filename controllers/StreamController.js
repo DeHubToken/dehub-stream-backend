@@ -8,12 +8,13 @@ const { Token } = require('../models/Token');
 const nftMetaDataTemplate = require('../data_structure/nft_metadata_template.json');
 const { defaultImageFilePath } = require('../utils/file');
 const { WatchHistory } = require('../models/WatchHistory');
-const { streamInfoKeys, supportedTokens } = require('../config/constants');
+const { streamInfoKeys, supportedTokens, overrideOptions } = require('../config/constants');
 const { config } = require('../config');
 const { isAddress } = require('ethers/lib/utils');
 const { Balance } = require('../models/Balance');
 const { updateWalletBalance } = require('./user');
 const { isInserted } = require('../utils/db');
+const { normalizeAddress } = require('../utils/format');
 const limitBuffer = 1 * 1024 * 1024; // 2M
 const initialBuffer = 80 * 1024; // first 80k is free
 
@@ -29,20 +30,24 @@ const StreamController = {
         catch (e) {
             return res.json({ error: 'error!' });
         }
+        console.log('----start stream:', tokenId);
         const tokenItem = await Token.findOne({ tokenId }).lean();
         if (!tokenItem) return res.json({ error: 'no stream!' });
-
         const videoPath = `${path.dirname(__dirname)}/assets/videos/${tokenId}.mp4`;
         const videoStat = fs.statSync(videoPath);
         const fileSize = videoStat.size;
         const videoRange = req.headers.range;
+        const nowTimestamp = Date.now();
+        const userAddress = signParams?.account?.toLowerCase();
+        let chainId = signParams?.chainId;
+        if (chainId) chainId = parseInt(chainId);
         if (videoRange) {
             const parts = videoRange.replace(/bytes=/, "").split("-");
             let start = parseInt(parts[0], 10);
             let end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
             let chunksize = end - start + 1;
             const oldChunkSize = chunksize;
-
+            // watching video at start position is always available.
             if (videoRange === 'bytes=0-') {
                 start = 0;
                 chunksize = initialBuffer + 1;
@@ -53,38 +58,36 @@ const StreamController = {
                     chunksize = limitBuffer + 1;
                     end = start + chunksize - 1;
                 }
-                // check signature for not start
-                const result = isValidAccount(signParams?.account, signParams?.timestamp, signParams.sig);
-                // return res.json({ error: 'error!' });  // for testing
-                if (!result) {
-                    console.log(result);
-                    return res.status(500).send('error!');
-                    // chunksize = 100;
-                    // end = start + chunksize - 1;              
-                }
-                let chainId = signParams?.chainId;
-                const account = signParams?.account;
-                if (chainId) chainId = parseInt(chainId);
                 if (tokenItem?.streamInfo?.[streamInfoKeys.isLockContent] || tokenItem?.streamInfo?.[streamInfoKeys.isPayPerView]) {
-                    const userAddress = signParams?.account?.toLowerCase();
-                    const accountItem = await Account.findOne({ address: userAddress }, { balance: 1, dhbBalance: 1 });
+                    // check signature for not start
+                    const result = isValidAccount(signParams?.account, signParams?.timestamp, signParams.sig);
+                    // return res.json({ error: 'error!' });  // for testing
+                    if (!result) {
+                        console.log('failed account auth', result);
+                        return res.status(500).send('error!');
+                        // chunksize = 100;
+                        // end = start + chunksize - 1;              
+                    }
+                    // const accountItem = await Account.findOne({ address: userAddress }, { balance: 1, dhbBalance: 1 });
                     if (tokenItem?.streamInfo?.[streamInfoKeys.isLockContent]) {
+
                         const symbol = tokenItem?.streamInfo?.[streamInfoKeys.lockContentTokenSymbol] || 'DHB';
                         const chainIds = tokenItem?.streamInfo?.[streamInfoKeys.lockContentChainIds] || [97];
                         if (!chainIds.includes(chainId)) return res.status(500).send('error!');
+
                         const tokenAddress = supportedTokens.find(e => e.symbol === symbol || e.chainId === chainId)?.address;
                         const lockContentAmount = Number(tokenItem?.streamInfo?.[streamInfoKeys.lockContentAmount]);
                         const balanceItem = await Balance.findOne({
                             address: userAddress,
-                            chainId, chainId
-                        }).lean();
-                        if (balanceItem && balanceItem.updateWalletBalanceAt > new Date(Date.now() - config.extraSecondForCheckingBalance) && balanceItem.walletBalance < lockContentAmount) {
-                            // if (lockContentAmount > accountItem.dhbBalance) {
+                            chainId, chainId,
+                            tokenAddress,
+                        }, { walletBalance: 1 }).lean();
+                        if (!balanceItem || balanceItem.walletBalance < lockContentAmount) {
                             return res.status(500).send('error!');
                         } else {
-                            updateWalletBalance(account, tokenAddress, chainId).then(() => {
-                                console.log('---update wallet', account, tokenAddress, chainId);
-                            })
+                            // updateWalletBalance(account, tokenAddress, chainId).then(() => {
+                            //     console.log('---update wallet', account, tokenAddress, chainId);
+                            // })
                         }
                     }
                     else // per view stream
@@ -93,21 +96,38 @@ const StreamController = {
                         const symbol = tokenItem?.streamInfo?.[streamInfoKeys.payPerViewTokenSymbol] || 'DHB';
                         const chainIds = tokenItem?.streamInfo?.[streamInfoKeys.payPerViewChainIds] || [97];
                         if (!chainIds.includes(chainId)) return res.status(500).send('error!');
-                        const tokenAddress = supportedTokens.find(e => e.symbol === symbol || e.chainId === chainId)?.address;
-                        const balanceItem = await Balance.findOne({
-                            address: signParams?.account?.toLowerCase(),
-                            chainId, tokenAddress
-                        });
 
-                        if (balanceItem && balanceItem.updateWalletBalanceAt > new Date(Date.now() - config.extraSecondForCheckingBalance) && balanceItem.walletBalance < payPerViewAmount) {
+                        const tokenAddress = normalizeAddress(supportedTokens.find(e => e.symbol === symbol || e.chainId === chainId)?.address);
+                        const balanceItem = await Balance.findOne({
+                            address: userAddress,
+                            chainId,
+                            tokenAddress: tokenAddress,
+                        }, { balance: 1, lockedForPPV: 1 }).lean();
+                        if (!balanceItem) {
                             return res.status(500).send('error!');
                         }
+                        const watchItem = await WatchHistory.findOne(
+                            { tokenId, chainId, watcherAddress: userAddress, exitedAt: { $gt: new Date(nowTimestamp - config.extraRecordSpaceSecond * 1000) } },
+                            { status: 1 }).lean();
+
+                        const availableBalance = (balanceItem.balance || 0) + (balanceItem.lockForPPV || 0);
+                        // we will check balance after cron job processes funds for this watch
+                        if (watchItem?.status !== 'confirmed') {
+                            if (availableBalance < payPerViewAmount) return res.status(500).send('error!');
+                            // else (balanceItem.lockForPPV < payPerViewAmount)
+                            // {
+                            //     await Balance.updateOne({
+                            //         address: userAddress,
+                            //         chainId,
+                            //         tokenAddress: tokenAddress,
+                            //     }, { balance: 1, lockedForPPV:  });
+                            // }
+                        }
                     }
+
                 }
-
             }
-
-            console.log('---signParams', signParams, req.headers.range, end, oldChunkSize, chunksize);
+            console.log('---call stream', nowTimestamp, signParams?.account, signParams?.chainId, tokenId, req.headers.range, end);
             const file = fs.createReadStream(videoPath, { start, end });
             const header = {
                 "Content-Range": `bytes ${start}-${end}/${fileSize}`,
@@ -118,24 +138,14 @@ const StreamController = {
 
             res.writeHead(206, header);
             file.pipe(res);
-            if (signParams?.account && isAddress(signParams?.account)) {
-                const nowTime = new Date();
-                const updatedResult = await WatchHistory.updateOne(
-                    { tokenId, watcherAddress: signParams?.account, exitedAt: { $gt: new Date(nowTime - config.extraRecordSpaceSecond * 1000) } },
-                    { exitedAt: nowTime, lastWatchedFrame: end }, { upsert: true, new: true, setDefaultsOnInsert: true });
-                if (isInserted(updatedResult)) {
-                    await Token.updateOne({ tokenId }, { $inc: { views: 1 } });
-                    console.log('----update views nft', tokenId);
-                }
-            }
-            // } else {
-            //     const head = {
-            //         'Content-Length': fileSize,
-            //         'Content-Type': 'video/mp4',
-            //     };
-            //     res.writeHead(200, head);
-            //     fs.createReadStream(videoPath).pipe(res);
+            // console.log('--- time without history: ', Date.now() - nowTimestamp);
+            // if (userAddress && isAddress(userAddress)) {
+            let filter = { tokenId, exitedAt: { $gt: new Date(nowTimestamp - config.extraRecordSpaceSecond * 1000) } };
+            if (userAddress && isAddress(userAddress)) filter = { ...filter, watcherAddress: userAddress };
+            if (chainId) filter = { ...filter, chainId };
+            await WatchHistory.updateOne(filter, { exitedAt: new Date(nowTimestamp), lastWatchedFrame: end }, overrideOptions);
         }
+        else return res.status(500).send('error!');
     },
     getImage: async function (req, res, next) {
         const id = req.params.id;

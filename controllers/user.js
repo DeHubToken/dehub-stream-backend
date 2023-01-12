@@ -45,9 +45,8 @@ const signatureForClaim = async (address, sig, timestamp, amount, chainId, token
     const toSignForClaim = ethers.utils.solidityKeccak256(["address", "uint256", "address", "address", "uint256", "uint256", "uint256"],
         [vaultContractAddresses[chainId], claimTx.id, address, tokenAddress, chainId, bigAmount, curTimestamp]);
     let signer = new ethers.Wallet(process.env.SIGNER_KEY);
-    const { r, s, v } = splitSignature(await signer.signMessage(ethers.utils.arrayify(toSignForClaim)));
-    // await Account.updateOne(filterBalanceOption, { $inc: { balance: -Number(amount), pendingBalance: Number(amount) } });
-    await Balance.updateOne(filterBalanceOption, { $inc: { balance: -Number(amount), pendingBalance: Number(amount) } });
+    const { r, s, v } = splitSignature(await signer.signMessage(ethers.utils.arrayify(toSignForClaim)));    
+    await Balance.updateOne(filterBalanceOption, { $inc: { balance: -Number(amount), pending: Number(amount) } });
     return { status: true, result: { amount: bigAmount.toString(), timestamp: curTimestamp, id: claimTx.id, v, r, s } };
 };
 

@@ -35,7 +35,7 @@ const tokenTemplate = {
 const accountTemplate = {
     username: 1,
     balance: 1,
-    depositedBalance: 1,
+    // deposited: 1,
     [userProfileKeys.avatarImageUrl]: 1,
     [userProfileKeys.coverImageUrl]: 1,
     [userProfileKeys.username]: 1,

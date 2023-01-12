@@ -19,7 +19,10 @@ const config = {
     recentTimeDiff: 3 * 24 * 60 * 60 * 1000,
     extraSecondForCheckingBalance: 2 * 60,
     extraRecordSpaceSecond: 60, // in second unit:  ignore this space time while watching video to record history
+    watchTimeForConfirming: 30 * 1000,  // in milisecond unit, when user watches while more than 30 seconds, it is confirmed, got paid, and views is increased.
     developerFee: 0.1, // developer fee for pay per view is 10 %
+    defaultChainId: 97,
+    defaultTokenSymbol: 'DHB',
 };
 module.exports = {
     config,

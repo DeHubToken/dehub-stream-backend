@@ -28,7 +28,7 @@ const VaultContract = new ethers.Contract(vaultContractAddresses[curNetwork.chai
 const zeroAddress = '0x0000000000000000000000000000000000000000';
 async function DepositEventListener(from, tokenAddress, amount, logInfo) {
     const { transactionHash, logIndex } = logInfo;
-    const token = getTokenByTokenAddress(tokenAddress);
+    const token = getTokenByTokenAddress(tokenAddress, chainId);
     tokenAddress = normalizeAddress(tokenAddress);
     const realAmount = Number(ethers.utils.formatUnits(amount, token.decimals));
     const address = normalizeAddress(from);
@@ -40,26 +40,26 @@ async function DepositEventListener(from, tokenAddress, amount, logInfo) {
             { amount: realAmount, from: address, tokenAddress: tokenAddress, to: normalizeAddress(VaultContract.address) },
             overrideOptions);
         await Balance.updateOne({ address, chainId, tokenAddress },
-            { $inc: { depositedBalance: realAmount, balance: realAmount } }, overrideOptions);
+            { $inc: { deposited: realAmount, balance: realAmount } }, overrideOptions);
     } catch (error) {
         console.log("--- token find error");
     }
 
 }
-async function ClaimEventListener(claimId, tokenAddress, to, amount, timestamp, logInfo) {
+async function ClaimEventListener(id, tokenAddress, to, amount, timestamp, logInfo) {
     const { transactionHash, logIndex } = logInfo;
-    const token = getTokenByTokenAddress(tokenAddress);
+    const token = getTokenByTokenAddress(tokenAddress, chainId);
     const realAmount = Number(ethers.utils.formatUnits(amount, token.decimals));
     const address = normalizeAddress(to);
-    console.log("---- checked claim", address, realAmount, Number(timestamp.toString()));
+    console.log("---- checked claim", Number(id.toString()), address, realAmount, Number(timestamp.toString()));
     // let account;
     try {
-        await ClaimTransaction.updateOne({ id: claimId, chainId, tokenAddress: normalizeAddress(tokenAddress), receiverAddress: address, amount: realAmount, timestamp: Number(timestamp.toString()) },
+        await ClaimTransaction.updateOne({ id: Number(id.toString()), chainId, tokenAddress: normalizeAddress(tokenAddress), receiverAddress: address, amount: realAmount, timestamp: Number(timestamp.toString()) },
             { txHash: transactionHash, logIndex },
             overrideOptions);
 
         await Balance.updateOne({ address, chainId, tokenAddress },
-            { $inc: { claimedBalance: realAmount, pendingBalance: -realAmount } }, overrideOptions);
+            { $inc: { claimed: realAmount, pending: -realAmount } }, overrideOptions);
     } catch (error) {
         console.log("--- token find error", error);
     }

@@ -5,16 +5,16 @@ let AccountSchema = new Schema({
     // "Account address"
     address: String,
     // "Total deposited amount"
-    depositedBalance: Number,
+    // deposited: Number,
     // Total claimed amount
-    claimedBalance: Number,
+    // claimedBalance: Number,
     // pending balance
-    pendingBalance: Number,
+    // pendingBalance: Number,
     // reward got
-    rewardBalance: Number,
+    // rewardBalance: Number,
     // Total claimed amount
-    balance: Number,
-    dhbBalance: Number, // balance of wallet
+    // balance: Number,
+    // dhbBalance: Number, // balance of wallet
     lastLoginTimestamp: Number,
 
     username: String,  // user profile

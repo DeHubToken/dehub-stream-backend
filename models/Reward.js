@@ -11,6 +11,8 @@ let RewardSchema = new Schema({
     tokenId: Number,
     // updated timestamp
     from: String,
+    // chain id
+    chainId: Number,
     type: { type: String, enum: Object.values(RewardType), default: RewardType.PayPerView, index: true },
 }, { timestamps: true });
 
