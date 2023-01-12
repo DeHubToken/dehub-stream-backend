@@ -107,7 +107,7 @@ const StreamController = {
                             return res.status(500).send('error!');
                         }
                         const watchItem = await WatchHistory.findOne(
-                            { tokenId, chainId, watcherAddress: userAddress, exitedAt: { $gt: new Date(nowTimestamp - config.extraRecordSpaceSecond * 1000) } },
+                            { tokenId, chainId, watcherAddress: userAddress, exitedAt: { $gt: new Date(nowTimestamp - config.extraPeriodForHistory) } },
                             { status: 1 }).lean();
 
                         const availableBalance = (balanceItem.balance || 0) + (balanceItem.lockForPPV || 0);
@@ -140,7 +140,7 @@ const StreamController = {
             file.pipe(res);
             // console.log('--- time without history: ', Date.now() - nowTimestamp);
             // if (userAddress && isAddress(userAddress)) {
-            let filter = { tokenId, exitedAt: { $gt: new Date(nowTimestamp - config.extraRecordSpaceSecond * 1000) } };
+            let filter = { tokenId, exitedAt: { $gt: new Date(nowTimestamp - config.extraPeriodForHistory) } };
             if (userAddress && isAddress(userAddress)) filter = { ...filter, watcherAddress: userAddress };
             if (chainId) filter = { ...filter, chainId };
             await WatchHistory.updateOne(filter, { exitedAt: new Date(nowTimestamp), lastWatchedFrame: end }, overrideOptions);

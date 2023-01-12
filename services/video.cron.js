@@ -72,7 +72,7 @@ async function processingFundsForPlayingStreams() {
         const _id = watchStream._id;
         const watchedTime = watchStream.exitedAt.getTime() - watchStream.createdAt.getTime();
         console.log('-watch history:', watchStream.tokenId, watchStream.watcherAddress, watchedTime);
-        const bExpired = watchedTime <= config.watchTimeForConfirming && watchStream.exitedAt < new Date(Date.now() - 2 * config.extraRecordSpaceSecond * 1000);
+        const bExpired = watchedTime <= config.watchTimeForConfirming && watchStream.exitedAt < new Date(Date.now() - 2 * config.extraPeriodForHistory);
         const tokenItem = await Token.findOne({ tokenId: watchStream.tokenId }, { streamInfo: 1, owner: 1 }).lean();
         // funds for pay per view stream
         if (tokenItem.streamInfo?.[streamInfoKeys.isPayPerView]) {
