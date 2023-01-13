@@ -55,7 +55,7 @@ async function ClaimEventListener(id, tokenAddress, to, amount, timestamp, logIn
     // let account;
     try {
         await ClaimTransaction.updateOne({ id: Number(id.toString()), chainId, tokenAddress: normalizeAddress(tokenAddress), receiverAddress: address, amount: realAmount, timestamp: Number(timestamp.toString()) },
-            { txHash: transactionHash, logIndex },
+            { txHash: transactionHash, logIndex, status: 'confirmed' },
             overrideOptions);
 
         await Balance.updateOne({ address, chainId, tokenAddress },
