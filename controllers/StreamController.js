@@ -81,7 +81,7 @@ const StreamController = {
                         const balanceItem = await Balance.findOne({
                             address: userAddress,
                             chainId, chainId,
-                            tokenAddress,
+                            tokenAddress: normalizeAddress(tokenAddress),
                         }, { walletBalance: 1 }).lean();
                         if (!balanceItem || balanceItem.walletBalance < lockContentAmount) {
                             return res.status(500).send('error!');

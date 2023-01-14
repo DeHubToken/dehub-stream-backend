@@ -56,7 +56,7 @@ const signatureForClaim = async (address, sig, timestamp, amount, chainId, token
 
 const updateWalletBalance = async (account, tokenAddress, chainId) => {
     const tokenBalance = await getERC20TokenBalance(account, tokenAddress, chainId);
-    await Balance.updateOne({ address: account.toLowerCase(), chainId, tokenAddress }, { walletBalance: tokenBalance, updateWalletBalanceAt: new Date() });
+    await Balance.updateOne({ address: normalizeAddress(account.toLowerCase()), chainId, tokenAddress: normalizeAddress(tokenAddress) }, { walletBalance: tokenBalance, updateWalletBalanceAt: new Date() });
 }
 
 const requestPPVStream = async (account, sig, timestamp, chainId, tokenId) => {

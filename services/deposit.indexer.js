@@ -49,12 +49,13 @@ async function DepositEventListener(from, tokenAddress, amount, logInfo) {
 async function ClaimEventListener(id, tokenAddress, to, amount, timestamp, logInfo) {
     const { transactionHash, logIndex } = logInfo;
     const token = getTokenByTokenAddress(tokenAddress, chainId);
+    tokenAddress = normalizeAddress(tokenAddress);
     const realAmount = Number(ethers.utils.formatUnits(amount, token.decimals));
     const address = normalizeAddress(to);
     console.log("---- checked claim", Number(id.toString()), address, realAmount, Number(timestamp.toString()));
     // let account;
     try {
-        await ClaimTransaction.updateOne({ id: Number(id.toString()), chainId, tokenAddress: normalizeAddress(tokenAddress), receiverAddress: address, amount: realAmount, timestamp: Number(timestamp.toString()) },
+        await ClaimTransaction.updateOne({ id: Number(id.toString()), chainId, tokenAddress, receiverAddress: address, amount: realAmount, timestamp: Number(timestamp.toString()) },
             { txHash: transactionHash, logIndex, status: 'confirmed' },
             overrideOptions);
 
