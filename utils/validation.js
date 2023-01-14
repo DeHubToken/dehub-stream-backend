@@ -1,3 +1,7 @@
+const { config } = require("../config");
+const { PPVTransaction } = require("../models/PPVTransaction");
+const { normalizeAddress } = require("./format");
+
 function removeDuplicatedObject(arr, subKey,) {
     var m = {};
     if (!subKey) subKey = '';
@@ -16,7 +20,12 @@ function removeDuplicatedObject(arr, subKey,) {
     }
     return newarr;
 }
-
+const isUnlockedPPVStream = async (streamTokenId, account) => {
+    const ppvTxItem = await PPVTransaction.findOne({ address: normalizeAddress(account), streamTokenId, createdAt: { $gt: new Date(Date.now() - config.availableTimeForPPVStream) } }, { createdAt: 1 }).lean();
+    if (ppvTxItem && ppvTxItem.createdAt) return true;
+    return false;
+}
 module.exports = {
     removeDuplicatedObject,
+    isUnlockedPPVStream,
 }

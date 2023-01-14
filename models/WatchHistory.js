@@ -12,5 +12,5 @@ let WatchHistorySchema = new Schema({
     watchedTime: Number, // in second unit    
     fundedTokenValue: Number,
 }, { timestamps: true });
-
+WatchHistorySchema.index({status: 1});
 module.exports.WatchHistory = mongoose.model('watch_history', WatchHistorySchema); 

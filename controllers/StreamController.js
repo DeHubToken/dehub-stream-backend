@@ -15,6 +15,7 @@ const { Balance } = require('../models/Balance');
 const { updateWalletBalance } = require('./user');
 const { isInserted } = require('../utils/db');
 const { normalizeAddress } = require('../utils/format');
+const { isUnlockedPPVStream } = require('../utils/validation');
 const limitBuffer = 1 * 1024 * 1024; // 2M
 const initialBuffer = 80 * 1024; // first 80k is free
 
@@ -63,7 +64,7 @@ const StreamController = {
                     const result = isValidAccount(signParams?.account, signParams?.timestamp, signParams.sig);
                     // return res.json({ error: 'error!' });  // for testing
                     if (!result) {
-                        console.log('failed account auth', result);
+                        console.log('failed account auth', signParams);
                         return res.status(500).send('error!');
                         // chunksize = 100;
                         // end = start + chunksize - 1;              
@@ -92,37 +93,40 @@ const StreamController = {
                     }
                     else // per view stream
                     {
-                        const payPerViewAmount = Number(tokenItem?.streamInfo?.[streamInfoKeys.payPerViewAmount]);
-                        const symbol = tokenItem?.streamInfo?.[streamInfoKeys.payPerViewTokenSymbol] || 'DHB';
-                        const chainIds = tokenItem?.streamInfo?.[streamInfoKeys.payPerViewChainIds] || [97];
-                        if (!chainIds.includes(chainId)) return res.status(500).send('error!');
+                        const isUnlocked = await isUnlockedPPVStream(tokenId, userAddress);
+                        if (!isUnlocked) return res.status(500).send('error!');
+                        // const payPerViewAmount = Number(tokenItem?.streamInfo?.[streamInfoKeys.payPerViewAmount]);
+                        // const symbol = tokenItem?.streamInfo?.[streamInfoKeys.payPerViewTokenSymbol] || 'DHB';
+                        // const chainIds = tokenItem?.streamInfo?.[streamInfoKeys.payPerViewChainIds] || [97];
 
-                        const tokenAddress = normalizeAddress(supportedTokens.find(e => e.symbol === symbol || e.chainId === chainId)?.address);
-                        const balanceItem = await Balance.findOne({
-                            address: userAddress,
-                            chainId,
-                            tokenAddress: tokenAddress,
-                        }, { balance: 1, lockedForPPV: 1 }).lean();
-                        if (!balanceItem) {
-                            return res.status(500).send('error!');
-                        }
-                        const watchItem = await WatchHistory.findOne(
-                            { tokenId, chainId, watcherAddress: userAddress, exitedAt: { $gt: new Date(nowTimestamp - config.extraPeriodForHistory) } },
-                            { status: 1 }).lean();
+                        // if (!chainIds.includes(chainId)) return res.status(500).send('error!');
 
-                        const availableBalance = (balanceItem.balance || 0) + (balanceItem.lockForPPV || 0);
-                        // we will check balance after cron job processes funds for this watch
-                        if (watchItem?.status !== 'confirmed') {
-                            if (availableBalance < payPerViewAmount) return res.status(500).send('error!');
-                            // else (balanceItem.lockForPPV < payPerViewAmount)
-                            // {
-                            //     await Balance.updateOne({
-                            //         address: userAddress,
-                            //         chainId,
-                            //         tokenAddress: tokenAddress,
-                            //     }, { balance: 1, lockedForPPV:  });
-                            // }
-                        }
+                        // const tokenAddress = normalizeAddress(supportedTokens.find(e => e.symbol === symbol || e.chainId === chainId)?.address);
+                        // const balanceItem = await Balance.findOne({
+                        //     address: userAddress,
+                        //     chainId,
+                        //     tokenAddress: tokenAddress,
+                        // }, { balance: 1, lockForPPV: 1 }).lean();
+                        // if (!balanceItem) {
+                        //     return res.status(500).send('error!');
+                        // }
+                        // const watchItem = await WatchHistory.findOne(
+                        //     { tokenId, chainId, watcherAddress: userAddress, exitedAt: { $gt: new Date(nowTimestamp - config.extraPeriodForHistory) } },
+                        //     { status: 1 }).lean();
+
+                        // const availableBalance = (balanceItem.balance || 0) + (balanceItem.lockForPPV || 0);
+                        // // we will check balance after cron job processes funds for this watch
+                        // if (watchItem?.status !== 'confirmed') {
+                        //     if (availableBalance < payPerViewAmount) return res.status(500).send('error!');
+                        //     // else (balanceItem.lockForPPV < payPerViewAmount)
+                        //     // {
+                        //     //     await Balance.updateOne({
+                        //     //         address: userAddress,
+                        //     //         chainId,
+                        //     //         tokenAddress: tokenAddress,
+                        //     //     }, { balance: 1, lockedForPPV:  });
+                        //     // }
+                        // }
                     }
 
                 }

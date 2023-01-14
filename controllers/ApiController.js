@@ -8,15 +8,16 @@ const { isValidAccount, reqParam } = require('../utils/auth');
 const { decryptWithSourceKey, encryptWithSourceKey } = require('../utils/encrypt');
 const { paramNames, errorMsgs, userProfileKeys, overrideOptions } = require('../config/constants');
 const { Token } = require('../models/Token');
-const { checkFileType } = require('../utils/format');
+const { checkFileType, normalizeAddress } = require('../utils/format');
 const { signatureForMintingNFT } = require('./mintNft');
 const { removeDuplicatedObject } = require('../utils/validation');
 const { WatchHistory } = require('../models/WatchHistory');
 const { config } = require('../config');
-const { signatureForClaim } = require('./user');
+const { signatureForClaim, requestPPVStream } = require('./user');
 const { result } = require('underscore');
 const { moveFile } = require('../utils/file');
 const { Balance } = require('../models/Balance');
+const { PPVTransaction } = require('../models/PPVTransaction');
 const expireTime = 86400000;
 const tokenTemplate = {
     name: 1,
@@ -295,8 +296,10 @@ const ApiController = {
         }
         else accountInfo = {};
         const balanceData = await Balance.find({ address: walletAddress.toLowerCase() }, { chainId: 1, tokenAddress: 1, balance: 1, _id: 0 });
+        const unlockedPPVStreams = await PPVTransaction.find({ address: normalizeAddress(walletAddress), createdAt: { $gt: new Date(Date.now() - config.availableTimeForPPVStream) } }, { streamTokenId: 1 }).distinct('streamTokenId');
         accountInfo.balances = balanceData;
-        return res.json({ result: accountInfo });
+        accountInfo.unlocked = unlockedPPVStreams;
+        return res.json({ result: accountInfo,  });
     },
     getSignDataForClaim: async function (req, res, next) {
         const address = reqParam(req, paramNames.address);
@@ -345,6 +348,25 @@ const ApiController = {
         let result = { result: true };
         return res.json(result);
 
+    },
+    requestPPVStream: async function (req, res, next) {
+        const address = reqParam(req, paramNames.address);
+        const rawSig = reqParam(req, paramNames.sig);
+        const timestamp = reqParam(req, paramNames.timestamp);
+        let chainId = reqParam(req, paramNames.chainId);
+        let streamTokenId = reqParam(req, paramNames.streamTokenId);
+        if (!rawSig || !address || !timestamp || !chainId)
+            return res.json({ error: true, msg: "sig or address not exist" });
+        try {
+            chainId = parseInt(chainId, 10);
+            streamTokenId = parseInt(streamTokenId, 10);
+            const result = await requestPPVStream(address, rawSig, timestamp, chainId, streamTokenId);
+            return res.json(result);
+        }
+        catch (err) {
+            console.log('-----getSignedDataForClaim error', err);
+            return res.json({ result: false, error: 'request ppv stream was failed' });
+        }
     },
 }
 module.exports = { ApiController };

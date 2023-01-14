@@ -18,6 +18,7 @@ let BalanceSchema = new Schema({
     // total protocol balance 
     balance: Number,
     lockForPPV: Number,
+    paidForPPV: Number,
     walletBalance: Number, // balance of wallet
     updateWalletBalanceAt: Date,
     // lastLoginTimestamp: Number,

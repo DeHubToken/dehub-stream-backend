@@ -20,6 +20,7 @@ const config = {
     extraSecondForCheckingBalance: 2 * 60,
     extraPeriodForHistory: 60 * 1000, // in millisecond unit:  store into same watch history record while watching video in this extra time
     watchTimeForConfirming: 30 * 1000,  // in millisecond unit, when user watches while more than 30 seconds, it is confirmed, got paid, and views is increased.
+    availableTimeForPPVStream: 24 * 60 * 60 * 1000, // in millisecond unit, after user pay with token, the stream is unlocked for the user while this time
     developerFee: 0.1, // developer fee for pay per view is 10 %
     defaultChainId: 97,
     defaultTokenSymbol: 'DHB',

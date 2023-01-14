@@ -4,7 +4,8 @@ const paramNames = {
     sig: 'sig',
     timestamp: 'timestamp',
     chainId: 'chainId',
-    tokenAddress: 'tokenAddress'
+    tokenAddress: 'tokenAddress',
+    streamTokenId: 'streamTokenId',
 }
 
 const supportedVideoTypes = ["/mp4"];

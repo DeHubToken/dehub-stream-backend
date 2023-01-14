@@ -59,5 +59,10 @@ router.post(
         return ApiController.updateProfile(req, res, next);
     },
 );
-
+router.post('/request_ppv_stream', async function (req, res, next) {
+    return ApiController.requestPPVStream(req, res, next);
+});
+router.get('/request_ppv_stream', async function (req, res, next) {
+    return ApiController.requestPPVStream(req, res, next);
+});
 module.exports = router;
