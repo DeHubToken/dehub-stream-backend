@@ -13,11 +13,12 @@ const { signatureForMintingNFT } = require('./mintNft');
 const { removeDuplicatedObject } = require('../utils/validation');
 const { WatchHistory } = require('../models/WatchHistory');
 const { config } = require('../config');
-const { signatureForClaim, requestPPVStream } = require('./user');
+const { signatureForClaim, requestPPVStream, requestLike } = require('./user');
 const { result } = require('underscore');
 const { moveFile } = require('../utils/file');
 const { Balance } = require('../models/Balance');
 const { PPVTransaction } = require('../models/PPVTransaction');
+const Feature = require('../models/Feature');
 const expireTime = 86400000;
 const tokenTemplate = {
     name: 1,
@@ -31,6 +32,7 @@ const tokenTemplate = {
     videoDuration: 1,
     videoExt: 1,
     views: 1,
+    likes:1,
     _id: 0,
 };
 const accountTemplate = {
@@ -193,6 +195,7 @@ const ApiController = {
             minter: 1,
             streamInfo: 1,
             videoDuration: 1,
+            likes:1, 
             _id: 0,
         };
         const totalCount = await Token.find(filter, tokenTemplate).count();
@@ -301,6 +304,7 @@ const ApiController = {
         accountInfo.balances = balanceData;
         accountInfo.unlocked = unlockedPPVStreams;
         accountInfo.uploads = await Token.find({ minter: walletAddress.toLowerCase() }, {}).countDocuments();
+        accountInfo.likes = await Feature.find({ address: walletAddress.toLowerCase() }, {}).distinct('tokenId');
         return res.json({ result: accountInfo, });
     },
     getSignDataForClaim: async function (req, res, next) {
@@ -366,7 +370,24 @@ const ApiController = {
             return res.json(result);
         }
         catch (err) {
-            console.log('-----getSignedDataForClaim error', err);
+            console.log('-----request ppv error', err);
+            return res.json({ result: false, error: 'request ppv stream was failed' });
+        }
+    },
+    requestLike: async function (req, res, next) {
+        const address = reqParam(req, paramNames.address);
+        const rawSig = reqParam(req, paramNames.sig);
+        const timestamp = reqParam(req, paramNames.timestamp);        
+        let streamTokenId = reqParam(req, paramNames.streamTokenId);
+        if (!rawSig || !address || !timestamp || !streamTokenId)
+            return res.json({ error: true, msg: "sig or address not exist" });
+        try {            
+            streamTokenId = parseInt(streamTokenId, 10);
+            const result = await requestLike(address, rawSig, timestamp, streamTokenId);
+            return res.json(result);
+        }
+        catch (err) {
+            console.log('-----request like error', err);
             return res.json({ result: false, error: 'request ppv stream was failed' });
         }
     },

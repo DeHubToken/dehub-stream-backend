@@ -13,6 +13,7 @@ const { getERC20TokenBalance } = require("../utils/web3");
 const { PPVTransaction } = require("../models/PPVTransaction");
 const { config } = require("../config");
 const { Reward } = require("../models/Reward");
+const Feature = require("../models/Feature");
 
 const signer = new ethers.Wallet(process.env.SIGNER_KEY);
 
@@ -91,8 +92,21 @@ const requestPPVStream = async (account, sig, timestamp, chainId, tokenId) => {
     return { result: true };
 }
 
+const requestLike = async (account, sig, timestamp, tokenId) => {
+    if (!account || !sig || !timestamp) return { result: false, error: 'Please connect with your wallet' };
+    if (!isValidAccount(account, timestamp, sig)) return { result: false, error: 'Please sign with your wallet' };
+    const nftStreamItem = await Token.findOne({ tokenId }, {}).lean();
+    if (!nftStreamItem) return { result: false, error: 'This stream no exist' };
+    const likeItem = await Feature.findOne({tokenId, address: normalizeAddress(account)});    
+    if (likeItem) return { result: false, error: 'Already you marked like' }; 
+    await Feature.create({tokenId, address: normalizeAddress(account)});
+    await Token.updateOne({tokenId},{$inc: {likes: 1}});
+    return { result: true };
+}
+
 module.exports = {
     signatureForClaim,
     updateWalletBalance,
     requestPPVStream,
+    requestLike,
 };
