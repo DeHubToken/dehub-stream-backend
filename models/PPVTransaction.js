@@ -15,4 +15,5 @@ let PPVTransactionSchema = new Schema({
     tokenAddress: String,    
 }, { timestamps: true });
 
+PPVTransactionSchema.index({address: 1, streamTokenId: 1, createdAt: 1});
 module.exports.PPVTransaction = mongoose.model('ppv_transactions', PPVTransactionSchema);

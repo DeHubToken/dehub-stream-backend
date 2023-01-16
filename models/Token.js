@@ -57,4 +57,7 @@ TokenSchema.pre("save", function (next) {
         );
     else next();
 });
+
+TokenSchema.index({minter: 1});
+
 module.exports.Token = mongoose.model('tokens', TokenSchema);
