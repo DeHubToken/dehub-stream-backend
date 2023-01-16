@@ -47,7 +47,7 @@ const StreamController = {
             let start = parseInt(parts[0], 10);
             let end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
             let chunksize = end - start + 1;
-            const oldChunkSize = chunksize;
+            // const oldChunkSize = chunksize;
             // watching video at start position is always available.
             if (videoRange === 'bytes=0-') {
                 start = 0;
@@ -59,7 +59,7 @@ const StreamController = {
                     chunksize = limitBuffer + 1;
                     end = start + chunksize - 1;
                 }
-                if (tokenItem?.streamInfo?.[streamInfoKeys.isLockContent] || tokenItem?.streamInfo?.[streamInfoKeys.isPayPerView]) {
+                if (tokenItem?.owner !== normalizeAddress(userAddress) && (tokenItem?.streamInfo?.[streamInfoKeys.isLockContent] || tokenItem?.streamInfo?.[streamInfoKeys.isPayPerView])) {
                     // check signature for not start
                     const result = isValidAccount(signParams?.account, signParams?.timestamp, signParams.sig);
                     // return res.json({ error: 'error!' });  // for testing
@@ -72,10 +72,9 @@ const StreamController = {
                     // const accountItem = await Account.findOne({ address: userAddress }, { balance: 1, dhbBalance: 1 });
                     if (tokenItem?.streamInfo?.[streamInfoKeys.isLockContent]) {
 
-                        const symbol = tokenItem?.streamInfo?.[streamInfoKeys.lockContentTokenSymbol] || 'DHB';
-                        const chainIds = tokenItem?.streamInfo?.[streamInfoKeys.lockContentChainIds] || [97];
+                        const symbol = tokenItem?.streamInfo?.[streamInfoKeys.lockContentTokenSymbol] || config.defaultTokenSymbol;
+                        const chainIds = tokenItem?.streamInfo?.[streamInfoKeys.lockContentChainIds] || [config.defaultChainId];
                         if (!chainIds.includes(chainId)) return res.status(500).send('error!');
-
                         const tokenAddress = supportedTokens.find(e => e.symbol === symbol || e.chainId === chainId)?.address;
                         const lockContentAmount = Number(tokenItem?.streamInfo?.[streamInfoKeys.lockContentAmount]);
                         const balanceItem = await Balance.findOne({

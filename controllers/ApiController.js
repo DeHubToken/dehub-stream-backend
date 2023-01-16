@@ -205,7 +205,7 @@ const ApiController = {
     },
     getFilteredNfts: async function (req, res, next) {
         try {
-            let { search, page, unit, sortMode, bulkIdList, verifiedOnly, isSales, minter } = req.query
+            let { search, page, unit, sortMode, bulkIdList, verifiedOnly, isSales, minter, owner } = req.query
             const searchQuery = {};
             if (!unit) unit = 20;
             if (unit > 100) unit = 100;
@@ -227,6 +227,7 @@ const ApiController = {
             if (!page) page = 0;
             let aggregateQuery = []
             if (minter) searchQuery['$match'] = { minter: minter.toLowerCase() };
+            if (owner) searchQuery['$match'] = { owner: owner.toLowerCase() };
             if (search) {
                 var re = new RegExp(search, "gi")
                 searchQuery['$match'] = { ...searchQuery['$match'], $or: [{ name: re }, { description: re }, { minter: re }, { owner: re }] }
@@ -299,7 +300,8 @@ const ApiController = {
         const unlockedPPVStreams = await PPVTransaction.find({ address: normalizeAddress(walletAddress), createdAt: { $gt: new Date(Date.now() - config.availableTimeForPPVStream) } }, { streamTokenId: 1 }).distinct('streamTokenId');
         accountInfo.balances = balanceData;
         accountInfo.unlocked = unlockedPPVStreams;
-        return res.json({ result: accountInfo,  });
+        accountInfo.uploads = await Token.find({ minter: walletAddress.toLowerCase() }, {}).countDocuments();
+        return res.json({ result: accountInfo, });
     },
     getSignDataForClaim: async function (req, res, next) {
         const address = reqParam(req, paramNames.address);
