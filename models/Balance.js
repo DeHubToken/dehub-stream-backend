@@ -25,4 +25,5 @@ let BalanceSchema = new Schema({
 }, { timestamps: true });
 
 BalanceSchema.index({ address: 1 });
+BalanceSchema.index({ address: 1, chainId: 1, tokenAddress: 1 });
 module.exports.Balance = mongoose.model('balances', BalanceSchema);
