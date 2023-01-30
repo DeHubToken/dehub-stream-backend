@@ -6,7 +6,7 @@ const { ethers, FixedNumber } = require('ethers');
 const { splitSignature } = require('@ethersproject/bytes');
 const { isValidAccount, reqParam } = require('../utils/auth');
 const { decryptWithSourceKey, encryptWithSourceKey } = require('../utils/encrypt');
-const { paramNames, errorMsgs, userProfileKeys, overrideOptions } = require('../config/constants');
+const { paramNames, errorMsgs, userProfileKeys, overrideOptions, supportedTokens } = require('../config/constants');
 const { Token } = require('../models/Token');
 const { checkFileType, normalizeAddress } = require('../utils/format');
 const { signatureForMintingNFT } = require('./mintNft');
@@ -32,7 +32,7 @@ const tokenTemplate = {
     videoDuration: 1,
     videoExt: 1,
     views: 1,
-    likes:1,
+    likes: 1,
     _id: 0,
 };
 const accountTemplate = {
@@ -195,7 +195,7 @@ const ApiController = {
             minter: 1,
             streamInfo: 1,
             videoDuration: 1,
-            likes:1, 
+            likes: 1,
             _id: 0,
         };
         const totalCount = await Token.find(filter, tokenTemplate).count();
@@ -377,11 +377,11 @@ const ApiController = {
     requestLike: async function (req, res, next) {
         const address = reqParam(req, paramNames.address);
         const rawSig = reqParam(req, paramNames.sig);
-        const timestamp = reqParam(req, paramNames.timestamp);        
+        const timestamp = reqParam(req, paramNames.timestamp);
         let streamTokenId = reqParam(req, paramNames.streamTokenId);
         if (!rawSig || !address || !timestamp || !streamTokenId)
             return res.json({ error: true, msg: "sig or address not exist" });
-        try {            
+        try {
             streamTokenId = parseInt(streamTokenId, 10);
             const result = await requestLike(address, rawSig, timestamp, streamTokenId);
             return res.json(result);
@@ -391,5 +391,56 @@ const ApiController = {
             return res.json({ result: false, error: 'request ppv stream was failed' });
         }
     },
+    leaderboard: async function (req, res, next) {
+        try {
+            const mainTokenAddresses = supportedTokens.filter(e => e.symbol === config.defaultTokenSymbol).map(f => {
+                return { tokenAddress: normalizeAddress(f.address) };
+            });
+            const query = [
+                {
+                    $match: {
+                        $or: mainTokenAddresses
+                    }
+                },
+                {
+                    $lookup: {
+                        from: 'accounts',
+                        localField: 'address',
+                        foreignField: 'address',
+                        as: 'account'
+                    }
+                },
+                {
+                    $group: {
+                        _id: '$address',
+                        sumBalance: { '$sum': '$walletBalance' },
+                        account: { $first: '$account' }
+                    }
+                },
+                {
+                    $sort: {
+                        sumBalance: -1
+                    }
+                },
+                {
+                    $limit: 20
+                }
+            ];
+            let result = await Balance.aggregate(query);
+            result = result.map(e => {
+                return {
+                    account: e._id,
+                    sumDHB: e.sumBalance,
+                    username: e.account[0].username,
+                    avatarUrl: e.account[0].avatarImageUrl ? `${process.env.DEFAULT_DOMAIN}/${e.account[0].avatarImageUrl}` : undefined
+                }
+            })
+            return res.json({ result: { byWalletBalance: result } });
+        }
+        catch (err) {
+            console.log('-----request like error', err);
+            return res.json({ result: false, error: 'request ppv stream was failed' });
+        }
+    }
 }
 module.exports = { ApiController };
