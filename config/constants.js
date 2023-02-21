@@ -37,7 +37,8 @@ const streamInfoKeys = {
 const RewardType = {
     PayPerView: 'PayPerView',
     FirstComment: 'FirstComment',
-    FirstView: 'FirstView'
+    FirstView: 'FirstView',
+    Tip: 'Tip'
 }
 
 const userProfileKeys = {

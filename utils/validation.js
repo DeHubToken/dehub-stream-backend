@@ -25,7 +25,11 @@ const isUnlockedPPVStream = async (streamTokenId, account) => {
     if (ppvTxItem && ppvTxItem.createdAt) return true;
     return false;
 }
+
+const isValidTipAmount = amount => amount <= config.rangeOfTip.max && amount >= config.rangeOfTip.min;
+
 module.exports = {
     removeDuplicatedObject,
     isUnlockedPPVStream,
+    isValidTipAmount
 }

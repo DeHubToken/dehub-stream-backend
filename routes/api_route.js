@@ -46,19 +46,13 @@ router.get("/account_info/:id", async function (req, res, next) {
 router.get('/claim', async function (req, res, next) {
     return ApiController.getSignDataForClaim(req, res, next);
 })
+// update apis
 router.post('/claim', async function (req, res, next) {
     return ApiController.getSignDataForClaim(req, res, next);
 })
-router.post(
-    "/update_profile",
-    upload.fields([
-        { name: "coverImg", maxCount: 1 },
-        { name: "avatarImg", maxCount: 1 },
-    ]),
-    async function (req, res, next) {
-        return ApiController.updateProfile(req, res, next);
-    },
-);
+router.post("/update_profile", upload.fields([{ name: "coverImg", maxCount: 1 }, { name: "avatarImg", maxCount: 1 },]), async function (req, res, next) {
+    return ApiController.updateProfile(req, res, next);
+});
 router.post('/request_ppv_stream', async function (req, res, next) {
     return ApiController.requestPPVStream(req, res, next);
 });
@@ -68,7 +62,11 @@ router.get('/request_ppv_stream', async function (req, res, next) {
 router.get('/request_like', async function (req, res, next) {
     return ApiController.requestLike(req, res, next);
 });
+router.get('/request_tip', async function (req, res, next) {
+    return ApiController.requestTip(req, res, next);
+});
 
+// get apis
 router.get('/leaderboard', async function (req, res, next) {
     return ApiController.leaderboard(req, res, next);
 });

@@ -19,6 +19,8 @@ let BalanceSchema = new Schema({
     balance: Number,
     lockForPPV: Number,
     paidForPPV: Number,
+    paidTips: Number,
+    sentTips: Number,
     walletBalance: Number, // balance of wallet
     updateWalletBalanceAt: Date,
     // lastLoginTimestamp: Number,

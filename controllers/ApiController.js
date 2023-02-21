@@ -1,20 +1,17 @@
 const { Account } = require('../models/Account');
 const path = require("path");
-const fs = require('fs');
 require("dotenv").config();
-const { ethers, FixedNumber } = require('ethers');
-const { splitSignature } = require('@ethersproject/bytes');
+const { ethers } = require('ethers');
 const { isValidAccount, reqParam } = require('../utils/auth');
 const { decryptWithSourceKey, encryptWithSourceKey } = require('../utils/encrypt');
 const { paramNames, errorMsgs, userProfileKeys, overrideOptions, supportedTokens } = require('../config/constants');
 const { Token } = require('../models/Token');
 const { checkFileType, normalizeAddress } = require('../utils/format');
 const { signatureForMintingNFT } = require('./mintNft');
-const { removeDuplicatedObject } = require('../utils/validation');
+const { removeDuplicatedObject, isValidTipAmount } = require('../utils/validation');
 const { WatchHistory } = require('../models/WatchHistory');
 const { config } = require('../config');
-const { signatureForClaim, requestPPVStream, requestLike } = require('./user');
-const { result } = require('underscore');
+const { signatureForClaim, requestPPVStream, requestLike, requestTip } = require('./user');
 const { moveFile } = require('../utils/file');
 const { Balance } = require('../models/Balance');
 const { PPVTransaction } = require('../models/PPVTransaction');
@@ -384,6 +381,28 @@ const ApiController = {
         try {
             streamTokenId = parseInt(streamTokenId, 10);
             const result = await requestLike(address, rawSig, timestamp, streamTokenId);
+            return res.json(result);
+        }
+        catch (err) {
+            console.log('-----request like error', err);
+            return res.json({ result: false, error: 'request ppv stream was failed' });
+        }
+    },
+    requestTip: async function (req, res, next) {
+        const address = reqParam(req, paramNames.address);
+        const rawSig = reqParam(req, paramNames.sig);
+        const timestamp = reqParam(req, paramNames.timestamp);
+        let amount = reqParam(req, 'amount');
+        let chainId = reqParam(req, 'chainId');
+        let streamTokenId = reqParam(req, paramNames.streamTokenId);
+        if (!rawSig || !address || !timestamp || !streamTokenId)
+            return res.json({ error: true, msg: "sig or address not exist" });
+        try {
+            amount = Number(amount);
+            chainId = parseInt(chainId, 10);         
+            if (!isValidTipAmount(amount)) return res.json({ error: true, msg: "Invalid tip amount!" });
+            streamTokenId = parseInt(streamTokenId, 10);
+            const result = await requestTip(address, rawSig, timestamp, streamTokenId, amount, chainId);
             return res.json(result);
         }
         catch (err) {

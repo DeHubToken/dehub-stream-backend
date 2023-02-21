@@ -14,6 +14,7 @@ const { PPVTransaction } = require("../models/PPVTransaction");
 const { config } = require("../config");
 const { Reward } = require("../models/Reward");
 const Feature = require("../models/Feature");
+const Tip = require("../models/Tip");
 
 const signer = new ethers.Wallet(process.env.SIGNER_KEY);
 
@@ -79,7 +80,7 @@ const requestPPVStream = async (account, sig, timestamp, chainId, tokenId) => {
             chainId,
         },
         { balance: 1 }
-    )
+    );
     if (!balanceItem?.balance || balanceItem.balance < payAmount) return { result: false, error: 'The user have no enough balance' };
     await Balance.updateOne({ address: normalizeAddress(account), tokenAddress: normalizeAddress(tokenItem.address), chainId }, { $inc: { balance: -payAmount, paidForPPV: payAmount } });
     const reward = payAmount * (1 - config.developerFee);
@@ -97,10 +98,32 @@ const requestLike = async (account, sig, timestamp, tokenId) => {
     if (!isValidAccount(account, timestamp, sig)) return { result: false, error: 'Please sign with your wallet' };
     const nftStreamItem = await Token.findOne({ tokenId }, {}).lean();
     if (!nftStreamItem) return { result: false, error: 'This stream no exist' };
-    const likeItem = await Feature.findOne({tokenId, address: normalizeAddress(account)});    
-    if (likeItem) return { result: false, error: 'Already you marked like' }; 
-    await Feature.create({tokenId, address: normalizeAddress(account)});
-    await Token.updateOne({tokenId},{$inc: {likes: 1}});
+    const likeItem = await Feature.findOne({ tokenId, address: normalizeAddress(account) });
+    if (likeItem) return { result: false, error: 'Already you marked like' };
+    await Feature.create({ tokenId, address: normalizeAddress(account) });
+    await Token.updateOne({ tokenId }, { $inc: { likes: 1 } });
+    return { result: true };
+}
+
+const requestTip = async (account, sig, timestamp, tokenId, tipAmount, chainId) => {
+    if (!account || !sig || !timestamp) return { result: false, error: 'Please connect with your wallet' };
+    if (!isValidAccount(account, timestamp, sig)) return { result: false, error: 'Please sign with your wallet' };
+    const nftStreamItem = await Token.findOne({ tokenId }, {}).lean();
+    if (!nftStreamItem) return { result: false, error: 'This stream no exist' };
+    const tokenItem = supportedTokens.find(e => e.symbol === config.defaultTokenSymbol && e.chainId === chainId);
+    const tokenAddress = normalizeAddress(tokenItem.address);
+    const sender = normalizeAddress(account);
+    const balanceItem = await Balance.findOne({ address: sender, tokenAddress, chainId, }, { balance: 1 });
+    if (!balanceItem?.balance || balanceItem.balance < tipAmount) return { result: false, error: 'The user have no enough balance' };
+
+    if (nftStreamItem.owner) {
+        await Balance.updateOne({ address: sender, tokenAddress, chainId },
+            { $inc: { balance: -tipAmount, sentTips: tipAmount } });
+        await Balance.updateOne({ address: nftStreamItem.owner, tokenAddress, chainId },
+            { $inc: { balance: tipAmount, paidTips: tipAmount } });
+        await Reward.create({ address: nftStreamItem.owner, rewardAmount: tipAmount, tokenId, from: sender, chainId, type: RewardType.Tip });
+        await Token.updateOne({ tokenId }, { $inc: { totalTips: tipAmount } });
+    }
     return { result: true };
 }
 
@@ -109,4 +132,5 @@ module.exports = {
     updateWalletBalance,
     requestPPVStream,
     requestLike,
+    requestTip
 };
