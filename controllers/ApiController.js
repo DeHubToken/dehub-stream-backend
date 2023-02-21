@@ -431,8 +431,8 @@ const ApiController = {
                 return {
                     account: e._id,
                     sumDHB: e.sumBalance,
-                    username: e.account[0].username,
-                    avatarUrl: e.account[0].avatarImageUrl ? `${process.env.DEFAULT_DOMAIN}/${e.account[0].avatarImageUrl}` : undefined
+                    username: e.account[0]?.username,
+                    avatarUrl: e.account[0]?.avatarImageUrl ? `${process.env.DEFAULT_DOMAIN}/${e.account[0].avatarImageUrl}` : undefined
                 }
             })
             return res.json({ result: { byWalletBalance: result } });
