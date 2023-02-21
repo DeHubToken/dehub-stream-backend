@@ -14,6 +14,7 @@ const { PPVTransaction } = require("../models/PPVTransaction");
 const { config } = require("../config");
 const { Reward } = require("../models/Reward");
 const Feature = require("../models/Feature");
+const Comment = require("../models/Comment");
 
 const signer = new ethers.Wallet(process.env.SIGNER_KEY);
 
@@ -132,10 +133,26 @@ const requestTip = async (account, tokenId, tipAmount, chainId) => {
     return { result: true };
 }
 
+const requestComment = async (account, tokenId, content, commentId) => {
+    const nftStreamItem = await Token.findOne({ tokenId }, {}).lean();
+    if (!nftStreamItem) return { result: false, error: 'This stream no exist' };
+    account = normalizeAddress(account);
+    if (commentId) {
+        const commentItem = await Comment.findOne({ id: commentId }, { tokenId: 1 }).lean();
+        if (commentItem?.tokenId != tokenId) return { result: false, error: 'invalid comment' };
+        const createdComment = await Comment.create({ tokenId, address: account, content, parentId: commentId });
+        await Comment.updateOne({ id: commentId }, { $push: { replyIds: createdComment.id } });
+    }
+    else {
+        await Comment.create({ tokenId, address: account, content });
+    }
+    return { result: true };
+}
 module.exports = {
     signatureForClaim,
     updateWalletBalance,
     requestPPVStream,
     requestLike,
-    requestTip
+    requestTip,
+    requestComment,
 };

@@ -11,7 +11,7 @@ const { signatureForMintingNFT } = require('./mintNft');
 const { removeDuplicatedObject, isValidTipAmount } = require('../utils/validation');
 const { WatchHistory } = require('../models/WatchHistory');
 const { config } = require('../config');
-const { signatureForClaim, requestPPVStream, requestLike, requestTip } = require('./user');
+const { signatureForClaim, requestPPVStream, requestLike, requestTip, requestComment } = require('./user');
 const { moveFile } = require('../utils/file');
 const { Balance } = require('../models/Balance');
 const { PPVTransaction } = require('../models/PPVTransaction');
@@ -389,26 +389,6 @@ const ApiController = {
             return res.json({ result: false, error: 'request ppv stream was failed' });
         }
     },
-    requestTip: async function (req, res, next) {
-        const address = reqParam(req, paramNames.address);
-        let amount = reqParam(req, 'amount');
-        let chainId = reqParam(req, 'chainId');
-        let streamTokenId = reqParam(req, paramNames.streamTokenId);
-        if (!streamTokenId)
-            return res.json({ error: true, msg: "streamTokenId not exist" });
-        try {
-            amount = Number(amount);
-            chainId = parseInt(chainId, 10);
-            if (!isValidTipAmount(amount)) return res.json({ error: true, msg: "Invalid tip amount!" });
-            streamTokenId = parseInt(streamTokenId, 10);
-            const result = await requestTip(address, streamTokenId, amount, chainId);
-            return res.json(result);
-        }
-        catch (err) {
-            console.log('-----request like error', err);
-            return res.json({ result: false, error: 'request ppv stream was failed' });
-        }
-    },
     leaderboard: async function (req, res, next) {
         try {
             const mainTokenAddresses = supportedTokens.filter(e => e.symbol === config.defaultTokenSymbol).map(f => {
@@ -454,6 +434,45 @@ const ApiController = {
                 }
             })
             return res.json({ result: { byWalletBalance: result } });
+        }
+        catch (err) {
+            console.log('-----request like error', err);
+            return res.json({ result: false, error: 'request ppv stream was failed' });
+        }
+    },
+    requestTip: async function (req, res, next) {
+        const address = reqParam(req, paramNames.address);
+        let amount = reqParam(req, 'amount');
+        let chainId = reqParam(req, 'chainId');
+        let streamTokenId = reqParam(req, paramNames.streamTokenId);
+        if (!streamTokenId)
+            return res.json({ error: true, msg: "streamTokenId not exist" });
+        try {
+            amount = Number(amount);
+            chainId = parseInt(chainId, 10);
+            if (!isValidTipAmount(amount)) return res.json({ error: true, msg: "Invalid tip amount!" });
+            streamTokenId = parseInt(streamTokenId, 10);
+            const result = await requestTip(address, streamTokenId, amount, chainId);
+            return res.json(result);
+        }
+        catch (err) {
+            console.log('-----request like error', err);
+            return res.json({ result: false, error: 'request ppv stream was failed' });
+        }
+    },
+    requestComment: async function (req, res, next) {
+        const address = reqParam(req, paramNames.address);
+        let content = reqParam(req, 'content');
+        let commentId = reqParam(req, 'commentId');
+        let streamTokenId = reqParam(req, paramNames.streamTokenId);
+        if (!streamTokenId)
+            return res.json({ error: true, msg: "streamTokenId not exist" });
+        try {
+            if (!content) return res.json({ error: true, msg: "no comment!" });
+            streamTokenId = parseInt(streamTokenId, 10);
+            commentId = parseInt(commentId, 10);
+            const result = await requestComment(address, streamTokenId, content, commentId);
+            return res.json(result);
         }
         catch (err) {
             console.log('-----request like error', err);

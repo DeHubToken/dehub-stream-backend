@@ -66,6 +66,9 @@ router.get('/request_like', async function (req, res, next) {
 router.get('/request_tip', isAuthorized, async function (req, res, next) {
     return ApiController.requestTip(req, res, next);
 });
+router.get('/request_comment', isAuthorized, async function (req, res, next) {
+    return ApiController.requestComment(req, res, next);
+});
 // get apis
 router.get('/leaderboard', async function (req, res, next) {
     return ApiController.leaderboard(req, res, next);
