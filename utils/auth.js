@@ -4,7 +4,7 @@ const { Account } = require("../models/Account");
 const { config } = require("../config");
 const { paramNames } = require('../config/constants');
 
-const expireSecond = 60 * 60 * 2; // 2 hours
+const expireSecond = config.isDevMode ? 60 * 60 * 2 : 60 * 60 * 24; // 2 hours for dev mode, 24 hours for production mode
 /**
  * if user signature and timestamp is correct, returns account data, if not => false
  * @param {*} address 

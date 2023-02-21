@@ -30,6 +30,7 @@ const tokenTemplate = {
     videoExt: 1,
     views: 1,
     likes: 1,
+    totalTips: 1,
     _id: 0,
 };
 const accountTemplate = {
