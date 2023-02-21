@@ -5,6 +5,7 @@ const path = require("path");
 const { ApiController } = require("../controllers/ApiController");
 let router = express.Router();
 var multer = require("multer");
+const { isAuthorized } = require("../utils/auth");
 const upload = multer({ dest: "uploads/" });
 
 /**
@@ -62,10 +63,9 @@ router.get('/request_ppv_stream', async function (req, res, next) {
 router.get('/request_like', async function (req, res, next) {
     return ApiController.requestLike(req, res, next);
 });
-router.get('/request_tip', async function (req, res, next) {
+router.get('/request_tip', isAuthorized, async function (req, res, next) {
     return ApiController.requestTip(req, res, next);
 });
-
 // get apis
 router.get('/leaderboard', async function (req, res, next) {
     return ApiController.leaderboard(req, res, next);

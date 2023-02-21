@@ -2,6 +2,7 @@ require('dotenv').config();
 const ethers = require('ethers');
 const { Account } = require("../models/Account");
 const { config } = require("../config");
+const { paramNames } = require('../config/constants');
 
 const expireSecond = 60 * 60 * 2; // 2 hours
 /**
@@ -11,7 +12,7 @@ const expireSecond = 60 * 60 * 2; // 2 hours
  * @param {*} sig 
  * @returns 
  */
-const isValidAccount =  (address, timestamp, sig) => {
+const isValidAccount = (address, timestamp, sig) => {
     if (!sig || !address || !timestamp)
         return false;
     const signedMsg = `${address.toLowerCase()}-${timestamp}`;
@@ -42,7 +43,27 @@ const reqParam = (req, paramName) => {
     if (!req) return null;
     return req.query?.[paramName] || req.body?.[paramName] || req.params?.[paramName];
 }
+
+/**
+ * call as middleware before main api function is called
+ * @param {*} req 
+ * @param {*} res 
+ * @param {*} next 
+ * @returns call next function if api call is authorized with signed params
+ */
+const isAuthorized = async (req, res, next) => {
+    const address = reqParam(req, paramNames.address);
+    const rawSig = reqParam(req, paramNames.sig);
+    const timestamp = reqParam(req, paramNames.timestamp);
+    if (!rawSig || !address || !timestamp)
+        return res.json({ error: true, msg: "sig or address not exist" });
+    const result = isValidAccount(address, timestamp, rawSig);
+    if (!result) return res.json({ status: false, error: true, error_msg: "should sign with your wallet first" });
+    return next();
+}
+
 module.exports = {
     isValidAccount,
     reqParam,
+    isAuthorized
 }

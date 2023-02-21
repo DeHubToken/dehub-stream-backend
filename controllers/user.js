@@ -14,7 +14,6 @@ const { PPVTransaction } = require("../models/PPVTransaction");
 const { config } = require("../config");
 const { Reward } = require("../models/Reward");
 const Feature = require("../models/Feature");
-const Tip = require("../models/Tip");
 
 const signer = new ethers.Wallet(process.env.SIGNER_KEY);
 
@@ -105,9 +104,15 @@ const requestLike = async (account, sig, timestamp, tokenId) => {
     return { result: true };
 }
 
-const requestTip = async (account, sig, timestamp, tokenId, tipAmount, chainId) => {
-    if (!account || !sig || !timestamp) return { result: false, error: 'Please connect with your wallet' };
-    if (!isValidAccount(account, timestamp, sig)) return { result: false, error: 'Please sign with your wallet' };
+/**
+ * ### call after authentication is checked ###
+ * @param {*} account 
+ * @param {*} tokenId 
+ * @param {*} tipAmount 
+ * @param {*} chainId 
+ * @returns true if balance is enough 
+ */
+const requestTip = async (account, tokenId, tipAmount, chainId) => {
     const nftStreamItem = await Token.findOne({ tokenId }, {}).lean();
     if (!nftStreamItem) return { result: false, error: 'This stream no exist' };
     const tokenItem = supportedTokens.find(e => e.symbol === config.defaultTokenSymbol && e.chainId === chainId);

@@ -390,19 +390,17 @@ const ApiController = {
     },
     requestTip: async function (req, res, next) {
         const address = reqParam(req, paramNames.address);
-        const rawSig = reqParam(req, paramNames.sig);
-        const timestamp = reqParam(req, paramNames.timestamp);
         let amount = reqParam(req, 'amount');
         let chainId = reqParam(req, 'chainId');
         let streamTokenId = reqParam(req, paramNames.streamTokenId);
-        if (!rawSig || !address || !timestamp || !streamTokenId)
-            return res.json({ error: true, msg: "sig or address not exist" });
+        if (!streamTokenId)
+            return res.json({ error: true, msg: "streamTokenId not exist" });
         try {
             amount = Number(amount);
-            chainId = parseInt(chainId, 10);         
+            chainId = parseInt(chainId, 10);
             if (!isValidTipAmount(amount)) return res.json({ error: true, msg: "Invalid tip amount!" });
             streamTokenId = parseInt(streamTokenId, 10);
-            const result = await requestTip(address, rawSig, timestamp, streamTokenId, amount, chainId);
+            const result = await requestTip(address, streamTokenId, amount, chainId);
             return res.json(result);
         }
         catch (err) {
