@@ -16,6 +16,7 @@ const { moveFile } = require('../utils/file');
 const { Balance } = require('../models/Balance');
 const { PPVTransaction } = require('../models/PPVTransaction');
 const Feature = require('../models/Feature');
+const { commentsForTokenId } = require('./comments');
 const expireTime = 86400000;
 const tokenTemplate = {
     name: 1,
@@ -286,6 +287,8 @@ const ApiController = {
         if (!nftInfo) return res.json({ error: 'no nft' });
         nftInfo.imageUrl = process.env.DEFAULT_DOMAIN + "/" + nftInfo.imageUrl;
         nftInfo.videoUrl = process.env.DEFAULT_DOMAIN + "/" + nftInfo.videoUrl;
+        const comments = await commentsForTokenId(tokenId);
+        nftInfo.comments = comments;        
         return res.json({ result: nftInfo });
     },
     getAccountInfo: async function (req, res, next) {
