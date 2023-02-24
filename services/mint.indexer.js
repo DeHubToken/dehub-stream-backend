@@ -15,11 +15,6 @@ const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_ENDPOINT);
 
 const NFTContract = new ethers.Contract(process.env.DEFAULT_COLLECTION, ContractAbi, provider)
 
-// const MINT_STATUS = {
-//     minted: 'minted',
-//     signed: 'signed',
-//     pending: 'pending'
-// }
 const zeroAddress = '0x0000000000000000000000000000000000000000';
 
 async function TxEventListener(from, to, tokenId, logInfo) {

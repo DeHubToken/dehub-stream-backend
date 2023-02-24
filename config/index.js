@@ -1,3 +1,4 @@
+const { normalizeAddress } = require('../utils/format');
 
 require('dotenv').config();
 
@@ -24,7 +25,8 @@ const config = {
     developerFee: 0.1, // developer fee for pay per view is 10 %
     defaultChainId: 97,
     defaultTokenSymbol: 'DHB',
-    rangeOfTip: { min: 1, max: 5 }
+    rangeOfTip: { min: 1, max: 5 },
+    devWalletAddress: normalizeAddress(process.env.DEV_ADDRESS),
 };
 module.exports = {
     config,

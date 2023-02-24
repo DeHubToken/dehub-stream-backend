@@ -18,6 +18,7 @@ let BalanceSchema = new Schema({
     // total protocol balance 
     balance: Number,
     lockForPPV: Number,
+    lockForBounty: Number,
     paidForPPV: Number,
     paidTips: Number,
     sentTips: Number,

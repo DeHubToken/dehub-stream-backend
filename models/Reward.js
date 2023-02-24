@@ -5,7 +5,7 @@ const Schema = mongoose.Schema;
 let RewardSchema = new Schema({
     // "Account address"
     address: String,
-    // "vote amount"
+    // "reward amount"
     rewardAmount: Number,
     // token id for stream nft
     tokenId: Number,
@@ -13,6 +13,7 @@ let RewardSchema = new Schema({
     from: String,
     // chain id
     chainId: Number,
+    // type : pay per view, bounty, tip
     type: { type: String, enum: Object.values(RewardType), default: RewardType.PayPerView, index: true },
 }, { timestamps: true });
 

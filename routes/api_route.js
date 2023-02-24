@@ -17,15 +17,9 @@ router.get("/getServerTime", async function (req, res, next) {
 router.post("/signinWithWallet", async function (req, res, next) {
     return ApiController.signWithWallet(req, res, next);
 });
-router.post(
-    "/user_mint",
-    upload.fields([
-        { name: "files", maxCount: 2 }
-    ]),
-    async function (req, res, next) {
-        return ApiController.getSignedDataForUserMint(req, res, next);
-    }
-);
+router.post("/user_mint", upload.fields([{ name: "files", maxCount: 2 }]), isAuthorized, async function (req, res, next) {
+    return ApiController.getSignedDataForUserMint(req, res, next);
+});
 router.get("/all_nfts", async function (req, res, next) {
     return ApiController.getAllNfts(req, res, next);
 });

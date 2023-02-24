@@ -32,6 +32,7 @@ const tokenTemplate = {
     views: 1,
     likes: 1,
     totalTips: 1,
+    status: 1,
     _id: 0,
 };
 const accountTemplate = {
@@ -148,7 +149,7 @@ const ApiController = {
         return res.json({ status: true, result: { data1, data2 } });
     },
     getSignedDataForUserMint: async function (req, res, next) {
-        const { from, name, description, streamInfo } = req.body;
+        const { address, name, description, streamInfo } = req.body;
         console.log(name, description, streamInfo);
         const uploadedFiles = req.files.files;
         if (uploadedFiles?.length < 2) return res.json({ error: true, msg: "upload image and video file" });
@@ -157,7 +158,7 @@ const ApiController = {
         const imageFile = uploadedFiles[1];
         if (!checkFileType(imageFile, 'image')) return res.json({ error: true, msg: errorMsgs.not_supported_image });
         try {
-            const result = await signatureForMintingNFT(videoFile, imageFile, name, description, JSON.parse(streamInfo));
+            const result = await signatureForMintingNFT(videoFile, imageFile, name, description, JSON.parse(streamInfo), address);
             return res.json(result);
         }
         catch (err) {
@@ -195,6 +196,7 @@ const ApiController = {
             streamInfo: 1,
             videoDuration: 1,
             likes: 1,
+            status: 1,
             _id: 0,
         };
         const totalCount = await Token.find(filter, tokenTemplate).count();
@@ -213,13 +215,13 @@ const ApiController = {
             if (unit > 100) unit = 100;
 
             let sortRule = { createdAt: -1 };
-            searchQuery['$match'] = {};
+            searchQuery['$match'] = { status: 'minted' };
             switch (sortMode) {
                 case 'trends':
                     sortRule = { views: -1 };
                     break;
                 case 'new':
-                    searchQuery['$match'] = { createdAt: { $gt: new Date(new Date() - config.recentTimeDiff) } }
+                    searchQuery['$match']['createdAt'] = { $gt: new Date(new Date() - config.recentTimeDiff) };
                     break;
                 case 'mostLiked':
                     sortRule = { likes: -1 };
@@ -288,7 +290,7 @@ const ApiController = {
         nftInfo.imageUrl = process.env.DEFAULT_DOMAIN + "/" + nftInfo.imageUrl;
         nftInfo.videoUrl = process.env.DEFAULT_DOMAIN + "/" + nftInfo.videoUrl;
         const comments = await commentsForTokenId(tokenId);
-        nftInfo.comments = comments;        
+        nftInfo.comments = comments;
         return res.json({ result: nftInfo });
     },
     getAccountInfo: async function (req, res, next) {

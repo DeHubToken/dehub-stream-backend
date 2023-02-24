@@ -38,7 +38,9 @@ const RewardType = {
     PayPerView: 'PayPerView',
     FirstComment: 'FirstComment',
     FirstView: 'FirstView',
-    Tip: 'Tip'
+    Tip: 'Tip',
+    BountyForViewer: 'BountyForViewer',
+    BountyForCommentor: 'BountyForCommentor',
 }
 
 const userProfileKeys = {

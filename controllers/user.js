@@ -4,7 +4,7 @@ const { ethers } = require("ethers");
 const { splitSignature } = require("@ethersproject/bytes");
 
 const { isValidAccount } = require("../utils/auth");
-const { vaultContractAddresses, ChainId, supportedTokens, streamInfoKeys, RewardType } = require("../config/constants");
+const { vaultContractAddresses, ChainId, supportedTokens, streamInfoKeys, RewardType, overrideOptions } = require("../config/constants");
 const { Balance } = require("../models/Balance");
 const { Token } = require("../models/Token");
 const { ClaimTransaction } = require("../models/ClaimTransaction");
@@ -70,26 +70,23 @@ const requestPPVStream = async (account, sig, timestamp, chainId, tokenId) => {
     if (!(streamInfo[streamInfoKeys.payPerViewChainIds] || [config.defaultChainId])?.includes(chainId)) return { result: false, error: 'Not supported chain' };
     const tokenItem = supportedTokens.find(e => e.symbol === (streamInfo[streamInfoKeys.payPerViewTokenSymbol] || config.defaultTokenSymbol) && e.chainId === chainId);
 
-    const ppvTxItem = await PPVTransaction.findOne({ address: normalizeAddress(account), streamTokenId: tokenId, createdAt: { $gt: new Date(Date.now() - config.availableTimeForPPVStream) } });
+    const address = normalizeAddress(account);
+    const tokenFilter = { tokenAddress: normalizeAddress(tokenItem.address), chainId };
+
+    const ppvTxItem = await PPVTransaction.findOne({ address, streamTokenId: tokenId, createdAt: { $gt: new Date(Date.now() - config.availableTimeForPPVStream) } });
     if (ppvTxItem) return { result: false, error: 'Already paid' };
     const payAmount = streamInfo[streamInfoKeys.payPerViewAmount];
-    const balanceItem = await Balance.findOne(
-        {
-            address: normalizeAddress(account),
-            tokenAddress: normalizeAddress(tokenItem.address),
-            chainId,
-        },
-        { balance: 1 }
-    );
+    const balanceItem = await Balance.findOne({ ...tokenFilter, address, }, { balance: 1 });
     if (!balanceItem?.balance || balanceItem.balance < payAmount) return { result: false, error: 'The user have no enough balance' };
-    await Balance.updateOne({ address: normalizeAddress(account), tokenAddress: normalizeAddress(tokenItem.address), chainId }, { $inc: { balance: -payAmount, paidForPPV: payAmount } });
+    await Balance.updateOne({ address, ...tokenFilter }, { $inc: { balance: -payAmount, paidForPPV: payAmount } });
     const reward = payAmount * (1 - config.developerFee);
     if (nftStreamItem.owner) {
-        await Balance.updateOne({ address: nftStreamItem.owner, tokenAddress: normalizeAddress(tokenItem.address), chainId }, { $inc: { balance: reward, reward } });
-        await Reward.create({ address: nftStreamItem.owner, rewardAmount: reward, tokenId, from: normalizeAddress(account), chainId, type: RewardType.PayPerView });
+        await Balance.updateOne({ address: nftStreamItem.owner, ...tokenFilter }, { $inc: { balance: reward, reward } }, overrideOptions);
+        await Reward.create({ address: nftStreamItem.owner, rewardAmount: reward, tokenId, from: address, chainId, type: RewardType.PayPerView });
         await Token.updateOne({ tokenId }, { $inc: { totalFunds: reward } });
+        await Balance.updateOne({ address: config.devWalletAddress, ...tokenFilter }, { $inc: { balance: payAmount * config.developerFee } }, overrideOptions);
     }
-    await PPVTransaction.create({ address: account, amount: payAmount, streamTokenId: tokenId, tokenAddress: normalizeAddress(tokenItem.address), chainId });
+    await PPVTransaction.create({ address, amount: payAmount, streamTokenId: tokenId, ...tokenFilter });
     return { result: true };
 }
 
