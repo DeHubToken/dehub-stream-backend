@@ -32,6 +32,7 @@ const tokenTemplate = {
     views: 1,
     likes: 1,
     totalTips: 1,
+    lockedBounty: 1,
     status: 1,
     _id: 0,
 };
@@ -475,7 +476,7 @@ const ApiController = {
         try {
             if (!content) return res.json({ error: true, msg: "no comment!" });
             streamTokenId = parseInt(streamTokenId, 10);
-            commentId = parseInt(commentId, 10);
+            commentId = commentId? parseInt(commentId, 10): undefined;
             const result = await requestComment(address, streamTokenId, content, commentId);
             return res.json(result);
         }

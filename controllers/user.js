@@ -60,7 +60,30 @@ const updateWalletBalance = async (account, tokenAddress, chainId) => {
     const tokenBalance = await getERC20TokenBalance(account, tokenAddress, chainId);
     await Balance.updateOne({ address: normalizeAddress(account.toLowerCase()), chainId, tokenAddress: normalizeAddress(tokenAddress) }, { walletBalance: tokenBalance, updateWalletBalanceAt: new Date() });
 }
-
+/**
+ * 
+ * @param {*} tokenId 
+ * @param {*} address address receives bounty
+ * @param {*} type Viewer or Commentor
+ */
+const payBounty = async (address, tokenId, type = RewardType.BountyForViewer) => {
+    const tokenItem = await Token.findOne({ tokenId }, { lockedBounty: 1, minter: 1, owner: 1, streamInfo: 1, _id: 0 }).lean();
+    const streamInfo = tokenItem.streamInfo;
+    if (!streamInfo?.[streamInfoKeys.isAddBounty]) return;
+    const bountyAmount = streamInfo[streamInfoKeys.addBountyAmount];
+    const chainId = Number(streamInfo[streamInfoKeys.addBountyChainId]);
+    // bounty can be paid only one time for viewer or commentor
+    const rewardItem = await Reward.findOne({ address, tokenId, type }, { address: 1 }).lean();
+    const field = type === RewardType.BountyForViewer ? 'viewer' : 'commentor';
+    if (!rewardItem?.address && streamInfo?.[streamInfoKeys.isAddBounty] && tokenItem.lockedBounty?.[field] >= bountyAmount) {
+        const bountyToken = supportedTokens.find(e => e.symbol === streamInfo[streamInfoKeys.addBountyTokenSymbol] && e.chainId === chainId);
+        const balanceFilter = { address: tokenItem.minter, tokenAddress: bountyToken?.address?.toLowerCase(), chainId };
+        await Token.updateOne({ tokenId }, { $inc: { [`lockedBounty.${field}`]: -bountyAmount } });
+        await Balance.updateOne(balanceFilter, { $inc: { lockForBounty: -bountyAmount } });
+        await Balance.updateOne({ ...balanceFilter, address }, { $inc: { balance: bountyAmount, reward: bountyAmount } }, overrideOptions);
+        await Reward.create({ address, tokenId, from: tokenItem.minter, rewardAmount: bountyAmount, type, chainId });
+    }
+}
 const requestPPVStream = async (account, sig, timestamp, chainId, tokenId) => {
     if (!account || !sig || !timestamp || !chainId) return { result: false, error: 'Please connect with your wallet' };
     if (!isValidAccount(account, timestamp, sig)) return { result: false, error: 'Please sign with your wallet' };
@@ -134,7 +157,7 @@ const requestComment = async (account, tokenId, content, commentId) => {
     const nftStreamItem = await Token.findOne({ tokenId }, {}).lean();
     if (!nftStreamItem) return { result: false, error: 'This stream no exist' };
     account = normalizeAddress(account);
-    if (commentId) {
+    if (commentId) { // reply
         const commentItem = await Comment.findOne({ id: commentId }, { tokenId: 1 }).lean();
         if (commentItem?.tokenId != tokenId) return { result: false, error: 'invalid comment' };
         const createdComment = await Comment.create({ tokenId, address: account, content, parentId: commentId });
@@ -143,6 +166,7 @@ const requestComment = async (account, tokenId, content, commentId) => {
     else {
         await Comment.create({ tokenId, address: account, content });
     }
+    await payBounty(account, tokenId, RewardType.BountyForCommentor);
     return { result: true };
 }
 module.exports = {
@@ -152,4 +176,5 @@ module.exports = {
     requestLike,
     requestTip,
     requestComment,
+    payBounty
 };

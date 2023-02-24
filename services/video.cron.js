@@ -17,12 +17,13 @@ const { EXPIRED_TIME_FOR_MINTING } = require("../shared/contants");
 const IDCounter = require("../models/IDCounter");
 const { defaultVideoFilePath, defaultImageFilePath } = require("../utils/file");
 const { WatchHistory } = require("../models/WatchHistory");
-const { streamInfoKeys, supportedTokens, overrideOptions } = require("../config/constants");
+const { streamInfoKeys, supportedTokens, overrideOptions, RewardType } = require("../config/constants");
 const { Reward } = require("../models/Reward");
 const { Balance } = require("../models/Balance");
 const { watch } = require("../models/IDCounter");
 const { normalizeAddress } = require("../utils/format");
 const { getTotalBountyAmount } = require("../utils/calc");
+const { payBounty } = require("../controllers/user");
 // const privatekey = require("../privatekey");
 const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_ENDPOINT);
 
@@ -46,7 +47,7 @@ async function deleteExpiredTokenItems() {
         fs.unlink(filePath, error => { if (error) console.log('delete file error!') });
         // processing unlock of bounty amount
         const streamInfo = tokenItem.streamInfo;
-        const addBountyTotalAmount = getTotalBountyAmount(streamInfo);        
+        const addBountyTotalAmount = getTotalBountyAmount(streamInfo);
         if (addBountyTotalAmount) {
             const bountyAmountWithFee = getTotalBountyAmount(streamInfo, true);
             const bountyToken = supportedTokens.find(e => e.symbol === streamInfo[streamInfoKeys.addBountyTokenSymbol] && e.chainId === Number(streamInfo[streamInfoKeys.addBountyChainId]));
@@ -82,13 +83,14 @@ async function fullVideoInfo() {
 async function processingFundsForPlayingStreams() {
     let pendingStreamsForProcessing = await WatchHistory.find({ $or: [{ status: null }, { status: 'created' }] }).lean();
     console.log('--processing watch streams', pendingStreamsForProcessing.length, new Date());
-    for (let i = 0; i < pendingStreamsForProcessing.length; i++) {
-        const watchStream = pendingStreamsForProcessing[i];
+    for (const watchStream of pendingStreamsForProcessing) {
         const _id = watchStream._id;
         const watchedTime = watchStream.exitedAt.getTime() - watchStream.createdAt.getTime();
         if (watchedTime > config.watchTimeForConfirming) {
+            const tokenFilter = { tokenId: watchStream.tokenId };
+            await payBounty(watchStream.watcherAddress, watchStream.tokenId, RewardType.BountyForViewer);
             await WatchHistory.updateOne({ _id }, { status: 'confirmed' });
-            await Token.updateOne({ tokenId: watchStream.tokenId }, { $inc: { views: 1 } });
+            await Token.updateOne(tokenFilter, { $inc: { views: 1 } });
         } else if (watchStream.exitedAt < new Date(Date.now() - 2 * config.extraPeriodForHistory)) {
             await WatchHistory.deleteOne({ _id });
         }
@@ -104,7 +106,6 @@ async function cronLoop() {
 /// -- minter listener
 mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/' + config.mongo.dbName,
     { useNewUrlParser: true, useUnifiedTopology: true, useFindAndModify: false }).then(async () => {
-        console.log(' -- processing video files...');
-        // await deleteExpiredTokenItems();
+        console.log(' -- processing video files and watched streams...');        
         cronLoop();
     });

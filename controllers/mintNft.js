@@ -18,10 +18,16 @@ const signatureForMintingNFT = async (videoFile, imageFile, name, description, s
   const videoExt = videoFile.mimetype.toString().substr(videoFile.mimetype.toString().indexOf("/") + 1);
   const imageExt = imageFile.mimetype.toString().substr(imageFile.mimetype.toString().indexOf("/") + 1);
 
+  const addedOptions = {};
   // 1. check balance and lock for bounty 
   if (streamInfo[streamInfoKeys.isAddBounty]) {
     const addBountyTotalAmount = getTotalBountyAmount(streamInfo);
     const bountyAmountWithFee = getTotalBountyAmount(streamInfo, true);
+    // adjust precision of bountyAmount
+    const precision = 5;
+    const bountyAmount = Math.round(streamInfo[streamInfoKeys.addBountyAmount] * 10 ** precision) / (10 ** precision);
+    streamInfo[streamInfoKeys.addBountyAmount] = bountyAmount;
+
     const bountyToken = supportedTokens.find(e => e.symbol === streamInfo[streamInfoKeys.addBountyTokenSymbol] && e.chainId === Number(streamInfo[streamInfoKeys.addBountyChainId]));
     const balanceFilter = { address: normalizeAddress(address), tokenAddress: bountyToken?.address?.toLowerCase(), chainId: Number(streamInfo[streamInfoKeys.addBountyChainId]) };
     const balanceItem = await Balance.findOne(balanceFilter).lean();
@@ -29,6 +35,10 @@ const signatureForMintingNFT = async (videoFile, imageFile, name, description, s
     const updatedBalanceItem = await Balance.findOneAndUpdate(balanceFilter, { $inc: { balance: -bountyAmountWithFee, lockForBounty: addBountyTotalAmount } }, { returnOriginal: false });
     if (updatedBalanceItem?.balance < 0) return { result: false, error: 'insufficient balance to add bounty' };
     await Balance.updateOne({ ...balanceFilter, address: config.devWalletAddress }, { $inc: { balance: bountyAmountWithFee - addBountyTotalAmount } }, overrideOptions);
+    addedOptions['lockedBounty'] = {
+      viewer: streamInfo[streamInfoKeys.addBountyAmount] * streamInfo[streamInfoKeys.addBountyFirstXViewers],
+      commentor: streamInfo[streamInfoKeys.addBountyAmount] * streamInfo[streamInfoKeys.addBountyFirstXComments],
+    };
   }
   // 2. create pending token
   const timestamp = Math.floor(Date.now() / 1000);
@@ -39,7 +49,8 @@ const signatureForMintingNFT = async (videoFile, imageFile, name, description, s
     streamInfo,
     videoExt,
     imageExt,
-    minter: normalizeAddress(address)
+    minter: normalizeAddress(address),
+    ...addedOptions
   });
   // 3. move file to main assets directory  
   const videoPath = `${path.dirname(__dirname)}/assets/videos/${tokenItem.tokenId}.${videoExt}`;
