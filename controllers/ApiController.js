@@ -17,6 +17,7 @@ const { Balance } = require('../models/Balance');
 const { PPVTransaction } = require('../models/PPVTransaction');
 const Feature = require('../models/Feature');
 const { commentsForTokenId } = require('./comments');
+const { requestVote } = require('./vote');
 const expireTime = 86400000;
 const tokenTemplate = {
     name: 1,
@@ -33,6 +34,7 @@ const tokenTemplate = {
     likes: 1,
     totalTips: 1,
     lockedBounty: 1,
+    totalVotes:1,
     status: 1,
     _id: 0,
 };
@@ -476,14 +478,31 @@ const ApiController = {
         try {
             if (!content) return res.json({ error: true, msg: "no comment!" });
             streamTokenId = parseInt(streamTokenId, 10);
-            commentId = commentId? parseInt(commentId, 10): undefined;
+            commentId = commentId ? parseInt(commentId, 10) : undefined;
             const result = await requestComment(address, streamTokenId, content, commentId);
             return res.json(result);
         }
         catch (err) {
-            console.log('-----request like error', err);
-            return res.json({ result: false, error: 'request ppv stream was failed' });
+            console.log('-----request comment error', err);
+            return res.json({ result: false, error: 'comment was failed' });
         }
-    }
+    },
+    requestVote: async function (req, res, next) {
+        const address = reqParam(req, paramNames.address);
+        const vote = reqParam(req, 'vote'); // 'true' => yes or 'false' => no
+        let streamTokenId = reqParam(req, paramNames.streamTokenId);
+        if (!streamTokenId)
+            return res.json({ error: true, msg: "streamTokenId not exist" });
+        try {
+            if (!vote) return res.json({ error: true, msg: "no vote!" });
+            streamTokenId = parseInt(streamTokenId, 10);
+            const result = await requestVote(address, streamTokenId, vote.toString());
+            return res.json(result);
+        }
+        catch (err) {
+            console.log('-----request vote error', err);
+            return res.json({ result: false, error: 'voting was failed' });
+        }
+    },
 }
 module.exports = { ApiController };

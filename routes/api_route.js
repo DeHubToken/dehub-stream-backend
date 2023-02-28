@@ -51,18 +51,12 @@ router.post("/update_profile", upload.fields([{ name: "coverImg", maxCount: 1 },
 router.post('/request_ppv_stream', async function (req, res, next) {
     return ApiController.requestPPVStream(req, res, next);
 });
-router.get('/request_ppv_stream', async function (req, res, next) {
-    return ApiController.requestPPVStream(req, res, next);
-});
-router.get('/request_like', async function (req, res, next) {
-    return ApiController.requestLike(req, res, next);
-});
-router.get('/request_tip', isAuthorized, async function (req, res, next) {
-    return ApiController.requestTip(req, res, next);
-});
-router.get('/request_comment', isAuthorized, async function (req, res, next) {
-    return ApiController.requestComment(req, res, next);
-});
+router.get('/request_ppv_stream', ApiController.requestPPVStream);
+router.get('/request_like', ApiController.requestLike);
+router.get('/request_tip', isAuthorized, ApiController.requestTip);
+router.get('/request_comment', isAuthorized, ApiController.requestComment);
+router.get('/request_vote', isAuthorized, ApiController.requestVote);
+
 // get apis
 router.get('/leaderboard', async function (req, res, next) {
     return ApiController.leaderboard(req, res, next);

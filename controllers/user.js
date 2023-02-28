@@ -169,6 +169,7 @@ const requestComment = async (account, tokenId, content, commentId) => {
     await payBounty(account, tokenId, RewardType.BountyForCommentor);
     return { result: true };
 }
+
 module.exports = {
     signatureForClaim,
     updateWalletBalance,
