@@ -24,6 +24,7 @@ const { watch } = require("../models/IDCounter");
 const { normalizeAddress } = require("../utils/format");
 const { getTotalBountyAmount } = require("../utils/calc");
 const { payBounty } = require("../controllers/user");
+const { deleteVotedStream } = require("../controllers/vote");
 // const privatekey = require("../privatekey");
 const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_ENDPOINT);
 
@@ -97,15 +98,24 @@ async function processingFundsForPlayingStreams() {
     }
 }
 
+async function deleteVotedStreams() {
+    console.log('-- checking voted streams');
+    const tokenItems = await Token.find({ status: { $ne: 'deleted' }, ['totalVotes.against']: { $gte: config.votesForDeleting * 0.9 } });
+    for (const tokenItem of tokenItems) {
+        await deleteVotedStream(tokenItem);
+    }
+}
+let autoDeleteCronCounter = 0;
 async function cronLoop() {
     await fullVideoInfo();
     await deleteExpiredTokenItems();
     await processingFundsForPlayingStreams();
+    if (autoDeleteCronCounter++ % (config.periodOfDeleleCron / 10) == 0) await deleteVotedStreams();
     setTimeout(cronLoop, 10 * 1000);
 }
 /// -- minter listener
 mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/' + config.mongo.dbName,
     { useNewUrlParser: true, useUnifiedTopology: true, useFindAndModify: false }).then(async () => {
-        console.log(' -- processing video files and watched streams...');        
+        console.log(' -- processing video files and watched streams...');
         cronLoop();
     });

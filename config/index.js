@@ -25,8 +25,11 @@ const config = {
     developerFee: 0.1, // developer fee for pay per view is 10 %
     defaultChainId: 97,
     defaultTokenSymbol: 'DHB',
-    rangeOfTip: { min: 1, max: 5 },
+    rangeOfTip: { min: 1, max: 1_000_000_000 },
     devWalletAddress: normalizeAddress(process.env.DEV_ADDRESS),
+    votesForDeleting: 1000,
+    totalStakedForDeleting: 50_000_0000,
+    periodOfDeleleCron: 60, // per 60 second, check and delete voted streams
 };
 module.exports = {
     config,

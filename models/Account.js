@@ -16,7 +16,7 @@ let AccountSchema = new Schema({
     // balance: Number,
     // dhbBalance: Number, // balance of wallet
     lastLoginTimestamp: Number,
-
+    stakedDHB: Number,
     username: String,  // user profile
     email: String,
     avatarImageUrl: String,

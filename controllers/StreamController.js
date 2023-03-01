@@ -32,7 +32,7 @@ const StreamController = {
             return res.json({ error: 'error!' });
         }
         console.log('----start stream:', tokenId);
-        const tokenItem = await Token.findOne({ tokenId }).lean();
+        const tokenItem = await Token.findOne({ tokenId, status: 'minted' }).lean();
         if (!tokenItem) return res.json({ error: 'no stream!' });
         const videoPath = `${path.dirname(__dirname)}/assets/videos/${tokenId}.mp4`;
         const videoStat = fs.statSync(videoPath);

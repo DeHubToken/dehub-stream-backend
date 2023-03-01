@@ -1,6 +1,8 @@
+require('dotenv').config();
 const { ethers } = require("ethers");
 const { supportedTokens, supportedNetworks, multicallContractAddresses } = require("../config/constants")
 const erc20ContractAbi = require('../abis/erc20.json');
+const stakingContractAbi = require('../abis/StakingDHB.json');
 const multicallContractAbi = require('../abis/multicall.json');
 
 const getTokenByTokenAddress = (tokenAddress, chainId = 97) => supportedTokens.find(e => e.address.toLowerCase() === tokenAddress.toLowerCase() && e.chainId === chainId);
@@ -91,9 +93,39 @@ const getTokenBalancesOfAddresses = async (addresses, tokenAddress, chainId) => 
     }
     return tempResult;
 }
+
+const getStakedAmountOfAddresses = async (addresses) => {
+    // const network = supportedNetworks.find(e => e.chainId === chainId);
+    // const token = supportedTokens.find(e => e.address.toLowerCase() === tokenAddress.toLowerCase() && e.chainId === chainId);
+    // if (!network || !token) return 0;
+    const stakingContractAddress = "0x26d2Cd7763106FDcE443faDD36163E2ad33A76E6";
+    const provider = new ethers.providers.JsonRpcProvider(process.env.BSC_RPC_ENDPOINT);
+    const chainId = 56;
+    const stakingContract = new ethers.Contract(stakingContractAddress, stakingContractAbi, provider);
+    const multicallContract = new ethers.Contract(multicallContractAddresses[chainId], multicallContractAbi, provider);
+    let tempResult = {};
+    for (let i = 0; i < addresses.length; i += 500) {
+        const subAddresses = addresses.slice(i, Math.min(i + 500, addresses.length));
+        const callDataArray = [];
+        subAddresses.forEach(address => {
+            callDataArray.push({
+                contract: stakingContract,
+                functionName: 'userTotalStakedAmount',
+                param: [address],
+                returnKey: `${address}`,
+            });
+        });
+        const multicallResult = await multicallRead(multicallContract, callDataArray);
+        Object.keys(multicallResult).forEach(key => multicallResult[key] = Number(ethers.utils.formatUnits(multicallResult[key], 18)));
+        tempResult = { ...tempResult, ...multicallResult };
+    }
+    return tempResult;
+}
+
 module.exports = {
     getTokenByTokenAddress,
     getERC20TokenBalance,
     multicallRead,
-    getTokenBalancesOfAddresses
+    getTokenBalancesOfAddresses,
+    getStakedAmountOfAddresses
 }
