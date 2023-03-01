@@ -53,7 +53,6 @@ const reqParam = (req, paramName) => {
  * @returns call next function if api call is authorized with signed params
  */
 const isAuthorized = async (req, res, next) => {
-    return next();
     const address = reqParam(req, paramNames.address);
     const rawSig = reqParam(req, paramNames.sig);
     const timestamp = reqParam(req, paramNames.timestamp);
