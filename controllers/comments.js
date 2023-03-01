@@ -44,7 +44,7 @@ const commentsForTokenId = async (tokenId) => {
         if (comment.account?.[0]) {
             comment.writor = {
                 username: comment.account?.[0]?.username,
-                avatarUrl: process.env.DEFAULT_DOMAIN + "/" + comment.account?.[0]?.avatarImageUrl
+                avatarUrl: comment.account?.[0]?.avatarImageUrl? process.env.DEFAULT_DOMAIN + "/" + comment.account?.[0]?.avatarImageUrl: undefined
             }
             delete comment.account;
         }
