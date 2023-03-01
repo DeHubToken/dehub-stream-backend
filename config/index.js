@@ -29,7 +29,7 @@ const config = {
     devWalletAddress: normalizeAddress(process.env.DEV_ADDRESS),
     votesForDeleting: 1000,
     totalStakedForDeleting: 50_000_0000,
-    periodOfDeleleCron: 60, // per 60 second, check and delete voted streams
+    periodOfDeleleCron: 600, // per 10 min, check and delete voted streams
 };
 module.exports = {
     config,
