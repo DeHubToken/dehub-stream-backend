@@ -18,6 +18,7 @@ const { PPVTransaction } = require('../models/PPVTransaction');
 const Feature = require('../models/Feature');
 const { commentsForTokenId } = require('./comments');
 const { requestVote } = require('./vote');
+const { getLeaderboard } = require('./getData');
 const expireTime = 86400000;
 const tokenTemplate = {
     name: 1,
@@ -34,7 +35,7 @@ const tokenTemplate = {
     likes: 1,
     totalTips: 1,
     lockedBounty: 1,
-    totalVotes:1,
+    totalVotes: 1,
     status: 1,
     _id: 0,
 };
@@ -398,55 +399,7 @@ const ApiController = {
         }
     },
     leaderboard: async function (req, res, next) {
-        try {
-            const mainTokenAddresses = supportedTokens.filter(e => e.symbol === config.defaultTokenSymbol).map(f => {
-                return { tokenAddress: normalizeAddress(f.address) };
-            });
-            const query = [
-                {
-                    $match: {
-                        $or: mainTokenAddresses
-                    }
-                },
-                {
-                    $lookup: {
-                        from: 'accounts',
-                        localField: 'address',
-                        foreignField: 'address',
-                        as: 'account'
-                    }
-                },
-                {
-                    $group: {
-                        _id: '$address',
-                        sumBalance: { '$sum': '$walletBalance' },
-                        account: { $first: '$account' }
-                    }
-                },
-                {
-                    $sort: {
-                        sumBalance: -1
-                    }
-                },
-                {
-                    $limit: 20
-                }
-            ];
-            let result = await Balance.aggregate(query);
-            result = result.map(e => {
-                return {
-                    account: e._id,
-                    sumDHB: e.sumBalance,
-                    username: e.account[0]?.username,
-                    avatarUrl: e.account[0]?.avatarImageUrl ? `${process.env.DEFAULT_DOMAIN}/${e.account[0].avatarImageUrl}` : undefined
-                }
-            })
-            return res.json({ result: { byWalletBalance: result } });
-        }
-        catch (err) {
-            console.log('-----request like error', err);
-            return res.json({ result: false, error: 'request ppv stream was failed' });
-        }
+        return res.json(await getLeaderboard());
     },
     requestTip: async function (req, res, next) {
         const address = reqParam(req, paramNames.address);

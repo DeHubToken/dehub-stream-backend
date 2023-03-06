@@ -1,18 +1,15 @@
-const mongoose = require("mongoose")
-require('dotenv').config()
+const mongoose = require("mongoose");
+require('dotenv').config();
 const ethers = require('ethers');
-const { BigNumber } = ethers
 const { Transaction } = require("../models/Transaction");
 const ContractAbi = require('../abis/VaultV2.json');
 const erc20ContractAbi = require('../abis/erc20.json');
-const { Account } = require("../models/Account");
 const { normalizeAddress } = require("../utils/format");
 const { vaultContractAddresses, ChainId, dhbTokenAddresses, overrideOptions, supportedNetworks, supportedTokens, supportedTokensForLockContent } = require("../config/constants");
 const { config } = require('../config');
 const { ClaimTransaction } = require("../models/ClaimTransaction");
 const { Balance } = require("../models/Balance");
 const { getTokenByTokenAddress } = require("../utils/web3");
-const { isInserted } = require("../utils/db");
 
 const networkName = (process?.argv?.[2] || "bsctest");
 const curNetwork = supportedNetworks.find(e => e.shortName === networkName);
@@ -23,9 +20,7 @@ const tokens = supportedTokens.filter(e => e.chainId === chainId);
 const provider = new ethers.providers.JsonRpcProvider(curNetwork.rpcUrls[0]);
 
 const VaultContract = new ethers.Contract(vaultContractAddresses[curNetwork.chainId], ContractAbi, provider);
-// const dhbContract = new ethers.Contract(dhbTokenAddresses[curNetwork.chainId], erc20ContractAbi, provider);
 
-const zeroAddress = '0x0000000000000000000000000000000000000000';
 async function DepositEventListener(from, tokenAddress, amount, logInfo) {
     const { transactionHash, logIndex } = logInfo;
     const token = getTokenByTokenAddress(tokenAddress, chainId);
@@ -46,6 +41,7 @@ async function DepositEventListener(from, tokenAddress, amount, logInfo) {
     }
 
 }
+
 async function ClaimEventListener(id, tokenAddress, to, amount, timestamp, logInfo) {
     const { transactionHash, logIndex } = logInfo;
     const token = getTokenByTokenAddress(tokenAddress, chainId);
@@ -67,12 +63,12 @@ async function ClaimEventListener(id, tokenAddress, to, amount, timestamp, logIn
 
 }
 
-async function TransferEventListener(from, to, value, logInfo, tokenAddress) {
+async function TransferEventListener(from, to, value, logInfo) {
     const { transactionHash, logIndex } = logInfo;
 
     const fromAddress = normalizeAddress(from);
     const toAddress = normalizeAddress(to);
-    tokenAddress = normalizeAddress(tokenAddress);
+    const tokenAddress = normalizeAddress(logInfo.address);
     const token = getTokenByTokenAddress(tokenAddress, chainId);
     const realAmount = Number(ethers.utils.formatUnits(value, token.decimals));
     console.log("---- checked transfer", tokenAddress, toAddress, realAmount);
@@ -91,7 +87,6 @@ async function TransferEventListener(from, to, value, logInfo, tokenAddress) {
     }
 }
 
-
 mongoose.set('useFindAndModify', false);
 mongoose.set('useCreateIndex', true);
 /// -- transfer listener
@@ -102,15 +97,12 @@ mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/
         // fetching balance in vault
         VaultContract.on('UserDeposit', DepositEventListener);
         VaultContract.on('Claim', ClaimEventListener);
-        // fetching token balance for locked content
+        // fetching token balance only for locked content 
         const tokens = supportedTokensForLockContent.filter(e => e.chainId === chainId);
         for (i = 0; i < tokens.length; i++) {
             const tokenItem = tokens[i];
             const tokenContract = new ethers.Contract(tokenItem.address, erc20ContractAbi, provider);
-            const txEventFunc = async (from, to, value, logInfo) => {
-                await TransferEventListener(from, to, value, logInfo, tokenItem.address)
-            };
-            tokenContract.on('Transfer', txEventFunc);
-            // tokenContracts[i].on('Transfer', txEventListeners[i]);
+            console.log('supported token: ', tokenItem.address);
+            tokenContract.on('Transfer', TransferEventListener);
         }
     });
