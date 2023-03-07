@@ -141,12 +141,11 @@ const getStakeHistories = async (fromBlock, toBlock) => {
         eventResults = await stakingContract.queryFilter(filter, fromBlock, toBlock);
         eventResults = eventResults.filter(e => e.event === 'Staked' || e.event === 'Unstaked'); // transaction with amount 0
         result = eventResults.map(e => {
-            return {
-                blockNumber: e.blockNumber,
-                user: e.args.user,                
+            return {                
+                user: e.args.user,
                 amount: e.event === 'Staked'? e.args.amount: e.args.actualAmount,
                 // id: e.transactionHash + "-" + e.logIndex,
-                logInfo: {transactionHash: e.transactionHash, logIndex: e.logIndex},
+                logInfo: {transactionHash: e.transactionHash, logIndex: e.logIndex, blockNumber: e.blockNumber},
                 event: e.event,
                 // realAmount: Number(ethers.utils.formatUnits(e.event === 'Staked'? e.args.amount: e.args.actualAmount, 18)),                
             }

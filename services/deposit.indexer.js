@@ -22,7 +22,7 @@ const provider = new ethers.providers.JsonRpcProvider(curNetwork.rpcUrls[0]);
 const vaultContract = new ethers.Contract(vaultContractAddresses[curNetwork.chainId], ContractAbi, provider);
 
 async function DepositEventListener(from, tokenAddress, amount, logInfo) {
-    const { transactionHash, logIndex } = logInfo;
+    const { transactionHash, logIndex, blockNumber } = logInfo;
     const token = getTokenByTokenAddress(tokenAddress, chainId);
     tokenAddress = normalizeAddress(tokenAddress);
     const realAmount = Number(ethers.utils.formatUnits(amount, token.decimals));
@@ -32,7 +32,11 @@ async function DepositEventListener(from, tokenAddress, amount, logInfo) {
     // let account;
     try {
         const result = await Transaction.updateOne({ txHash: transactionHash, logIndex, chainId },
-            { amount: realAmount, from: address, tokenAddress: tokenAddress, to: normalizeAddress(vaultContract.address) },
+            {
+                amount: realAmount, from: address, tokenAddress: tokenAddress,
+                to: normalizeAddress(vaultContract.address), blockNumber,
+                type: 'DEPOSIT'
+            },
             overrideOptions);
         await Balance.updateOne({ address, chainId, tokenAddress },
             { $inc: { deposited: realAmount, balance: realAmount } }, overrideOptions);
@@ -43,7 +47,7 @@ async function DepositEventListener(from, tokenAddress, amount, logInfo) {
 }
 
 async function ClaimEventListener(id, tokenAddress, to, amount, timestamp, logInfo) {
-    const { transactionHash, logIndex } = logInfo;
+    const { transactionHash, logIndex, blockNumber } = logInfo;
     const token = getTokenByTokenAddress(tokenAddress, chainId);
     tokenAddress = normalizeAddress(tokenAddress);
     const realAmount = Number(ethers.utils.formatUnits(amount, token.decimals));
@@ -51,10 +55,16 @@ async function ClaimEventListener(id, tokenAddress, to, amount, timestamp, logIn
     console.log("---- checked claim", Number(id.toString()), address, realAmount, Number(timestamp.toString()));
     // let account;
     try {
+        const result = await Transaction.updateOne({ txHash: transactionHash, logIndex, chainId },
+            {
+                amount: realAmount, from: address, tokenAddress: tokenAddress,
+                to: normalizeAddress(vaultContract.address), blockNumber,
+                type: 'CLAIM'
+            },
+            overrideOptions);
         await ClaimTransaction.updateOne({ id: Number(id.toString()), chainId, tokenAddress, receiverAddress: address, amount: realAmount, timestamp: Number(timestamp.toString()) },
             { txHash: transactionHash, logIndex, status: 'confirmed' },
             overrideOptions);
-
         await Balance.updateOne({ address, chainId, tokenAddress },
             { $inc: { claimed: realAmount, pending: -realAmount } }, overrideOptions);
     } catch (error) {
@@ -64,7 +74,7 @@ async function ClaimEventListener(id, tokenAddress, to, amount, timestamp, logIn
 }
 
 async function TransferEventListener(from, to, value, logInfo) {
-    const { transactionHash, logIndex } = logInfo;
+    const { transactionHash, logIndex, blockNumber } = logInfo;
 
     const fromAddress = normalizeAddress(from);
     const toAddress = normalizeAddress(to);
@@ -73,8 +83,8 @@ async function TransferEventListener(from, to, value, logInfo) {
     const realAmount = Number(ethers.utils.formatUnits(value, token.decimals));
     console.log("---- checked transfer", tokenAddress, toAddress, realAmount);
     try {
-        const updatedResult = await Transaction.updateOne({ txHash: transactionHash, logIndex },
-            { amount: realAmount, from: fromAddress, to: toAddress, tokenAddress },
+        const updatedResult = await Transaction.updateOne({ txHash: transactionHash, logIndex, chainId },
+            { amount: realAmount, from: fromAddress, to: toAddress, tokenAddress, blockNumber, type: 'TRANSFER' },
             overrideOptions);
         // if (isInserted(updatedResult)) {
         await Balance.updateOne({ address: toAddress, chainId, tokenAddress },

@@ -17,30 +17,31 @@ const stakingContract = new ethers.Contract(stakingContractAddresses[chainId], C
 const tokenAddress = normalizeAddress("0x680D3113caf77B61b510f332D5Ef4cf5b41A761D");
 
 async function StakeEventListener(user, period, amount, stakeAt, rewardIndex, tierIndex, logInfo) {
-    const { transactionHash, logIndex } = logInfo;
+    const { transactionHash, logIndex, blockNumber } = logInfo;
     const realAmount = Number(ethers.utils.formatUnits(amount, 18));
     const address = normalizeAddress(user);
-    console.log("---- checked stake:", address, realAmount);
     try {
         const updateResult = await Transaction.updateOne({ txHash: transactionHash, logIndex, chainId },
-            { amount: realAmount, from: address, tokenAddress: tokenAddress, to: normalizeAddress(stakingContract.address), type: 'STAKE' },
+            { amount: realAmount, from: address, tokenAddress: tokenAddress, to: normalizeAddress(stakingContract.address), type: 'STAKE', blockNumber },
             overrideOptions);
-        if (isInserted(updateResult))
+        if (isInserted(updateResult)) {
+            console.log("---- checked stake:", address, realAmount, blockNumber);
             await Balance.updateOne({ address, chainId, tokenAddress },
                 { $inc: { staked: realAmount } }, overrideOptions);
+        }
     } catch (error) {
         console.log("--- update stake error", error);
     }
 }
 
 async function UnStakeEventListener(user, actualAmount, transferAmount, unstakeAt, logInfo) {
-    const { transactionHash, logIndex } = logInfo;
+    const { transactionHash, logIndex, blockNumber } = logInfo;
     const realAmount = Number(ethers.utils.formatUnits(actualAmount, 18));
     const address = normalizeAddress(user);
     console.log("---- checked unstake:", address, realAmount);
     try {
         const updateResult = await Transaction.updateOne({ txHash: transactionHash, logIndex, chainId },
-            { amount: realAmount, from: address, tokenAddress: tokenAddress, to: normalizeAddress(stakingContract.address), type: 'UNSTAKE' },
+            { amount: realAmount, from: address, tokenAddress: tokenAddress, to: normalizeAddress(stakingContract.address), type: 'UNSTAKE', blockNumber },
             overrideOptions);
         if (isInserted(updateResult)) await Balance.updateOne({ address, chainId, tokenAddress },
             { $inc: { staked: -realAmount } }, overrideOptions);
@@ -56,10 +57,13 @@ mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/
     { useNewUrlParser: true, useUnifiedTopology: true })
     .then(async () => {
         console.log(' -- starting staking indexer...');
-        const balanceItems = await Balance.find({ staked: { $gt: 0 } }).sort({ updatedAt: -1 }).limit(1);
-        if (balanceItems?.length < 1) {
-            let firstBlock = 25835683;
-            const latestBlock = await provider.getBlockNumber();
+        const transactionItems = await Transaction.find({ type: 'STAKE' }).sort({ blockNumber: -1 }).limit(1);
+        let nowDate = new Date();
+        let lastDayDate = nowDate;
+        lastDayDate.setDate(nowDate.getDate() - 1);
+        const latestBlock = await provider.getBlockNumber();
+        if (transactionItems?.length < 1 || transactionItems[0].blockNumber < latestBlock- 3000) {
+            let firstBlock = transactionItems[0].blockNumber;            
             await sleep(200);
             const limit = 3000;
             let totalStakedData = [];

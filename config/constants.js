@@ -87,7 +87,7 @@ const vaultContractAddresses = {
 };
 
 const stakingContractAddresses = {    
-    [ChainId.BSC_MAINNET]: '0x669154b6ccbbf067b894172e686c0ad42f9f812f',    
+    [ChainId.BSC_MAINNET]: '0x26d2Cd7763106FDcE443faDD36163E2ad33A76E6',    
 };
 
 const multicallContractAddresses = {
