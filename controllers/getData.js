@@ -12,6 +12,8 @@ const getLeaderboard = async () => {
         const mainTokenAddresses = supportedTokens.filter(e => e.symbol === config.defaultTokenSymbol).map(f => {
             return { tokenAddress: normalizeAddress(f.address) };
         });
+        // @dev only
+        mainTokenAddresses.push({ tokenAddress: normalizeAddress("0x680D3113caf77B61b510f332D5Ef4cf5b41A761D") });
         const query = [
             {
                 $match: {
@@ -29,14 +31,17 @@ const getLeaderboard = async () => {
             {
                 $group: {
                     _id: '$address',
-                    sumBalance: { '$sum': { '$add': ['$walletBalance', { $ifNull: ['$balance', 0] }] } },
+                    sumBalance: { '$sum': { '$add': [{ $ifNull: ['$walletBalance', 0] }, { $ifNull: ['$staked', 0] }, { $ifNull: ['$balance', 0] }] } },
                     account: { $first: '$account' }
                 }
             },
             {
                 $project: {
-                    total: { $add: ['$sumBalance', { $ifNull: [{ $first: '$account.stakedDHB' }, 0] }] },
-                    account: { $first: '$account' }
+                    account: '$_id',
+                    _id: 0,
+                    total: '$sumBalance',
+                    username: { $first: '$account.username' },
+                    avatarUrl: { $first: '$account.avatarImageUrl' },
                 }
             },
             {
@@ -49,14 +54,14 @@ const getLeaderboard = async () => {
             }
         ];
         let result = await Balance.aggregate(query);
-        result = result.map(e => {
-            return {
-                account: e._id,
-                sumDHB: e.total,
-                username: e.account?.username,
-                avatarUrl: e.account?.avatarImageUrl ? `${process.env.DEFAULT_DOMAIN}/${e.account.avatarImageUrl}` : undefined
-            }
-        })
+        // result = result.map(e => {
+        //     return {
+        //         account: e._id,
+        //         sumDHB: e.total,
+        //         username: e.account?.username,
+        //         avatarUrl: e.account?.avatarImageUrl ? `${process.env.DEFAULT_DOMAIN}/${e.account.avatarImageUrl}` : undefined
+        //     }
+        // })
         return { result: { byWalletBalance: result } };
     }
     catch (err) {

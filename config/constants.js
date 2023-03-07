@@ -86,6 +86,10 @@ const vaultContractAddresses = {
     [ChainId.POLYGON_MAINNET]: '0x275617327c958bD06b5D6b871E7f491D76113dd8',
 };
 
+const stakingContractAddresses = {    
+    [ChainId.BSC_MAINNET]: '0x669154b6ccbbf067b894172e686c0ad42f9f812f',    
+};
+
 const multicallContractAddresses = {
     [ChainId.MAINNET]: '0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696',
     [ChainId.GORLI]: '0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696',
@@ -162,6 +166,8 @@ const supportedNetworks = [
     }
 ]
 
+
+
 module.exports = {
     paramNames,
     supportedVideoTypes,
@@ -182,4 +188,5 @@ module.exports = {
     supportedChainIds,
     supportedNetworks,
     multicallContractAddresses,
+    stakingContractAddresses
 }

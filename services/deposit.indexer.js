@@ -19,7 +19,7 @@ console.log("---deposit indexer for:", networkName, 'chainId:', chainId);
 const tokens = supportedTokens.filter(e => e.chainId === chainId);
 const provider = new ethers.providers.JsonRpcProvider(curNetwork.rpcUrls[0]);
 
-const VaultContract = new ethers.Contract(vaultContractAddresses[curNetwork.chainId], ContractAbi, provider);
+const vaultContract = new ethers.Contract(vaultContractAddresses[curNetwork.chainId], ContractAbi, provider);
 
 async function DepositEventListener(from, tokenAddress, amount, logInfo) {
     const { transactionHash, logIndex } = logInfo;
@@ -32,7 +32,7 @@ async function DepositEventListener(from, tokenAddress, amount, logInfo) {
     // let account;
     try {
         const result = await Transaction.updateOne({ txHash: transactionHash, logIndex, chainId },
-            { amount: realAmount, from: address, tokenAddress: tokenAddress, to: normalizeAddress(VaultContract.address) },
+            { amount: realAmount, from: address, tokenAddress: tokenAddress, to: normalizeAddress(vaultContract.address) },
             overrideOptions);
         await Balance.updateOne({ address, chainId, tokenAddress },
             { $inc: { deposited: realAmount, balance: realAmount } }, overrideOptions);
@@ -95,8 +95,10 @@ mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/
     .then(async () => {
         console.log(' -- starting deposit indexer...');
         // fetching balance in vault
-        VaultContract.on('UserDeposit', DepositEventListener);
-        VaultContract.on('Claim', ClaimEventListener);
+        if (vaultContract) {
+            vaultContract.on('UserDeposit', DepositEventListener);
+            vaultContract.on('Claim', ClaimEventListener);
+        }
         // fetching token balance only for locked content 
         const tokens = supportedTokensForLockContent.filter(e => e.chainId === chainId);
         for (i = 0; i < tokens.length; i++) {

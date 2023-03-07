@@ -15,18 +15,21 @@ let BalanceSchema = new Schema({
     pending: Number,
     // reward got
     reward: Number,
+    // staked amount
+    staked: Number,
     // total protocol balance 
-    balance: Number,
+    balance: { type: Number, default: 0 },
     lockForPPV: Number,
     lockForBounty: Number,
     paidForPPV: Number,
     paidTips: Number,
     sentTips: Number,
-    walletBalance: Number, // balance of wallet
+    walletBalance: { type: Number, default: 0 }, // balance of wallet
     updateWalletBalanceAt: Date,
     // lastLoginTimestamp: Number,
 }, { timestamps: true });
 
 BalanceSchema.index({ address: 1 });
 BalanceSchema.index({ address: 1, chainId: 1, tokenAddress: 1 });
+
 module.exports.Balance = mongoose.model('balances', BalanceSchema);
