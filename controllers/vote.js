@@ -8,7 +8,7 @@ const { getStakedAmountOfAddresses } = require("../utils/web3");
 const requestVote = async (account, tokenId, vote) => {
     account = normalizeAddress(account);
     const voteItem = await Vote.findOne({ address: account, tokenId }, { vote: 1 }).lean();
-    if (voteItem) return { result: false, error: `already voted ${vote ? 'yes' : 'no'}` };
+    if (voteItem) return { result: false, error: `already voted ${voteItem.vote ? 'yes' : 'no'}` };
 
     const nftStreamItem = await Token.findOne({ tokenId }, {}).lean();
     if (!nftStreamItem) return { result: false, error: 'This stream no exist' };
