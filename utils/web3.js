@@ -5,7 +5,7 @@ const erc20ContractAbi = require('../abis/erc20.json');
 const stakingContractAbi = require('../abis/StakingDHB.json');
 const multicallContractAbi = require('../abis/multicall.json');
 
-const getTokenByTokenAddress = (tokenAddress, chainId = 97) => supportedTokens.find(e => e.address.toLowerCase() === tokenAddress.toLowerCase() && e.chainId === chainId);
+const getTokenByTokenAddress = (tokenAddress, chainId = 56) => supportedTokens.find(e => e.address.toLowerCase() === tokenAddress.toLowerCase() && e.chainId === chainId);
 
 const getERC20TokenBalance = async (account, tokenAddress, chainId) => {
     const network = supportedNetworks.find(e => e.chainId === chainId);

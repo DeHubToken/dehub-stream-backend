@@ -86,8 +86,8 @@ const vaultContractAddresses = {
     [ChainId.POLYGON_MAINNET]: '0x275617327c958bD06b5D6b871E7f491D76113dd8',
 };
 
-const stakingContractAddresses = {    
-    [ChainId.BSC_MAINNET]: '0x26d2Cd7763106FDcE443faDD36163E2ad33A76E6',    
+const stakingContractAddresses = {
+    [ChainId.BSC_MAINNET]: '0x26d2Cd7763106FDcE443faDD36163E2ad33A76E6',
 };
 
 const multicallContractAddresses = {
@@ -110,8 +110,8 @@ const supportedTokens = [
         label: 'DHB',
         symbol: 'DHB',
         customAbbreviation: 'dhb',
-        chainId: 97,
-        address: '0x06EdA7889330031a8417f46e4C771C628c0b6418',
+        chainId: 1,
+        address: '0x99BB69Ee1BbFC7706C3ebb79b21C5B698fe58EC0',
         iconUrl: 'assets/icons/tokens/DHB.png',
         decimals: 18,
     },
@@ -120,19 +120,19 @@ const supportedTokens = [
         label: 'DHB',
         symbol: 'DHB',
         customAbbreviation: 'dhb',
-        chainId: 5,
-        address: '0x0F0fBE6FB65AaCE87D84f599924f6524b4F8d858',
+        chainId: 56,
+        address: '0x680D3113caf77B61b510f332D5Ef4cf5b41A761D',
         iconUrl: 'assets/icons/tokens/DHB.png',
         decimals: 18,
     },
     {
-        value: 'busd',
-        label: 'BUSD',
-        symbol: 'BUSD',
-        customAbbreviation: 'busd',
-        chainId: 97,
-        address: '0x53D4A05DF7caAf3302184B774855EcBe2a50bD3E',
-        iconUrl: 'assets/icons/tokens/BUSD.png',
+        value: 'dhb',
+        label: 'DHB',
+        symbol: 'DHB',
+        customAbbreviation: 'dhb',
+        chainId: 137,
+        address: '0x6051e59eb50BB568415B6C476Fbd394EEF83834D',
+        iconUrl: 'assets/icons/tokens/DHB.png',
         decimals: 18,
     },
     {
@@ -140,9 +140,59 @@ const supportedTokens = [
         label: 'USDC',
         symbol: 'USDC',
         customAbbreviation: 'usdc',
-        chainId: 97,
-        address: '0x4131fd3F1206d48A89410EE610BF1949934e0a72',
+        chainId: 1,
+        address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
         iconUrl: 'assets/icons/tokens/USDC.png',
+        decimals: 6,
+    },
+    {
+        value: 'usdc',
+        label: 'USDC',
+        symbol: 'USDC',
+        customAbbreviation: 'usdc',
+        chainId: 56,
+        address: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d',
+        iconUrl: 'assets/icons/tokens/USDC.png',
+        decimals: 6,
+    },
+    {
+        value: 'usdc',
+        label: 'USDC',
+        symbol: 'USDC',
+        customAbbreviation: 'usdc',
+        chainId: 137,
+        address: '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',
+        iconUrl: 'assets/icons/tokens/USDC.png',
+        decimals: 6,
+    },
+    {
+        value: 'usdt',
+        label: 'USDT',
+        symbol: 'USDT',
+        customAbbreviation: 'usdt',
+        chainId: 1,
+        address: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+        iconUrl: 'assets/icons/tokens/USDT.png',
+        decimals: 18,
+    },
+    {
+        value: 'usdt',
+        label: 'USDT',
+        symbol: 'USDT',
+        customAbbreviation: 'usdt',
+        chainId: 56,
+        address: '0x55d398326f99059ff775485246999027b3197955',
+        iconUrl: 'assets/icons/tokens/USDT.png',
+        decimals: 18,
+    },
+    {
+        value: 'usdt',
+        label: 'USDT',
+        symbol: 'USDT',
+        customAbbreviation: 'usdt',
+        chainId: 137,
+        address: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F',
+        iconUrl: 'assets/icons/tokens/USDT.png',
         decimals: 18,
     },
 ];
@@ -151,18 +201,23 @@ const supportedTokensForLockContent = supportedTokens.filter(e => e.symbol === '
 const supportedTokensForPPV = supportedTokens;
 const supportedTokensForAddBounty = supportedTokens;
 
-const supportedChainIdsForMinting = [97];
-const supportedChainIds = [ChainId.BSC_TESTNET, ChainId.GORLI];
+const supportedChainIdsForMinting = [56];
+const supportedChainIds = [ChainId.MAINNET, ChainId.BSC_MAINNET, ChainId.POLYGON_MAINNET];
 const supportedNetworks = [
     {
-        chainId: ChainId.BSC_TESTNET,
-        shortName: `bsctest`,
-        rpcUrls: [process.env.BSCTEST_RPC_ENDPOINT],
+        chainId: ChainId.BSC_MAINNET,
+        shortName: `bsc`,
+        rpcUrls: [process.env.BSC_RPC_ENDPOINT],
     },
     {
-        chainId: ChainId.GORLI,
-        shortName: `goerli`,
-        rpcUrls: [`https://goerli.infura.io/v3/${process.env.INFURA_API_KEY}`,]
+        chainId: ChainId.MAINNET,
+        shortName: `mainnet`,
+        rpcUrls: [`https://mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`,]
+    },
+    {
+        chainId: ChainId.POLYGON_MAINNET,
+        shortName: `polygon`,
+        rpcUrls: [`https://polygon-rpc.co`,]
     }
 ]
 

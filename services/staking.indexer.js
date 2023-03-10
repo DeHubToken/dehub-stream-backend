@@ -63,7 +63,7 @@ mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/
         lastDayDate.setDate(nowDate.getDate() - 1);
         const latestBlock = await provider.getBlockNumber();
         if (transactionItems?.length < 1 || transactionItems[0].blockNumber < latestBlock- 3000) {
-            let firstBlock = transactionItems[0].blockNumber;            
+            let firstBlock = transactionItems?.[0]?.blockNumber || 25835683;
             await sleep(200);
             const limit = 3000;
             let totalStakedData = [];
