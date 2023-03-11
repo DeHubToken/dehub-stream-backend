@@ -25,6 +25,7 @@ const { normalizeAddress } = require("../utils/format");
 const { getTotalBountyAmount } = require("../utils/calc");
 const { payBounty } = require("../controllers/user");
 const { deleteVotedStream } = require("../controllers/vote");
+const { ClaimTransaction } = require("../models/ClaimTransaction");
 // const privatekey = require("../privatekey");
 const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_ENDPOINT);
 
@@ -33,9 +34,25 @@ const NFTContract = new ethers.Contract(process.env.DEFAULT_COLLECTION, Contract
 const MINT_STATUS = {
     minted: 'minted',
     signed: 'signed',
-    pending: 'pending'
+    pending: 'pending',
+    confirmed: 'confirmed',
+    failed: 'failed',
 }
 const zeroAddress = '0x0000000000000000000000000000000000000000';
+
+async function deleteExpiredClaimTx() {
+    const claimTxs = await ClaimTransaction.find({ status: MINT_STATUS.pending, createdAt: { $lt: new Date(new Date() - EXPIRED_TIME_FOR_MINTING) } }).lean();
+    for (const claimTx of claimTxs) {
+        const balanceFilter = { address: claimTx.receiverAddress, chainId: claimTx.chainId, tokenAddress: claimTx.tokenAddress };
+        const balanceItem = await Balance.findOne(balanceFilter).lean();
+        if (balanceItem.pending >= claimTx.amount) {
+            // release pending
+            console.log('expired claim', balanceFilter);
+            await Balance.updateOne(balanceFilter, { $inc: { balance: claimTx.amount, pending: -claimTx.amount } });
+            await ClaimTransaction.updateOne({_id: claimTx._id}, {status: MINT_STATUS.failed});
+        }
+    }
+}
 
 async function deleteExpiredTokenItems() {
     const expiredTokenItems = await Token.find({ status: MINT_STATUS.signed, createdAt: { $lt: new Date(new Date() - EXPIRED_TIME_FOR_MINTING) } });
@@ -107,6 +124,7 @@ async function deleteVotedStreams() {
 }
 let autoDeleteCronCounter = 0;
 async function cronLoop() {
+    await deleteExpiredClaimTx();
     await fullVideoInfo();
     await deleteExpiredTokenItems();
     await processingFundsForPlayingStreams();

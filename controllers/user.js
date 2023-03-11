@@ -1,5 +1,5 @@
 require("dotenv").config();
-const path = require("path");
+// const path = require("path");
 const { ethers } = require("ethers");
 const { splitSignature } = require("@ethersproject/bytes");
 
@@ -16,7 +16,7 @@ const { Reward } = require("../models/Reward");
 const Feature = require("../models/Feature");
 const Comment = require("../models/Comment");
 
-const signer = new ethers.Wallet(process.env.SIGNER_KEY);
+// const signer = new ethers.Wallet(process.env.SIGNER_KEY);
 
 const signatureForClaim = async (address, sig, timestamp, amount, chainId, tokenAddress) => {
 
@@ -50,7 +50,7 @@ const signatureForClaim = async (address, sig, timestamp, amount, chainId, token
     });
     const toSignForClaim = ethers.utils.solidityKeccak256(["address", "uint256", "address", "address", "uint256", "uint256", "uint256"],
         [vaultContractAddresses[chainId], claimTx.id, address, tokenAddress, chainId, bigAmount, curTimestamp]);
-    let signer = new ethers.Wallet(process.env.SIGNER_KEY);
+    let signer = new ethers.Wallet(process.env.SIGNER_KEY);    
     const { r, s, v } = splitSignature(await signer.signMessage(ethers.utils.arrayify(toSignForClaim)));
     await Balance.updateOne(filterBalanceOption, { $inc: { balance: -Number(amount), pending: Number(amount) } });
     return { status: true, result: { amount: bigAmount.toString(), timestamp: curTimestamp, id: claimTx.id, v, r, s } };

@@ -11,7 +11,7 @@ const { ClaimTransaction } = require("../models/ClaimTransaction");
 const { Balance } = require("../models/Balance");
 const { getTokenByTokenAddress } = require("../utils/web3");
 
-const networkName = (process?.argv?.[2] || "bsctest");
+const networkName = (process?.argv?.[2] || "bsc");
 const curNetwork = supportedNetworks.find(e => e.shortName === networkName);
 if (!curNetwork) process.exit('no supported network!');
 const chainId = curNetwork.chainId;
