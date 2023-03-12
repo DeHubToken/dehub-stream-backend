@@ -54,14 +54,6 @@ const getLeaderboard = async () => {
             }
         ];
         let result = await Balance.aggregate(query);
-        // result = result.map(e => {
-        //     return {
-        //         account: e._id,
-        //         sumDHB: e.total,
-        //         username: e.account?.username,
-        //         avatarUrl: e.account?.avatarImageUrl ? `${process.env.DEFAULT_DOMAIN}/${e.account.avatarImageUrl}` : undefined
-        //     }
-        // })
         return { result: { byWalletBalance: result } };
     }
     catch (err) {

@@ -113,6 +113,7 @@ const supportedTokens = [
         chainId: 1,
         address: '0x99BB69Ee1BbFC7706C3ebb79b21C5B698fe58EC0',
         iconUrl: 'assets/icons/tokens/DHB.png',
+        mintBlockNumber: 16428469,
         decimals: 18,
     },
     {
@@ -123,6 +124,7 @@ const supportedTokens = [
         chainId: 56,
         address: '0x680D3113caf77B61b510f332D5Ef4cf5b41A761D',
         iconUrl: 'assets/icons/tokens/DHB.png',
+        mintBlockNumber: 24867920,
         decimals: 18,
     },
     {
@@ -133,6 +135,7 @@ const supportedTokens = [
         chainId: 137,
         address: '0x6051e59eb50BB568415B6C476Fbd394EEF83834D',
         iconUrl: 'assets/icons/tokens/DHB.png',
+        mintBlockNumber: 38197541,
         decimals: 18,
     },
     {
@@ -217,7 +220,7 @@ const supportedNetworks = [
     {
         chainId: ChainId.POLYGON_MAINNET,
         shortName: `polygon`,
-        rpcUrls: [`https://polygon-rpc.co`,]
+        rpcUrls: [`https://polygon-mainnet.rpcfast.com?api_key=xbhWBI1Wkguk8SNMu1bvvLurPGLXmgwYeC4S6g2H7WdwFigZSmPWVZRxrskEQwIf`,]
     }
 ]
 

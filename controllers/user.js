@@ -100,7 +100,7 @@ const requestPPVStream = async (account, sig, timestamp, chainId, tokenId) => {
     if (ppvTxItem) return { result: false, error: 'Already paid' };
     const payAmount = streamInfo[streamInfoKeys.payPerViewAmount];
     const balanceItem = await Balance.findOne({ ...tokenFilter, address, }, { balance: 1 });
-    if (!balanceItem?.balance || balanceItem.balance < payAmount) return { result: false, error: 'The user have no enough balance' };
+    if (!balanceItem?.balance || balanceItem.balance < payAmount) return { result: false, error: 'Deposit or buy more tokens in the profile section' };
     await Balance.updateOne({ address, ...tokenFilter }, { $inc: { balance: -payAmount, paidForPPV: payAmount } });
     const reward = payAmount * (1 - config.developerFee);
     if (nftStreamItem.owner) {
@@ -140,7 +140,7 @@ const requestTip = async (account, tokenId, tipAmount, chainId) => {
     const tokenAddress = normalizeAddress(tokenItem.address);
     const sender = normalizeAddress(account);
     const balanceItem = await Balance.findOne({ address: sender, tokenAddress, chainId, }, { balance: 1 });
-    if (!balanceItem?.balance || balanceItem.balance < tipAmount) return { result: false, error: 'The user have no enough balance' };
+    if (!balanceItem?.balance || balanceItem.balance < tipAmount) return { result: false, error: 'Deposit or buy more tokens in the profile section' };
 
     if (nftStreamItem.owner) {
         await Balance.updateOne({ address: sender, tokenAddress, chainId },

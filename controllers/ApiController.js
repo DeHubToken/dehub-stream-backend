@@ -343,7 +343,7 @@ const ApiController = {
         });
         const coverImgFile = req.files?.coverImg?.[0];
         const avatarImgFile = req.files?.avatarImg?.[0];
-        console.log(JSON.parse(JSON.stringify(req.body)), req.body);
+        // console.log(JSON.parse(JSON.stringify(req.body)), req.body);
         const accountItem = await Account.findOne({ address: address.toLowerCase() }).lean();
         if (coverImgFile) {
             const imageExt = coverImgFile.mimetype.toString().substr(coverImgFile.mimetype.toString().indexOf("/") + 1);

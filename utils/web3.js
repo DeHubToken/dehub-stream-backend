@@ -132,7 +132,7 @@ const getStakeHistories = async (fromBlock, toBlock) => {
     let result = [];
     try {
         let eventResults = [];
-        const filter1 = stakingContract.filters.Staked();        
+        const filter1 = stakingContract.filters.Staked();
         const filter = {
             address: filter1.address,
             topics: []
@@ -141,13 +141,51 @@ const getStakeHistories = async (fromBlock, toBlock) => {
         eventResults = await stakingContract.queryFilter(filter, fromBlock, toBlock);
         eventResults = eventResults.filter(e => e.event === 'Staked' || e.event === 'Unstaked'); // transaction with amount 0
         result = eventResults.map(e => {
-            return {                
+            return {
                 user: e.args.user,
-                amount: e.event === 'Staked'? e.args.amount: e.args.actualAmount,
+                amount: e.event === 'Staked' ? e.args.amount : e.args.actualAmount,
                 // id: e.transactionHash + "-" + e.logIndex,
-                logInfo: {transactionHash: e.transactionHash, logIndex: e.logIndex, blockNumber: e.blockNumber},
+                logInfo: { transactionHash: e.transactionHash, logIndex: e.logIndex, blockNumber: e.blockNumber },
                 event: e.event,
                 // realAmount: Number(ethers.utils.formatUnits(e.event === 'Staked'? e.args.amount: e.args.actualAmount, 18)),                
+            }
+        });
+    }
+    catch (e) {
+        console.log(e);
+        return { result: [] };
+    }
+    return { result, toBlock };
+
+}
+
+/**
+* 
+* @param {int} fromBlock 
+* @param {int} latestBlock 
+* @param {object} evmWeb3 
+* @param {string} tokenAddress 
+* @returns {transfers, toBlock}
+*/
+const getTokenHistories = async (fromBlock, toBlock, tokenAddress, chainId) => {
+    if (toBlock <= fromBlock) return { transfers: [] };
+    const network = supportedNetworks.find(e => e.chainId === chainId);
+    const token = supportedTokens.find(e => e.address.toLowerCase() === tokenAddress.toLowerCase() && e.chainId === chainId);
+    if (!network || !token) return { tranfers: [] };
+    const provider = new ethers.providers.JsonRpcProvider(network.rpcUrls[0]);
+    const tokenContract = new ethers.Contract(tokenAddress, erc20ContractAbi, provider);
+    let result = [];
+    try {
+        let eventResults = [];
+        const filter = tokenContract.filters.Transfer();
+        eventResults = await tokenContract.queryFilter(filter, fromBlock, toBlock);
+        result = eventResults.map(e => {
+            return {
+                from: e.args.from,
+                to: e.args.to,
+                value: e.args.value,
+                logInfo: { transactionHash: e.transactionHash, logIndex: e.logIndex, blockNumber: e.blockNumber, address: tokenAddress },
+                event: e.event,
             }
         });
     }
@@ -165,4 +203,5 @@ module.exports = {
     getTokenBalancesOfAddresses,
     getStakedAmountOfAddresses,
     getStakeHistories,
+    getTokenHistories,
 }

@@ -9,7 +9,9 @@ const { vaultContractAddresses, ChainId, dhbTokenAddresses, overrideOptions, sup
 const { config } = require('../config');
 const { ClaimTransaction } = require("../models/ClaimTransaction");
 const { Balance } = require("../models/Balance");
-const { getTokenByTokenAddress } = require("../utils/web3");
+const { getTokenByTokenAddress, getTokenHistories } = require("../utils/web3");
+const { sleep } = require("../utils/time");
+const { isInserted } = require("../utils/db");
 
 const networkName = (process?.argv?.[2] || "bsc");
 const curNetwork = supportedNetworks.find(e => e.shortName === networkName);
@@ -86,17 +88,48 @@ async function TransferEventListener(from, to, value, logInfo) {
         const updatedResult = await Transaction.updateOne({ txHash: transactionHash, logIndex, chainId },
             { amount: realAmount, from: fromAddress, to: toAddress, tokenAddress, blockNumber, type: 'TRANSFER' },
             overrideOptions);
-        // if (isInserted(updatedResult)) {
+        if (isInserted(updatedResult)) {
         await Balance.updateOne({ address: toAddress, chainId, tokenAddress },
-            { $inc: { walletBalance: realAmount } }, overrideOptions);
+            { $inc: { walletBalance: realAmount } }, overrideOptions);        
         await Balance.updateOne({ address: fromAddress, chainId, tokenAddress },
             { $inc: { walletBalance: -realAmount } }, overrideOptions);
-        // }
+        }
     } catch (error) {
         console.log("--- token find error");
     }
 }
 
+async function loadHistory(tokenItem) {
+    const transactionItems = await Transaction.find({ type: 'TRANSFER', tokenAddress: normalizeAddress(tokenItem.address), chainId: tokenItem.chainId }).sort({ blockNumber: -1 }).limit(1);
+    let nowDate = new Date();
+    let lastDayDate = nowDate;
+    lastDayDate.setDate(nowDate.getDate() - 1);
+    const latestBlock = await provider.getBlockNumber();
+    if (transactionItems?.length < 1 || transactionItems[0].blockNumber < latestBlock - 3000) {
+        let firstBlock = transactionItems?.[0]?.blockNumber || tokenItem.mintBlockNumber;
+        await sleep(200);
+        const limit = 3000;
+        let totalCount = 0;
+        while (firstBlock <= latestBlock) {
+            try {
+                const historyData = await getTokenHistories(firstBlock, firstBlock + limit - 1, tokenItem.address, tokenItem.chainId);
+                console.log(historyData.result?.length, firstBlock, historyData?.toBlock);
+                for (const historyItem of historyData?.result) {
+                    await TransferEventListener(historyItem.from, historyItem.to, historyItem.value, historyItem.logInfo);                    
+                }
+                totalCount+=historyData.result?.length;
+            }
+            catch (err) {
+                console.log('--error fetch', err);
+                await sleep(1000);
+                firstBlock -= limit;
+            }
+            await sleep(200);
+            firstBlock += limit;
+        }
+        console.log('load historical data ', totalCount);
+    }
+}
 mongoose.set('useFindAndModify', false);
 mongoose.set('useCreateIndex', true);
 /// -- transfer listener
@@ -115,6 +148,7 @@ mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/
             const tokenItem = tokens[i];
             const tokenContract = new ethers.Contract(tokenItem.address, erc20ContractAbi, provider);
             console.log('supported token: ', tokenItem.address);
+            await loadHistory(tokenItem);
             tokenContract.on('Transfer', TransferEventListener);
         }
     });
