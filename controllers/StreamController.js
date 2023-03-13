@@ -16,9 +16,13 @@ const { updateWalletBalance } = require('./user');
 const { isInserted } = require('../utils/db');
 const { normalizeAddress } = require('../utils/format');
 const { isUnlockedPPVStream } = require('../utils/validation');
-const limitBuffer = 1 * 1024 * 1024; // 2M
-const initialBuffer = 80 * 1024; // first 80k is free
-
+const defaultLimitBuffer = 1 * 1024 * 1024; // 2M
+const defaultInitialBuffer = 160 * 1024; // first 160k is free
+const tokenTemplateForStream = {
+    owner: 1,
+    streamInfo: 1,
+    videoInfo: 1,
+};
 const StreamController = {
     getStream: async function (req, res, next) {
         let tokenId = req.params.id;
@@ -32,7 +36,7 @@ const StreamController = {
             return res.json({ error: 'error!' });
         }
         console.log('----start stream:', tokenId);
-        const tokenItem = await Token.findOne({ tokenId, status: 'minted' }).lean();
+        const tokenItem = await Token.findOne({ tokenId, status: 'minted' }, tokenTemplateForStream).lean();
         if (!tokenItem) return res.json({ error: 'no stream!' });
         const videoPath = `${path.dirname(__dirname)}/assets/videos/${tokenId}.mp4`;
         const videoStat = fs.statSync(videoPath);
@@ -40,6 +44,8 @@ const StreamController = {
         const videoRange = req.headers.range;
         const nowTimestamp = Date.now();
         const userAddress = signParams?.account?.toLowerCase();
+        const limitBuffer = tokenItem.videoInfo?.bitrate ? Math.floor(tokenItem.videoInfo?.bitrate / 8 * 3) : defaultLimitBuffer;
+        const initialBuffer = tokenItem.videoInfo?.bitrate ? Math.floor(tokenItem.videoInfo?.bitrate / 8) : defaultInitialBuffer;
         let chainId = signParams?.chainId;
         if (chainId) chainId = parseInt(chainId);
         if (videoRange) {
@@ -84,50 +90,13 @@ const StreamController = {
                         }, { walletBalance: 1 }).lean();
                         if (!balanceItem || balanceItem.walletBalance < lockContentAmount) {
                             return res.status(500).send('error!');
-                        } else {
-                            // updateWalletBalance(account, tokenAddress, chainId).then(() => {
-                            //     console.log('---update wallet', account, tokenAddress, chainId);
-                            // })
                         }
                     }
                     else // per view stream
                     {
                         const isUnlocked = await isUnlockedPPVStream(tokenId, userAddress);
                         if (!isUnlocked) return res.status(500).send('error!');
-                        // const payPerViewAmount = Number(tokenItem?.streamInfo?.[streamInfoKeys.payPerViewAmount]);
-                        // const symbol = tokenItem?.streamInfo?.[streamInfoKeys.payPerViewTokenSymbol] || 'DHB';
-                        // const chainIds = tokenItem?.streamInfo?.[streamInfoKeys.payPerViewChainIds] || [97];
-
-                        // if (!chainIds.includes(chainId)) return res.status(500).send('error!');
-
-                        // const tokenAddress = normalizeAddress(supportedTokens.find(e => e.symbol === symbol || e.chainId === chainId)?.address);
-                        // const balanceItem = await Balance.findOne({
-                        //     address: userAddress,
-                        //     chainId,
-                        //     tokenAddress: tokenAddress,
-                        // }, { balance: 1, lockForPPV: 1 }).lean();
-                        // if (!balanceItem) {
-                        //     return res.status(500).send('error!');
-                        // }
-                        // const watchItem = await WatchHistory.findOne(
-                        //     { tokenId, chainId, watcherAddress: userAddress, exitedAt: { $gt: new Date(nowTimestamp - config.extraPeriodForHistory) } },
-                        //     { status: 1 }).lean();
-
-                        // const availableBalance = (balanceItem.balance || 0) + (balanceItem.lockForPPV || 0);
-                        // // we will check balance after cron job processes funds for this watch
-                        // if (watchItem?.status !== 'confirmed') {
-                        //     if (availableBalance < payPerViewAmount) return res.status(500).send('error!');
-                        //     // else (balanceItem.lockForPPV < payPerViewAmount)
-                        //     // {
-                        //     //     await Balance.updateOne({
-                        //     //         address: userAddress,
-                        //     //         chainId,
-                        //     //         tokenAddress: tokenAddress,
-                        //     //     }, { balance: 1, lockedForPPV:  });
-                        //     // }
-                        // }
                     }
-
                 }
             }
             console.log('---call stream', nowTimestamp, signParams?.account, signParams?.chainId, tokenId, req.headers.range, end);
@@ -178,7 +147,7 @@ const StreamController = {
         };
         const filter = { tokenId: parseInt(tokenId) };
         const tokenItem = await Token.findOne(filter, tokenTemplate).lean();
-        if (!tokenItem) return json({});
+        if (!tokenItem) return JSON.stringify({});
         const result = JSON.parse(JSON.stringify(nftMetaDataTemplate));
         nftMetaDataTemplate.name = tokenItem.name;
         nftMetaDataTemplate.description = tokenItem.description;

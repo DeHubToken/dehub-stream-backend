@@ -25,6 +25,7 @@ let TokenSchema = new Schema({
     videoExt: String,
     imageExt: String,
     description: String,
+    videoInfo: Object,
     videoDuration: { type: Number, index: true }, // in second unit
     videoFilePath: { type: String },
     likes: {type: Number, index: true},

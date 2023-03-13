@@ -49,7 +49,7 @@ async function deleteExpiredClaimTx() {
             // release pending
             console.log('expired claim', balanceFilter);
             await Balance.updateOne(balanceFilter, { $inc: { balance: claimTx.amount, pending: -claimTx.amount } });
-            await ClaimTransaction.updateOne({_id: claimTx._id}, {status: MINT_STATUS.failed});
+            await ClaimTransaction.updateOne({ _id: claimTx._id }, { status: MINT_STATUS.failed });
         }
     }
 }
@@ -86,12 +86,27 @@ async function deleteExpiredTokenItems() {
 }
 
 async function fullVideoInfo() {
-    const tokenItems = await Token.find({ videoDuration: null });
+    const tokenItems = await Token.find({ videoInfo: null });
     tokenItems.map((tokenItem) => {
         const videoFilePath = defaultVideoFilePath(tokenItem.tokenId, tokenItem.videoExt);
         ffprobe(videoFilePath, { path: ffprobeStatic.path }).then((videoInfo) => {
-            const videoDuration = videoInfo?.streams?.[0]?.duration;
-            Token.updateOne({ tokenId: tokenItem.tokenId }, { videoDuration }).then();
+            const videoStream = videoInfo?.streams?.find(e => e.codec_type === 'video');
+            if (!videoStream) return;
+            // const streamData = videoInfo.streams[0];
+            const videoDuration = videoStream.duration;
+            const w = videoStream.width;
+            const h = videoStream.height;
+            let bitrate = Number(videoStream.bit_rate);
+            const lang = videoStream.tags?.language;
+            const audioStream = videoInfo?.streams?.find(e => e.codec_type === 'audio');
+            let channelLayout = 'mono';
+            if (audioStream) {
+                channelLayout = audioStream.channel_layout;
+                bitrate += Number(audioStream.bit_rate);
+            }
+            Token.updateOne({ tokenId: tokenItem.tokenId }, { videoDuration, videoInfo: { w, h, bitrate, channelLayout, lang } }).then(
+                () => { console.log('updated video info', tokenItem.tokenId); }
+            );
         }).catch(e => {
             console.log('---error from ffprobe', e);
         })
@@ -104,7 +119,8 @@ async function processingFundsForPlayingStreams() {
     for (const watchStream of pendingStreamsForProcessing) {
         const _id = watchStream._id;
         const watchedTime = watchStream.exitedAt.getTime() - watchStream.createdAt.getTime();
-        if (watchedTime > config.watchTimeForConfirming) {
+        const tokenItem = await Token.findOne({ tokenId: watchStream.tokenId }, { videoDuration: 1, _id: 0 }).lean();
+        if (watchedTime >= (Math.min(config.watchTimeForConfirming, tokenItem.videoDuration * 0.5))) {
             const tokenFilter = { tokenId: watchStream.tokenId };
             await payBounty(watchStream.watcherAddress, watchStream.tokenId, RewardType.BountyForViewer);
             await WatchHistory.updateOne({ _id }, { status: 'confirmed' });
@@ -129,7 +145,7 @@ async function cronLoop() {
     await deleteExpiredTokenItems();
     await processingFundsForPlayingStreams();
     if (autoDeleteCronCounter++ % (config.periodOfDeleleCron / 10) == 0) await deleteVotedStreams();
-    setTimeout(cronLoop, 10 * 1000);
+    setTimeout(cronLoop, 20 * 1000);
 }
 /// -- minter listener
 mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/' + config.mongo.dbName,
