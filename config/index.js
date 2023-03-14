@@ -16,7 +16,7 @@ const config = {
     },
     graphQlUrl: 'https://api.thegraph.com/subgraphs/name/streaming-nft/streaming-nft',
     expireSigninTime: 2 * 60 * 60, // 2 hours
-    isDevMode: process.env.RUN_MODE != 'dev',
+    isDevMode: process.env.RUN_MODE === 'dev',
     recentTimeDiff: 3 * 24 * 60 * 60 * 1000,
     extraSecondForCheckingBalance: 2 * 60,
     extraPeriodForHistory: 60 * 1000, // in millisecond unit:  store into same watch history record while watching video in this extra time
