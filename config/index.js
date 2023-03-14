@@ -3,16 +3,16 @@ const { normalizeAddress } = require('../utils/format');
 require('dotenv').config();
 
 const config = {
-    port: 9015,
+    port: process.env.API_PORT || 9015,
     socket: 9003,
-    baseUrl: 'http://127.0.0.1:9015',
+    baseUrl: `http://127.0.0.1:${process.env.API_PORT || 9015}`,
 
     devPort: 9002,
     devBaseUrl: 'http://127.0.0.1:9002',
     mongo: {
         host: '127.0.0.1',
         port: 27017,
-        dbName: 'streaming_production_db'
+        dbName: process.env.DB_NAME || 'streaming_production_db',
     },
     graphQlUrl: 'https://api.thegraph.com/subgraphs/name/streaming-nft/streaming-nft',
     expireSigninTime: 2 * 60 * 60, // 2 hours
