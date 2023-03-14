@@ -11,7 +11,7 @@ config.json
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 generated/
-uploads/
+uploads/*
 # Runtime data
 pids
 *.pid
@@ -121,10 +121,13 @@ dist
 .pnp.*
 /logs
 # uploaded images and videos for nft
-/assets/videos
-/assets/images
+/assets/videos/*
+!/assets/videos/holder.md
+/assets/images/*
+!/assets/images/holder.md
 # uploaded cover images and avatar images for user
 /assets/covers/*
 !/assets/covers/holder.md
 /assets/avatars/*
 !/assets/avatars/holder.md
+!/uploads/holder.md

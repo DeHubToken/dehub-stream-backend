@@ -1,15 +1,10 @@
 const fs = require("fs");
 const path = require("path");
 const moveFile = (srcFilePath, destFilePath) => {
-    var source = fs.createReadStream(srcFilePath);
-    var dest = fs.createWriteStream(destFilePath);
-
-    source.pipe(dest);
-    source.on('end', function () {
-        console.log('----copied');
-        fs.unlink(srcFilePath, error => { if (error) console.log('delete file error!') });
-    });
-    source.on('error', function (err) { console.log('----not copied', err) });
+    fs.rename(srcFilePath, destFilePath, (e)=>{
+        if(e) console.log(e);
+        else console.log('--moved', destFilePath);
+    });    
 }
 
 const defaultVideoFilePath = (tokenId, videoExt = 'mp4') => {
