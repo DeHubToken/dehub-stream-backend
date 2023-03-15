@@ -19,6 +19,9 @@ const Feature = require('../models/Feature');
 const { commentsForTokenId } = require('./comments');
 const { requestVote } = require('./vote');
 const { getLeaderboard } = require('./getData');
+const { isAddress } = require('ethers/lib/utils');
+const { requestFollow, unFollow, getFollowing, getFollowers } = require('./follow');
+
 const expireTime = 86400000;
 const tokenTemplate = {
     name: 1,
@@ -314,6 +317,8 @@ const ApiController = {
         accountInfo.unlocked = unlockedPPVStreams;
         accountInfo.uploads = await Token.find({ minter: walletAddress.toLowerCase() }, {}).countDocuments();
         accountInfo.likes = await Feature.find({ address: walletAddress.toLowerCase() }, {}).distinct('tokenId');
+        accountInfo.followings = await getFollowing(walletAddress);
+        accountInfo.followers = await getFollowers(walletAddress);
         return res.json({ result: accountInfo, });
     },
     getSignDataForClaim: async function (req, res, next) {
@@ -457,6 +462,23 @@ const ApiController = {
         catch (err) {
             console.log('-----request vote error', err);
             return res.json({ result: false, error: 'voting was failed' });
+        }
+    },
+    requestFollow: async function (req, res, next) {
+        const address = reqParam(req, paramNames.address);
+        const following = reqParam(req, 'following');
+        const unFollowing = reqParam(req, 'unFollowing');
+        if (!following && !isAddress(following))
+            return res.json({ error: true, msg: "following param is missing" });
+        try {
+            let result = undefined;
+            if (!unFollowing) result = await requestFollow(address, following);
+            else result = await unFollow(address, following);
+            return res.json(result);
+        }
+        catch (err) {
+            console.log('-----request follow error', err);
+            return res.json({ result: false, error: 'following was failed' });
         }
     },
 }
