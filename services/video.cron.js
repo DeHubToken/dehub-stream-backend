@@ -1,36 +1,22 @@
 /**
  * this cron job gets info and converts videos if needed by processing video files 
  */
-const mongoose = require("mongoose")
-require('dotenv').config()
-const ethers = require('ethers');
-const { BigNumber } = ethers
+const mongoose = require("mongoose");
+require('dotenv').config();
 const fs = require('fs');
-const ffprobe = require('ffprobe');
-const ffprobeStatic = require('ffprobe-static');
-const ffmpeg = require('fluent-ffmpeg');
-// const Token = require('../models/Token')
-
-const ContractAbi = require('../abis/StreamNft.json');
 const { config } = require("../config");
 const { Token } = require("../models/Token");
 const { EXPIRED_TIME_FOR_MINTING } = require("../shared/contants");
 const IDCounter = require("../models/IDCounter");
-const { defaultVideoFilePath, defaultImageFilePath, getTempVideoFilePath, moveFile } = require("../utils/file");
+const { defaultVideoFilePath, defaultImageFilePath } = require("../utils/file");
 const { WatchHistory } = require("../models/WatchHistory");
 const { streamInfoKeys, supportedTokens, overrideOptions, RewardType } = require("../config/constants");
-const { Reward } = require("../models/Reward");
 const { Balance } = require("../models/Balance");
-const { watch } = require("../models/IDCounter");
-const { normalizeAddress } = require("../utils/format");
 const { getTotalBountyAmount } = require("../utils/calc");
+const { updateVideoInfo, transcodeVideo } = require('../utils/stream');
 const { payBounty } = require("../controllers/user");
 const { deleteVotedStream } = require("../controllers/vote");
 const { ClaimTransaction } = require("../models/ClaimTransaction");
-// const privatekey = require("../privatekey");
-const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_ENDPOINT);
-
-const NFTContract = new ethers.Contract(process.env.DEFAULT_COLLECTION, ContractAbi, provider)
 
 const MINT_STATUS = {
     minted: 'minted',
@@ -39,7 +25,6 @@ const MINT_STATUS = {
     confirmed: 'confirmed',
     failed: 'failed',
 }
-const zeroAddress = '0x0000000000000000000000000000000000000000';
 
 async function deleteExpiredClaimTx() {
     const claimTxs = await ClaimTransaction.find({ status: MINT_STATUS.pending, createdAt: { $lt: new Date(new Date() - EXPIRED_TIME_FOR_MINTING) } }).lean();
@@ -87,55 +72,22 @@ async function deleteExpiredTokenItems() {
 }
 
 async function transcodeVideos() {
-    const transcodingCount = await Token.countDocuments({ transcodingStatus: 'on' });    
+    const transcodingCount = await Token.countDocuments({ transcodingStatus: 'on' });
     if (transcodingCount > 1) {
         console.log('---transcoding: ', transcodingCount);
         return;
     }
-    const tokenItems = await Token.find({ transcodingStatus: null }, { tokenId: 1, videoExt: 1 }).limit(1).lean();
+    const tokenItems = await Token.find({ transcodingStatus: null, videoInfo: { $ne: null } }, { tokenId: 1, videoExt: 1 }).limit(1).lean();
     for (const tokenItem of tokenItems) {
-        const videoFilePath = defaultVideoFilePath(tokenItem.tokenId, tokenItem.videoExt);
-        const tempFilePath = getTempVideoFilePath(tokenItem.tokenId, tokenItem.videoExt);
-        console.log('c', videoFilePath);
-        console.log('t', tempFilePath);
-        await Token.updateOne({ _id: tokenItem._id }, { transcodingStatus: 'on' });
-        ffmpeg(videoFilePath)
-            .withOutputFormat('mp4')
-            .on('end', () => {
-                console.log('--finished transcoding', tokenItem.tokenId);
-                Token.updateOne({ _id: tokenItem._id }, { transcodingStatus: 'done' }).then();
-                moveFile(tempFilePath, videoFilePath);
-            })
-            .saveToFile(tempFilePath);
+        await transcodeVideo(tokenItem.tokenId, tokenItem.videoExt);
     }
 }
 
 async function fullVideoInfo() {
     const tokenItems = await Token.find({ videoInfo: null }, { tokenId: 1, videoExt: 1, }).lean();
-    tokenItems.map((tokenItem) => {
-        const videoFilePath = defaultVideoFilePath(tokenItem.tokenId, tokenItem.videoExt);
-        ffprobe(videoFilePath, { path: ffprobeStatic.path }).then((videoInfo) => {
-            const videoStream = videoInfo?.streams?.find(e => e.codec_type === 'video');
-            if (!videoStream) return;
-            // const streamData = videoInfo.streams[0];
-            const videoDuration = videoStream.duration;
-            const w = videoStream.width;
-            const h = videoStream.height;
-            let bitrate = Number(videoStream.bit_rate);
-            const lang = videoStream.tags?.language;
-            const audioStream = videoInfo?.streams?.find(e => e.codec_type === 'audio');
-            let channelLayout = 'mono';
-            if (audioStream) {
-                channelLayout = audioStream.channel_layout;
-                bitrate += Number(audioStream.bit_rate);
-            }
-            Token.updateOne({ tokenId: tokenItem.tokenId }, { videoDuration, videoInfo: { w, h, bitrate, channelLayout, lang } }).then(
-                () => { console.log('updated video info', tokenItem.tokenId); }
-            );
-        }).catch(e => {
-            console.log('---error from ffprobe', e);
-        })
-    })
+    for (const tokenItem of tokenItems) {
+        await updateVideoInfo(tokenItem.tokenId, tokenItem.videoExt);
+    }
 }
 
 async function processingFundsForPlayingStreams() {

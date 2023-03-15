@@ -8,7 +8,7 @@ const paramNames = {
     streamTokenId: 'streamTokenId',
 }
 
-const supportedVideoTypes = ["/mp4"];
+const supportedVideoTypes = ["/mp4", "/quicktime"];
 const supportedImageTypes = ["/png", "/jpeg", "/jpg", "/gif"];
 const errorMsgs = {
     not_supported_video: 'Not supported video',

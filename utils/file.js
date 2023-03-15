@@ -26,6 +26,7 @@ const defaultImageFilePath = (tokenId, imageExt = 'png') => {
     return `${path.dirname(__dirname)}/assets/images/${tokenId}.${imageExt}`;
 }
 
+
 module.exports = {
     moveFile,
     defaultVideoFilePath,

@@ -41,6 +41,7 @@ const tokenTemplate = {
     lockedBounty: 1,
     totalVotes: 1,
     status: 1,
+    transcodingStatus: 1,
     _id: 0,
 };
 const accountTemplate = {
@@ -191,23 +192,7 @@ const ApiController = {
         const limit = req.body.limit || req.query.limit || 1000;
         const owner = req.body.owner || req.query.owner;
         if (!owner) return res.json({ error: 'no owner field!' });
-        const filter = { status: 'minted', $or: [{ owner: owner.toLowerCase() }, { minter: owner.toLowerCase() }] };
-
-        const tokenTemplate = {
-            name: 1,
-            description: 1,
-            tokenId: 1,
-            imageUrl: 1,
-            videoUrl: 1,
-            owner: 1,
-            minter: 1,
-            streamInfo: 1,
-            videoInfo: 1,
-            videoDuration: 1,
-            likes: 1,
-            status: 1,
-            _id: 0,
-        };
+        const filter = { status: 'minted', $or: [{ owner: owner.toLowerCase() }, { minter: owner.toLowerCase() }] };        
         const totalCount = await Token.find(filter, tokenTemplate).count();
         const all = await Token.find(filter, tokenTemplate)
             .sort({ updatedAt: -1 })

@@ -15,7 +15,8 @@ const signer = new ethers.Wallet(process.env.SIGNER_KEY);
 
 const signatureForMintingNFT = async (videoFile, imageFile, name, description, streamInfo, address) => {
   const collectionAddress = process.env.DEFAULT_COLLECTION?.toLowerCase();
-  const videoExt = videoFile.mimetype.toString().substr(videoFile.mimetype.toString().indexOf("/") + 1);
+  let videoExt = videoFile.mimetype.toString().substr(videoFile.mimetype.toString().indexOf("/") + 1);
+  if(videoExt === 'quicktime') videoExt = 'mov';
   const imageExt = imageFile.mimetype.toString().substr(imageFile.mimetype.toString().indexOf("/") + 1);
 
   const addedOptions = {};
