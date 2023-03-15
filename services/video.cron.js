@@ -8,6 +8,7 @@ const { BigNumber } = ethers
 const fs = require('fs');
 const ffprobe = require('ffprobe');
 const ffprobeStatic = require('ffprobe-static');
+const ffmpeg = require('fluent-ffmpeg');
 // const Token = require('../models/Token')
 
 const ContractAbi = require('../abis/StreamNft.json');
@@ -15,7 +16,7 @@ const { config } = require("../config");
 const { Token } = require("../models/Token");
 const { EXPIRED_TIME_FOR_MINTING } = require("../shared/contants");
 const IDCounter = require("../models/IDCounter");
-const { defaultVideoFilePath, defaultImageFilePath } = require("../utils/file");
+const { defaultVideoFilePath, defaultImageFilePath, getTempVideoFilePath, moveFile } = require("../utils/file");
 const { WatchHistory } = require("../models/WatchHistory");
 const { streamInfoKeys, supportedTokens, overrideOptions, RewardType } = require("../config/constants");
 const { Reward } = require("../models/Reward");
@@ -85,8 +86,32 @@ async function deleteExpiredTokenItems() {
     console.log('--deleted expired tokens', deletedTokenIds.length, result);
 }
 
+async function transcodeVideos() {
+    const transcodingCount = await Token.countDocuments({ transcodingStatus: 'on' });    
+    if (transcodingCount > 1) {
+        console.log('---transcoding: ', transcodingCount);
+        return;
+    }
+    const tokenItems = await Token.find({ transcodingStatus: null }, { tokenId: 1, videoExt: 1 }).limit(1).lean();
+    for (const tokenItem of tokenItems) {
+        const videoFilePath = defaultVideoFilePath(tokenItem.tokenId, tokenItem.videoExt);
+        const tempFilePath = getTempVideoFilePath(tokenItem.tokenId, tokenItem.videoExt);
+        console.log('c', videoFilePath);
+        console.log('t', tempFilePath);
+        await Token.updateOne({ _id: tokenItem._id }, { transcodingStatus: 'on' });
+        ffmpeg(videoFilePath)
+            .withOutputFormat('mp4')
+            .on('end', () => {
+                console.log('--finished transcoding', tokenItem.tokenId);
+                Token.updateOne({ _id: tokenItem._id }, { transcodingStatus: 'done' }).then();
+                moveFile(tempFilePath, videoFilePath);
+            })
+            .saveToFile(tempFilePath);
+    }
+}
+
 async function fullVideoInfo() {
-    const tokenItems = await Token.find({ videoInfo: null });
+    const tokenItems = await Token.find({ videoInfo: null }, { tokenId: 1, videoExt: 1, }).lean();
     tokenItems.map((tokenItem) => {
         const videoFilePath = defaultVideoFilePath(tokenItem.tokenId, tokenItem.videoExt);
         ffprobe(videoFilePath, { path: ffprobeStatic.path }).then((videoInfo) => {
@@ -142,10 +167,11 @@ let autoDeleteCronCounter = 0;
 async function cronLoop() {
     await deleteExpiredClaimTx();
     await fullVideoInfo();
+    await transcodeVideos();
     await deleteExpiredTokenItems();
     await processingFundsForPlayingStreams();
     if (autoDeleteCronCounter++ % (config.periodOfDeleleCron / 10) == 0) await deleteVotedStreams();
-    setTimeout(cronLoop, 20 * 1000);
+    setTimeout(cronLoop, 10 * 1000);
 }
 /// -- minter listener
 mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/' + config.mongo.dbName,
