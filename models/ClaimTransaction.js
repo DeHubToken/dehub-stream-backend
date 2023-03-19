@@ -11,9 +11,9 @@ let ClaimTransactionSchema = new Schema({
     txHash: String,
     block: Number,
     logIndex: Number,
-    id: Number,
+    id: {type: Number, unique: true },
     chainId: Number,
-    status: { type: String, enum:['pending', 'confirmed', 'expired'], default: 'pending'},
+    status: { type: String, enum: ['pending', 'confirmed', 'expired'], default: 'pending' },
 }, { timestamps: true });
 
 ClaimTransactionSchema.pre("save", function (next) {

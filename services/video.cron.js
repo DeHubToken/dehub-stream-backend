@@ -17,6 +17,7 @@ const { updateVideoInfo, transcodeVideo } = require('../utils/stream');
 const { payBounty } = require("../controllers/user");
 const { deleteVotedStream } = require("../controllers/vote");
 const { ClaimTransaction } = require("../models/ClaimTransaction");
+const { Setting } = require("../models/Setting");
 
 const MINT_STATUS = {
     minted: 'minted',
@@ -27,8 +28,11 @@ const MINT_STATUS = {
 }
 
 async function deleteExpiredClaimTx() {
+    const setting = await Setting.findOne({}).lean();
     const claimTxs = await ClaimTransaction.find({ status: MINT_STATUS.pending, createdAt: { $lt: new Date(new Date() - EXPIRED_TIME_FOR_MINTING) } }).lean();
     for (const claimTx of claimTxs) {
+        // if not synced, not delete
+        if (setting.syncedDiffTimeOfGraph?.[claimTx.chainId] > 60) continue;
         const balanceFilter = { address: claimTx.receiverAddress, chainId: claimTx.chainId, tokenAddress: claimTx.tokenAddress };
         const balanceItem = await Balance.findOne(balanceFilter).lean();
         if (balanceItem.pending >= claimTx.amount) {

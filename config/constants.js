@@ -211,16 +211,20 @@ const supportedNetworks = [
         chainId: ChainId.BSC_MAINNET,
         shortName: `bsc`,
         rpcUrls: [process.env.BSC_RPC_ENDPOINT],
+        startBlockNumber: 25834000,
+        graphUrl: process.env.BSC_GRAPH_API_ENDPOINT,
     },
     {
         chainId: ChainId.MAINNET,
         shortName: `mainnet`,
-        rpcUrls: [`https://mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`,]
+        rpcUrls: [`https://mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`,],
+        startBlockNumber: 16428469,
     },
     {
         chainId: ChainId.POLYGON_MAINNET,
         shortName: `polygon`,
-        rpcUrls: [`https://polygon-mainnet.rpcfast.com?api_key=xbhWBI1Wkguk8SNMu1bvvLurPGLXmgwYeC4S6g2H7WdwFigZSmPWVZRxrskEQwIf`,]
+        rpcUrls: [`https://polygon-mainnet.rpcfast.com?api_key=xbhWBI1Wkguk8SNMu1bvvLurPGLXmgwYeC4S6g2H7WdwFigZSmPWVZRxrskEQwIf`,],
+        startBlockNumber: 38197541,
     }
 ]
 

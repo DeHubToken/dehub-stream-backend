@@ -10,7 +10,7 @@ let TransactionSchema = new Schema({
     timestamp: Number,
     blockNumber: Number,
     amount: Number,
-    type: { type: String, default: "DEPOSIT" }, // DEPOSIT or CLAIM
+    type: { type: String, default: "DEPOSIT" }, // DEPOSIT or CLAIM or STAKE, UNSTAKE
     logIndex: Number,
     status: String,
     chainId: Number,
