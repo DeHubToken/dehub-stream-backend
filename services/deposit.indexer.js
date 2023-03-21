@@ -24,7 +24,7 @@ const provider = new ethers.providers.JsonRpcProvider(curNetwork.rpcUrls[0]);
 const vaultContract = new ethers.Contract(vaultContractAddresses[curNetwork.chainId], ContractAbi, provider);
 
 async function DepositEventListener(from, tokenAddress, amount, logInfo) {
-    const { transactionHash, logIndex, blockNumber } = logInfo;
+    const { transactionHash: txHash, logIndex, blockNumber } = logInfo;
     const token = getTokenByTokenAddress(tokenAddress, chainId);
     tokenAddress = normalizeAddress(tokenAddress);
     const realAmount = Number(ethers.utils.formatUnits(amount, token.decimals));
@@ -33,10 +33,11 @@ async function DepositEventListener(from, tokenAddress, amount, logInfo) {
     console.log("---- checked deposit", address, realAmount);
     // let account;
     try {
-        const result = await Transaction.updateOne({ txHash: transactionHash, logIndex, chainId },
+        const result = await Transaction.updateOne({ amount: realAmount },
             {
-                amount: realAmount, from: address, tokenAddress: tokenAddress,
-                to: normalizeAddress(vaultContract.address), blockNumber,
+                from: address, to: normalizeAddress(vaultContract.address),
+                tokenAddress: tokenAddress,
+                chainId, blockNumber, txHash, logIndex,
                 type: 'DEPOSIT'
             },
             overrideOptions);
@@ -45,7 +46,6 @@ async function DepositEventListener(from, tokenAddress, amount, logInfo) {
     } catch (error) {
         console.log("--- token find error");
     }
-
 }
 
 async function ClaimEventListener(id, tokenAddress, to, amount, timestamp, logInfo) {
@@ -89,10 +89,10 @@ async function TransferEventListener(from, to, value, logInfo) {
             { amount: realAmount, from: fromAddress, to: toAddress, tokenAddress, blockNumber, type: 'TRANSFER' },
             overrideOptions);
         if (isInserted(updatedResult)) {
-        await Balance.updateOne({ address: toAddress, chainId, tokenAddress },
-            { $inc: { walletBalance: realAmount } }, overrideOptions);        
-        await Balance.updateOne({ address: fromAddress, chainId, tokenAddress },
-            { $inc: { walletBalance: -realAmount } }, overrideOptions);
+            await Balance.updateOne({ address: toAddress, chainId, tokenAddress },
+                { $inc: { walletBalance: realAmount } }, overrideOptions);
+            await Balance.updateOne({ address: fromAddress, chainId, tokenAddress },
+                { $inc: { walletBalance: -realAmount } }, overrideOptions);
         }
     } catch (error) {
         console.log("--- token find error");
@@ -105,7 +105,7 @@ async function loadHistory(tokenItem) {
     let lastDayDate = nowDate;
     lastDayDate.setDate(nowDate.getDate() - 1);
     const latestBlock = await provider.getBlockNumber();
-    if (transactionItems?.length < 1 || transactionItems[0].blockNumber < latestBlock - 3000) {
+    if (transactionItems?.length < 1 || transactionItems[0].blockNumber < latestBlock - 10) {
         let firstBlock = transactionItems?.[0]?.blockNumber || tokenItem.mintBlockNumber;
         await sleep(200);
         const limit = 3000;
@@ -115,9 +115,9 @@ async function loadHistory(tokenItem) {
                 const historyData = await getTokenHistories(firstBlock, firstBlock + limit - 1, tokenItem.address, tokenItem.chainId);
                 console.log(historyData.result?.length, firstBlock, historyData?.toBlock);
                 for (const historyItem of historyData?.result) {
-                    await TransferEventListener(historyItem.from, historyItem.to, historyItem.value, historyItem.logInfo);                    
+                    await TransferEventListener(historyItem.from, historyItem.to, historyItem.value, historyItem.logInfo);
                 }
-                totalCount+=historyData.result?.length;
+                totalCount += historyData.result?.length;
             }
             catch (err) {
                 console.log('--error fetch', err);
@@ -146,9 +146,9 @@ mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/
         const tokens = supportedTokensForLockContent.filter(e => e.chainId === chainId);
         for (i = 0; i < tokens.length; i++) {
             const tokenItem = tokens[i];
-            const tokenContract = new ethers.Contract(tokenItem.address, erc20ContractAbi, provider);
-            console.log('supported token: ', tokenItem.address);
+            // const tokenContract = new ethers.Contract(tokenItem.address, erc20ContractAbi, provider);
+            // console.log('supported token: ', tokenItem.address);
             await loadHistory(tokenItem);
-            tokenContract.on('Transfer', TransferEventListener);
+            // tokenContract.on('Transfer', TransferEventListener);
         }
     });

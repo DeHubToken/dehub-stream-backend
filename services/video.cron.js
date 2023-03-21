@@ -48,11 +48,11 @@ async function deleteExpiredTokenItems() {
     const expiredTokenItems = await Token.find({ status: MINT_STATUS.signed, createdAt: { $lt: new Date(new Date() - EXPIRED_TIME_FOR_MINTING) } });
     if (expiredTokenItems.length < 1) return;
     for (const tokenItem of expiredTokenItems) {
-        // delete video files and image files
-        let filePath = defaultVideoFilePath(tokenItem.tokenId, tokenItem.videoExt);
-        fs.unlink(filePath, error => { if (error) console.log('delete file error!') });
-        filePath = defaultImageFilePath(tokenItem.tokenId, tokenItem.imageExt);
-        fs.unlink(filePath, error => { if (error) console.log('delete file error!') });
+        // not delete video files and image files
+        // let filePath = defaultVideoFilePath(tokenItem.tokenId, tokenItem.videoExt);
+        // fs.unlink(filePath, error => { if (error) console.log('delete file error!') });
+        // filePath = defaultImageFilePath(tokenItem.tokenId, tokenItem.imageExt);
+        // fs.unlink(filePath, error => { if (error) console.log('delete file error!') });
         // processing unlock of bounty amount
         const streamInfo = tokenItem.streamInfo;
         const addBountyTotalAmount = getTotalBountyAmount(streamInfo);
@@ -71,7 +71,7 @@ async function deleteExpiredTokenItems() {
     }
     const deletedTokenIds = expiredTokenItems.map(e => e.tokenId);
     await IDCounter.updateOne({ id: 'tokenId' }, { $push: { expiredIds: deletedTokenIds } });
-    const result = await Token.deleteMany({ tokenId: { $in: deletedTokenIds } });
+    const result = await Token.updateMany({ tokenId: { $in: deletedTokenIds } },{status: 'failed'});
     console.log('--deleted expired tokens', deletedTokenIds.length, result);
 }
 

@@ -141,7 +141,7 @@ const requestTip = async (account, tokenId, tipAmount, chainId) => {
     const sender = normalizeAddress(account);
     const balanceItem = await Balance.findOne({ address: sender, tokenAddress, chainId, }, { balance: 1 });
     if (!balanceItem?.balance || balanceItem.balance < tipAmount) return { result: false, error: 'Deposit or buy more tokens in the profile section' };
-
+    if(nftStreamItem.owner === sender)  return { result: false, error: `Can't tip for stream owned by yourself` };
     if (nftStreamItem.owner) {
         await Balance.updateOne({ address: sender, tokenAddress, chainId },
             { $inc: { balance: -tipAmount, sentTips: tipAmount } });

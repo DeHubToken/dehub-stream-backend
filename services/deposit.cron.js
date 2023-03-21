@@ -35,9 +35,10 @@ async function updateWalletBalanceFromTransfer(transfer) {
     const updatedResult = await Transaction.updateOne({ txHash, logIndex, chainId },
         { amount, from, to, tokenAddress, blockNumber, type: 'TRANSFER' },
         overrideOptions);
-    if (isInserted(updatedResult)) {
-        console.log('---not processed tx', 'TRANSFER', txHash, logIndex);
-    }
+    // there is no log for transfer
+    // if (isInserted(updatedResult)) {
+        // console.log('---not processed tx', 'TRANSFER', txHash, logIndex);
+    // }
     // update wallet balance directly
     await Balance.updateOne({ address: from, chainId, tokenAddress }, { walletBalance: fromBalance }, overrideOptions);
     await Balance.updateOne({ address: to, chainId, tokenAddress }, { walletBalance: toBalance }, overrideOptions);
