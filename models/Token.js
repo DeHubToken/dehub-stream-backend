@@ -11,7 +11,7 @@ let TokenSchema = new Schema({
     decimals: Number, // 1
     chainId: Number,  // 56
     logoURI: String,
-    ts: String, //totalsupply
+    totalSupply: Number,    // total supply
     tokenId: { type: Number, unique: true },
     price: Number,
     metaDataUrl: String,
@@ -19,7 +19,7 @@ let TokenSchema = new Schema({
     videoUrl: String, //related path
     site: String, //
     contractAddress: String,
-    minter: String,
+    minter: String,    
     owner: String,
     streamInfo: Object,
     videoExt: String,

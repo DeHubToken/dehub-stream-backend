@@ -1,4 +1,5 @@
 const { config } = require("../config");
+const { supportedChainIds } = require("../config/constants");
 const { PPVTransaction } = require("../models/PPVTransaction");
 const { normalizeAddress } = require("./format");
 
@@ -28,8 +29,10 @@ const isUnlockedPPVStream = async (streamTokenId, account) => {
 
 const isValidTipAmount = amount => amount <= config.rangeOfTip.max && amount >= config.rangeOfTip.min;
 
+const isSupportedChain = chainId => supportedChainIds.includes(chainId)
 module.exports = {
     removeDuplicatedObject,
     isUnlockedPPVStream,
-    isValidTipAmount
+    isValidTipAmount,
+    isSupportedChain
 }

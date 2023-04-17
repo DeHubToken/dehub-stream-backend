@@ -158,8 +158,8 @@ const ApiController = {
         return res.json({ status: true, result: { data1, data2 } });
     },
     getSignedDataForUserMint: async function (req, res, next) {
-        const { address, name, description, streamInfo } = req.body;
-        console.log(name, description, streamInfo);
+        const { address, name, description, streamInfo, chainId } = req.body;
+        console.log('upload:', name, description, streamInfo, chainId);
         const uploadedFiles = req.files.files;
         if (uploadedFiles?.length < 2) return res.json({ error: true, msg: "upload image and video file" });
         const videoFile = uploadedFiles[0];
@@ -167,7 +167,7 @@ const ApiController = {
         const imageFile = uploadedFiles[1];
         if (!checkFileType(imageFile, 'image')) return res.json({ error: true, msg: errorMsgs.not_supported_image });
         try {
-            const result = await signatureForMintingNFT(videoFile, imageFile, name, description, JSON.parse(streamInfo), address);
+            const result = await signatureForMintingNFT(videoFile, imageFile, name, description, JSON.parse(streamInfo), address, Number(chainId));
             return res.json(result);
         }
         catch (err) {
@@ -192,7 +192,7 @@ const ApiController = {
         const limit = req.body.limit || req.query.limit || 1000;
         const owner = req.body.owner || req.query.owner;
         if (!owner) return res.json({ error: 'no owner field!' });
-        const filter = { status: 'minted', $or: [{ owner: owner.toLowerCase() }, { minter: owner.toLowerCase() }] };        
+        const filter = { status: 'minted', $or: [{ owner: owner.toLowerCase() }, { minter: owner.toLowerCase() }] };
         const totalCount = await Token.find(filter, tokenTemplate).count();
         const all = await Token.find(filter, tokenTemplate)
             .sort({ updatedAt: -1 })

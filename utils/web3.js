@@ -1,9 +1,10 @@
 require('dotenv').config();
 const { ethers } = require("ethers");
-const { supportedTokens, supportedNetworks, multicallContractAddresses } = require("../config/constants")
+const { supportedTokens, supportedNetworks, multicallContractAddresses, streamCollectionAddresses } = require("../config/constants")
 const erc20ContractAbi = require('../abis/erc20.json');
 const stakingContractAbi = require('../abis/StakingDHB.json');
 const multicallContractAbi = require('../abis/multicall.json');
+const erc1155ContractAbi = require('../abis/erc1155.json');
 
 const getTokenByTokenAddress = (tokenAddress, chainId = 56) => supportedTokens.find(e => e.address.toLowerCase() === tokenAddress.toLowerCase() && e.chainId === chainId);
 
@@ -65,6 +66,25 @@ async function multicallRead(
         return returnData;
     } catch (e) {
         console.log('multicallRead', e);
+    }
+}
+
+const multiCallReading = async (multicallContract, callDataArray, fetchUnit = 500) => {
+    try {
+        let resultObject = {};
+        for (let i = 0; i < callDataArray.length; i += fetchUnit) {
+            const tempCallDataArray = callDataArray.filter((item, idx) => {
+                return ((idx >= i) && (idx < i + fetchUnit))
+            })
+
+            const aggregateCallData = makeAggregateCalldata(tempCallDataArray);
+            const resultRaw = await multicallContract.aggregate(aggregateCallData);
+            const resultParsed = parseAggregateCalldata(resultRaw, tempCallDataArray);
+            resultObject = { ...resultObject, ...resultParsed }
+        }
+        return resultObject;
+    } catch (error) {
+        console.log(' ---multicall reading error', error.message)
     }
 }
 
@@ -196,6 +216,110 @@ const getTokenHistories = async (fromBlock, toBlock, tokenAddress, chainId) => {
     return { result, toBlock };
 
 }
+
+const getCollectionContract = (networkName) => {
+    const curNetwork = supportedNetworks.find(e => e.shortName === networkName);
+    if (!curNetwork) return undefined;
+    const provider = new ethers.providers.JsonRpcProvider(curNetwork.rpcUrls[0]);
+    return new ethers.Contract(streamCollectionAddresses[curNetwork.chainId], erc1155ContractAbi, provider);
+}
+
+const getCreatorsOfCollection = async (chainId) => {
+    const network = supportedNetworks.find(e => e.chainId === chainId);
+    if (!network) return 0;
+    const collectionAddress = streamCollectionAddresses[chainId];
+    const provider = new ethers.providers.JsonRpcProvider(network.rpcUrls[0]);
+    const colletionContract = new ethers.Contract(collectionAddress, erc1155ContractAbi, provider);
+    const maxTokenId = 200;
+    const multicallContract = new ethers.Contract(multicallContractAddresses[chainId], multicallContractAbi, provider);
+    const callDataArray = [];
+    for (let i = 0; i < parseInt(maxTokenId.toString()); i++) {
+        callDataArray.push({
+            contract: colletionContract,
+            functionName: 'creaters',
+            param: [i],
+            returnKey: `${i}`,
+        });
+    }
+    const multicallResult = await multiCallReading(multicallContract, callDataArray);
+    return multicallResult;
+}
+
+/**
+* 
+* @param {int} fromBlock 
+* @param {int} latestBlock 
+* @param {object} evmWeb3 
+* @param {string} collectionAddress 
+* @returns {transfers, toBlock}
+*/
+const getCollectionHistories = async (fromBlock, toBlock, collectionAddress, chainId) => {
+    if (toBlock <= fromBlock) return { transfers: [] };
+    const network = supportedNetworks.find(e => e.chainId === chainId);
+    if (!network) return { tranfers: [] };
+    const provider = new ethers.providers.JsonRpcProvider(network.rpcUrls[0]);
+    const collectionContract = new ethers.Contract(collectionAddress, erc1155ContractAbi, provider);
+    let result = [];
+    try {
+        let eventResults = [];
+        const filter = collectionContract.filters.TransferSingle();
+        eventResults = await collectionContract.queryFilter(filter, fromBlock, toBlock);
+        result = eventResults.map(e => {
+            return {
+                from: e.args._from,
+                to: e.args._to,
+                tokenId: e.args._id,
+                amount: e.args._value,
+                logInfo: { transactionHash: e.transactionHash, logIndex: e.logIndex, blockNumber: e.blockNumber, address: e.address },
+                event: e.event,
+            }
+        });
+    }
+    catch (e) {
+        console.log(e);
+        return { result: [] };
+    }
+    return { result, toBlock };
+
+}
+
+/**
+* 
+* @param {int} fromBlock 
+* @param {int} latestBlock 
+* @param {object} evmWeb3 
+* @param {string} collectionAddress 
+* @returns {transfers, toBlock}
+*/
+const getControllerHistories = async (fromBlock, toBlock, collectionAddress, chainId) => {
+    if (toBlock <= fromBlock) return { transfers: [] };
+    const network = supportedNetworks.find(e => e.chainId === chainId);
+    if (!network) return { tranfers: [] };
+    const provider = new ethers.providers.JsonRpcProvider(network.rpcUrls[0]);
+    const collectionContract = new ethers.Contract(collectionAddress, erc1155ContractAbi, provider);
+    let result = [];
+    try {
+        let eventResults = [];
+        const filter = collectionContract.filters.TransferSingle();
+        eventResults = await collectionContract.queryFilter(filter, fromBlock, toBlock);
+        result = eventResults.map(e => {
+            return {
+                from: e.args._from,
+                to: e.args._to,
+                tokenId: e.args._id,
+                amount: e.args._value,
+                logInfo: { transactionHash: e.transactionHash, logIndex: e.logIndex, blockNumber: e.blockNumber, address: e.address },
+                event: e.event,
+            }
+        });
+    }
+    catch (e) {
+        console.log(e);
+        return { result: [] };
+    }
+    return { result, toBlock };
+
+}
 module.exports = {
     getTokenByTokenAddress,
     getERC20TokenBalance,
@@ -204,4 +328,7 @@ module.exports = {
     getStakedAmountOfAddresses,
     getStakeHistories,
     getTokenHistories,
+    getCollectionContract,
+    getCreatorsOfCollection,
+    getCollectionHistories
 }

@@ -5,7 +5,7 @@ const { splitSignature } = require("@ethersproject/bytes");
 const { Collection } = require("../models/Collection");
 const { Token } = require("../models/Token");
 const { moveFile } = require("../utils/file");
-const { streamInfoKeys, supportedTokens, overrideOptions } = require("../config/constants");
+const { streamInfoKeys, supportedTokens, overrideOptions, streamCollectionAddresses } = require("../config/constants");
 const { Balance } = require("../models/Balance");
 const { normalizeAddress } = require("../utils/format");
 const { getTotalBountyAmount } = require("../utils/calc");
@@ -13,10 +13,11 @@ const { config } = require("../config");
 
 const signer = new ethers.Wallet(process.env.SIGNER_KEY);
 
-const signatureForMintingNFT = async (videoFile, imageFile, name, description, streamInfo, address) => {
-  const collectionAddress = process.env.DEFAULT_COLLECTION?.toLowerCase();
+const signatureForMintingNFT = async (videoFile, imageFile, name, description, streamInfo, address, chainId) => {
+
+  const collectionAddress = normalizeAddress(streamCollectionAddresses[chainId]);
   let videoExt = videoFile.mimetype.toString().substr(videoFile.mimetype.toString().indexOf("/") + 1);
-  if(videoExt === 'quicktime') videoExt = 'mov';
+  if (videoExt === 'quicktime') videoExt = 'mov';
   const imageExt = imageFile.mimetype.toString().substr(imageFile.mimetype.toString().indexOf("/") + 1);
 
   const addedOptions = {};
@@ -32,9 +33,12 @@ const signatureForMintingNFT = async (videoFile, imageFile, name, description, s
     const bountyToken = supportedTokens.find(e => e.symbol === streamInfo[streamInfoKeys.addBountyTokenSymbol] && e.chainId === Number(streamInfo[streamInfoKeys.addBountyChainId]));
     const balanceFilter = { address: normalizeAddress(address), tokenAddress: bountyToken?.address?.toLowerCase(), chainId: Number(streamInfo[streamInfoKeys.addBountyChainId]) };
     const balanceItem = await Balance.findOne(balanceFilter).lean();
-    if (balanceItem.balance < bountyAmountWithFee) return { result: false, error: 'insufficient balance to add bounty' };
+    if (balanceItem.walletbalance < bountyAmountWithFee) return { result: false, error: 'insufficient balance to add bounty' };
     const updatedBalanceItem = await Balance.findOneAndUpdate(balanceFilter, { $inc: { balance: -bountyAmountWithFee, lockForBounty: addBountyTotalAmount } }, { returnOriginal: false });
-    if (updatedBalanceItem?.balance < 0) return { result: false, error: 'insufficient balance to add bounty' };
+    if (updatedBalanceItem?.walletbalance < 0) {
+
+      return { result: false, error: 'insufficient balance to add bounty' };
+    }
     await Balance.updateOne({ ...balanceFilter, address: config.devWalletAddress }, { $inc: { balance: bountyAmountWithFee - addBountyTotalAmount } }, overrideOptions);
     addedOptions['lockedBounty'] = {
       viewer: streamInfo[streamInfoKeys.addBountyAmount] * streamInfo[streamInfoKeys.addBountyFirstXViewers],
@@ -50,6 +54,7 @@ const signatureForMintingNFT = async (videoFile, imageFile, name, description, s
     streamInfo,
     videoExt,
     imageExt,
+    chainId,
     minter: normalizeAddress(address),
     ...addedOptions
   });
@@ -63,10 +68,10 @@ const signatureForMintingNFT = async (videoFile, imageFile, name, description, s
   moveFile(`${path.dirname(__dirname)}/${imageFile.path}`, imagePath);
 
   // 4. signature for minting token
-  const mintCount = 1;
+  const totalSupply = 1000;
   const messageHash = ethers.utils.solidityKeccak256(
     ["address", "uint256", "uint256", "uint256"],
-    [collectionAddress, tokenItem.tokenId, mintCount, timestamp]
+    [collectionAddress,  tokenItem.tokenId, chainId, totalSupply]
   );
   const { r, s, v } = splitSignature(
     await signer.signMessage(ethers.utils.arrayify(messageHash))

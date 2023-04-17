@@ -1,4 +1,9 @@
 require('dotenv').config();
+/**
+ * @notice this should not contain any other js.
+ */
+const isDevMode = process.env.RUN_MODE === 'dev';
+
 const paramNames = {
     address: 'address',
     sig: 'sig',
@@ -102,9 +107,63 @@ const multicallContractAddresses = {
     [ChainId.POLYGON_MAINNET]: '0x275617327c958bD06b5D6b871E7f491D76113dd8',
 };
 
-const overrideOptions = { new: true, upsert: true, returnOriginal: false };
+// this contract addresses should be unique for each network
+const streamCollectionAddresses = {
+    [ChainId.MAINNET]: '0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696',
+    [ChainId.GORLI]: '0x752E941001e626b36DCF99b659F86545F237FBA3',
+    [ChainId.KOVAN]: '0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696',
+    [ChainId.BSC_MAINNET]: '0x41B90b73a88804f2aed1C4672b3dbA74eb9A92ce',
+    [ChainId.BSC_TESTNET]: '0x5Ae62dF56fF1E68Fb1772a337859b856CAEEFab6',
+    [ChainId.FANTOM_MAINNET]: '0xbb804a896E1A6962837c0813a5F89fDb771d808f',
+    [ChainId.AVALANCHE_MAINNET]: '0x84514BeaaF8f9a4cbe25A9C5a7EBdd16B4FE7154',
+    [ChainId.OKEX_MAINNET]: '0xdf4CDd4b8F1790f62a91Bcc4cb793159c641B1bd',
+    [ChainId.POLYGON_MAINNET]: '0x275617327c958bD06b5D6b871E7f491D76113dd8',
+};
 
-const supportedTokens = [
+const overrideOptions = { new: true, upsert: true, returnOriginal: false };
+const devTokens = [
+    {
+        value: 'dhb',
+        label: 'DHB',
+        symbol: 'DHB',
+        customAbbreviation: 'dhb',
+        chainId: 97,
+        address: '0x06EdA7889330031a8417f46e4C771C628c0b6418',
+        iconUrl: 'assets/icons/tokens/DHB.png',
+        decimals: 18,
+    },
+    {
+        value: 'dhb',
+        label: 'DHB',
+        symbol: 'DHB',
+        customAbbreviation: 'dhb',
+        chainId: 5,
+        address: '0x0F0fBE6FB65AaCE87D84f599924f6524b4F8d858',
+        iconUrl: 'assets/icons/tokens/DHB.png',
+        decimals: 18,
+    },
+    {
+        value: 'busd',
+        label: 'BUSD',
+        symbol: 'BUSD',
+        customAbbreviation: 'busd',
+        chainId: 97,
+        address: '0x53D4A05DF7caAf3302184B774855EcBe2a50bD3E',
+        iconUrl: 'assets/icons/tokens/BUSD.png',
+        decimals: 18,
+    },
+    {
+        value: 'usdc',
+        label: 'USDC',
+        symbol: 'USDC',
+        customAbbreviation: 'usdc',
+        chainId: 97,
+        address: '0x4131fd3F1206d48A89410EE610BF1949934e0a72',
+        iconUrl: 'assets/icons/tokens/USDC.png',
+        decimals: 18,
+    },
+];
+const productionTokens = [
     {
         value: 'dhb',
         label: 'DHB',
@@ -200,13 +259,14 @@ const supportedTokens = [
     },
 ];
 
+const supportedTokens = isDevMode ? devTokens : productionTokens;
 const supportedTokensForLockContent = supportedTokens.filter(e => e.symbol === 'DHB');
 const supportedTokensForPPV = supportedTokens;
 const supportedTokensForAddBounty = supportedTokens;
 
 const supportedChainIdsForMinting = [56];
-const supportedChainIds = [ChainId.MAINNET, ChainId.BSC_MAINNET, ChainId.POLYGON_MAINNET];
-const supportedNetworks = [
+const supportedChainIds = isDevMode ? [ChainId.BSC_TESTNET, ChainId.GORLI] : [ChainId.MAINNET, ChainId.BSC_MAINNET, ChainId.POLYGON_MAINNET];
+const mainNetworks = [
     {
         chainId: ChainId.BSC_MAINNET,
         shortName: `bsc`,
@@ -226,7 +286,24 @@ const supportedNetworks = [
         rpcUrls: [`https://polygon-mainnet.rpcfast.com?api_key=xbhWBI1Wkguk8SNMu1bvvLurPGLXmgwYeC4S6g2H7WdwFigZSmPWVZRxrskEQwIf`,],
         startBlockNumber: 38197541,
     }
-]
+];
+const testNetworks = [
+    {
+        chainId: ChainId.BSC_TESTNET,
+        shortName: `bsctest`,
+        rpcUrls: [process.env.BSCTEST_RPC_ENDPOINT],
+        startBlockNumber: 8708163
+    },
+    {
+        chainId: ChainId.GORLI,
+        shortName: `goerli`,
+        rpcUrls: [`https://goerli.infura.io/v3/${process.env.INFURA_API_KEY}`,],
+        startBlockNumber: 8804175,
+        graphUrl: process.env.GOERLI_GRAPH_API_ENDPOINT,
+    }
+];
+
+const supportedNetworks = isDevMode ? testNetworks : mainNetworks;
 
 
 
@@ -250,5 +327,6 @@ module.exports = {
     supportedChainIds,
     supportedNetworks,
     multicallContractAddresses,
-    stakingContractAddresses
+    stakingContractAddresses,
+    streamCollectionAddresses
 }
