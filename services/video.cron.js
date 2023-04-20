@@ -10,7 +10,7 @@ const { EXPIRED_TIME_FOR_MINTING } = require("../shared/contants");
 const IDCounter = require("../models/IDCounter");
 const { defaultVideoFilePath, defaultImageFilePath } = require("../utils/file");
 const { WatchHistory } = require("../models/WatchHistory");
-const { streamInfoKeys, supportedTokens, overrideOptions, RewardType } = require("../config/constants");
+const { streamInfoKeys, supportedTokens, overrideOptions, RewardType, supportedNetworks, ChainId } = require("../config/constants");
 const { Balance } = require("../models/Balance");
 const { getTotalBountyAmount } = require("../utils/calc");
 const { updateVideoInfo, transcodeVideo } = require('../utils/stream');
@@ -18,6 +18,9 @@ const { payBounty } = require("../controllers/user");
 const { deleteVotedStream } = require("../controllers/vote");
 const { ClaimTransaction } = require("../models/ClaimTransaction");
 const { Setting } = require("../models/Setting");
+const { multicallRead, getCreatorsForTokenIds } = require("../utils/web3");
+const Collection = require("../models/Collection");
+const { ethers } = require("ethers");
 
 const MINT_STATUS = {
     minted: 'minted',
@@ -47,32 +50,85 @@ async function deleteExpiredClaimTx() {
 async function deleteExpiredTokenItems() {
     const expiredTokenItems = await Token.find({ status: MINT_STATUS.signed, createdAt: { $lt: new Date(new Date() - EXPIRED_TIME_FOR_MINTING) } });
     if (expiredTokenItems.length < 1) return;
-    for (const tokenItem of expiredTokenItems) {
+    const tokenItemsByChainIds = await Token.aggregate([
+        { $match: { status: MINT_STATUS.signed, createdAt: { $lt: new Date(new Date() - EXPIRED_TIME_FOR_MINTING) } } },
+        {
+            $lookup: {
+                from: 'collections',
+                localField: 'contractAddress',
+                foreignField: 'address',
+                as: 'collection'
+            }
+        },
+        {
+            $group: {
+                _id: "$chainId",
+                nfts: { $push: { address: "$contractAddress", tokenId: "$tokenId", collection: "$collection" } }
+            }
+        }
+    ]);
+    const tokenItemsToDelete = [];
+    const mintedTokenIds = [];
+    for (const nftItems of tokenItemsByChainIds) {
+        const chainId = nftItems._id || config.defaultChainId;
+        console.log('chainId: ', chainId);
+        const aa = [];
+        nftItems.nfts.map(e => {
+            const a = { type: '721', address: e.address, tokenId: e.tokenId };
+            if (e.collection?.[0]?.type === '1155') a.type = '1155';
+            aa.push(a);
+        });
+        // console.log(aa.filter((c, index) => aa.findIndex(e=>e.address === c.address) === index));
+        const creators = await getCreatorsForTokenIds(chainId, aa);
+        for (const nftItem of nftItems.nfts) {
+            if (creators[nftItem.tokenId] && creators[nftItem.tokenId] !== ethers.constants.AddressZero) {                
+                mintedTokenIds.push(nftItem.tokenId);
+            }
+            else {
+                tokenItemsToDelete.push(expiredTokenItems.find(e => e.tokenId === nftItem.tokenId));
+            }
+        }
+        continue;
+    }    
+    // const tokenIds = expiredTokenItems.map(e => e.tokenId);
+    // console.log(tokenIds);
+    // return;
+    // for (const tokenItem of expiredTokenItems) {
         // not delete video files and image files
         // let filePath = defaultVideoFilePath(tokenItem.tokenId, tokenItem.videoExt);
         // fs.unlink(filePath, error => { if (error) console.log('delete file error!') });
         // filePath = defaultImageFilePath(tokenItem.tokenId, tokenItem.imageExt);
         // fs.unlink(filePath, error => { if (error) console.log('delete file error!') });
         // processing unlock of bounty amount
-        const streamInfo = tokenItem.streamInfo;
-        const addBountyTotalAmount = getTotalBountyAmount(streamInfo);
-        if (addBountyTotalAmount) {
-            const bountyAmountWithFee = getTotalBountyAmount(streamInfo, true);
-            const bountyToken = supportedTokens.find(e => e.symbol === streamInfo[streamInfoKeys.addBountyTokenSymbol] && e.chainId === Number(streamInfo[streamInfoKeys.addBountyChainId]));
-            const balanceFilter = { address: tokenItem.minter, tokenAddress: bountyToken?.address?.toLowerCase(), chainId: Number(streamInfo[streamInfoKeys.addBountyChainId]) };
-            let balanceItem = await Balance.findOne(balanceFilter).lean();
-            if (balanceItem.lockForBounty < addBountyTotalAmount) {
-                console.log(`insufficient locked to add bounty`, tokenItem.tokenId, tokenItem.minter, balanceItem.lockForBounty);
-            }
-            balanceItem = await Balance.findOneAndUpdate(balanceFilter, { $inc: { balance: bountyAmountWithFee, lockForBounty: -addBountyTotalAmount } }, overrideOptions);
-            console.log('unlocked bounty stream', tokenItem.tokenId, balanceFilter, 'total bounty:', bountyAmountWithFee);
-            await Balance.updateOne({ ...balanceFilter, address: config.devWalletAddress }, { $inc: { balance: -(bountyAmountWithFee - addBountyTotalAmount) } }, overrideOptions);
-        }
-    }
-    const deletedTokenIds = expiredTokenItems.map(e => e.tokenId);
-    await IDCounter.updateOne({ id: 'tokenId' }, { $push: { expiredIds: deletedTokenIds } });
-    const result = await Token.updateMany({ tokenId: { $in: deletedTokenIds } },{status: 'failed'});
-    console.log('--deleted expired tokens', deletedTokenIds.length, result);
+        // const streamInfo = tokenItem.streamInfo;
+        // const addBountyTotalAmount = getTotalBountyAmount(streamInfo);
+        // if (addBountyTotalAmount) {
+        //     const bountyAmountWithFee = getTotalBountyAmount(streamInfo, true);
+        //     const bountyToken = supportedTokens.find(e => e.symbol === streamInfo[streamInfoKeys.addBountyTokenSymbol] && e.chainId === Number(streamInfo[streamInfoKeys.addBountyChainId]));
+        //     const balanceFilter = { address: tokenItem.minter, tokenAddress: bountyToken?.address?.toLowerCase(), chainId: Number(streamInfo[streamInfoKeys.addBountyChainId]) };
+        //     let balanceItem = await Balance.findOne(balanceFilter).lean();
+        //     if (balanceItem.lockForBounty < addBountyTotalAmount) {
+        //         console.log(`insufficient locked to add bounty`, tokenItem.tokenId, tokenItem.minter, balanceItem.lockForBounty);
+        //     }
+        //     balanceItem = await Balance.findOneAndUpdate(balanceFilter, { $inc: { balance: bountyAmountWithFee, lockForBounty: -addBountyTotalAmount } }, overrideOptions);
+        //     console.log('unlocked bounty stream', tokenItem.tokenId, balanceFilter, 'total bounty:', bountyAmountWithFee);
+        //     await Balance.updateOne({ ...balanceFilter, address: config.devWalletAddress }, { $inc: { balance: -(bountyAmountWithFee - addBountyTotalAmount) } }, overrideOptions);
+        // }
+    // }
+    const deletedTokenIds = tokenItemsToDelete.map(e => e.tokenId);
+    if(deletedTokenIds.length>0){
+        console.log('---deleted tokens:', deletedTokenIds);
+        await IDCounter.updateOne({ id: 'tokenId' }, { $push: { expiredIds: deletedTokenIds } });
+        const result = await Token.updateMany({ tokenId: { $in: deletedTokenIds } }, { status: 'failed' });        
+        console.log('--deleted expired tokens', deletedTokenIds.length, result);
+    } 
+
+    if(mintedTokenIds.length>0)
+    {
+        console.log('---minted:', mintedTokenIds );
+        const result2 = await Token.updateMany({ tokenId: { $in: mintedTokenIds } }, { status: 'checking' });
+        console.log('--checking tokens',  result2);
+    } 
 }
 
 async function transcodeVideos() {
@@ -101,9 +157,9 @@ async function processingFundsForPlayingStreams() {
         const _id = watchStream._id;
         const watchedTime = watchStream.exitedAt.getTime() - watchStream.createdAt.getTime();
         const tokenItem = await Token.findOne({ tokenId: watchStream.tokenId }, { videoDuration: 1, _id: 0 }).lean();
-        if (watchedTime >= (Math.min(config.watchTimeForConfirming, tokenItem.videoDuration * 0.5))) {
+        if (tokenItem && watchedTime >= (Math.min(config.watchTimeForConfirming, tokenItem.videoDuration * 0.5))) {
             const tokenFilter = { tokenId: watchStream.tokenId };
-            await payBounty(watchStream.watcherAddress, watchStream.tokenId, RewardType.BountyForViewer);
+            // await payBounty(watchStream.watcherAddress, watchStream.tokenId, RewardType.BountyForViewer);
             await WatchHistory.updateOne({ _id }, { status: 'confirmed' });
             await Token.updateOne(tokenFilter, { $inc: { views: 1 } });
         } else if (watchStream.exitedAt < new Date(Date.now() - 2 * config.extraPeriodForHistory)) {
@@ -121,7 +177,7 @@ async function deleteVotedStreams() {
 }
 let autoDeleteCronCounter = 0;
 async function cronLoop() {
-    await deleteExpiredClaimTx();
+    // await deleteExpiredClaimTx();
     await fullVideoInfo();
     await transcodeVideos();
     await deleteExpiredTokenItems();

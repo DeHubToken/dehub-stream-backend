@@ -5,6 +5,8 @@ const erc20ContractAbi = require('../abis/erc20.json');
 const stakingContractAbi = require('../abis/StakingDHB.json');
 const multicallContractAbi = require('../abis/multicall.json');
 const erc1155ContractAbi = require('../abis/erc1155.json');
+const erc721ContractAbi = require('../abis/StreamNft.json');
+
 
 const getTokenByTokenAddress = (tokenAddress, chainId = 56) => supportedTokens.find(e => e.address.toLowerCase() === tokenAddress.toLowerCase() && e.chainId === chainId);
 
@@ -55,6 +57,31 @@ const parseAggregateCalldata = (returnResult, callObjectArray) => {
     }
 };
 
+const parseTryAggregateCalldata = (returnResult, callObjectArray) => {
+    try {
+        const returnData = {}
+        callObjectArray?.map((item, idx) => {
+            const returnKey = item.returnKey || item.functionName
+            if (!returnResult?.[idx]?.success) {
+                console.error('multicallParse error', returnKey)
+                return
+            }
+            if (returnKey) {
+                let decodedResult = item?.contract?.interface?.decodeFunctionResult(
+                    item?.functionName,
+                    returnResult?.[idx]?.returnData
+                )
+                if (decodedResult?.length === 1) decodedResult = decodedResult?.toString()
+                returnData[returnKey] = decodedResult
+            }
+        })
+        return returnData
+    } catch (error) {
+        console.log('parseAggregateCalldata', error?.message)
+        return {}
+    }
+};
+
 async function multicallRead(
     multicallContract,
     callObjectArray
@@ -78,8 +105,8 @@ const multiCallReading = async (multicallContract, callDataArray, fetchUnit = 50
             })
 
             const aggregateCallData = makeAggregateCalldata(tempCallDataArray);
-            const resultRaw = await multicallContract.aggregate(aggregateCallData);
-            const resultParsed = parseAggregateCalldata(resultRaw, tempCallDataArray);
+            const resultRaw = await multicallContract.tryAggregate(false, aggregateCallData);
+            const resultParsed = parseTryAggregateCalldata(resultRaw, tempCallDataArray);
             resultObject = { ...resultObject, ...resultParsed }
         }
         return resultObject;
@@ -245,6 +272,37 @@ const getCreatorsOfCollection = async (chainId) => {
     return multicallResult;
 }
 
+const getCreatorsForTokenIds = async (chainId, tokenItems) => {
+    const network = supportedNetworks.find(e => e.chainId === chainId);
+    if (!network) return [];
+    const provider = new ethers.providers.JsonRpcProvider(network.rpcUrls[0]);
+    const multicallContract = new ethers.Contract(multicallContractAddresses[chainId], multicallContractAbi, provider);
+    const callDataArray = [];
+    for (const tokenItem of tokenItems) {
+        if (tokenItem.type === '1155') {
+            const colletionContract = new ethers.Contract(tokenItem.address, erc1155ContractAbi, provider);
+            callDataArray.push({
+                contract: colletionContract,
+                functionName: 'creators',
+                param: [tokenItem.tokenId],
+                returnKey: `${tokenItem.tokenId}`,
+            });
+        }
+        else {
+            const colletionContract = new ethers.Contract(tokenItem.address, erc721ContractAbi, provider);
+            callDataArray.push({
+                contract: colletionContract,
+                functionName: 'ownerOf',
+                param: [tokenItem.tokenId],
+                returnKey: `${tokenItem.tokenId}`,
+            });
+        }
+
+    }
+    const multicallResult = await multiCallReading(multicallContract, callDataArray);
+    return multicallResult;
+}
+
 /**
 * 
 * @param {int} fromBlock 
@@ -330,5 +388,6 @@ module.exports = {
     getTokenHistories,
     getCollectionContract,
     getCreatorsOfCollection,
-    getCollectionHistories
+    getCollectionHistories,
+    getCreatorsForTokenIds
 }

@@ -38,7 +38,7 @@ let TokenSchema = new Schema({
     status: {
         type: String,
         default: "signed",
-        enum: ["signed", "pending", "minted", "deleted", "failed", "burned"],
+        enum: ["signed", "pending", "minted", "deleted", "failed", "burned", "checking"],
     },
     transcodingStatus: String,
 }, { timestamps: true });

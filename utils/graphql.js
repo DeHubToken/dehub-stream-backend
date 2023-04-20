@@ -51,9 +51,9 @@ const getHistoryFromGraphGL = async (minBlockNumber, maxBlockNumber, url) => {
           }
         protocolTxes(first: ${config.itemLimitsForFetching}, where:{ blockNumber_gte: ${minBlockNumber}, blockNumber_lte: ${maxBlockNumber} }, orderBy: blockNumber, orderDirection:asc) {
             type
-            id 
+            tokenId 
             amount        
-            blockNumber
+            blockNumber            
             transaction {
                 id
                 timestamp
@@ -75,7 +75,7 @@ const getHistoryFromGraphGL = async (minBlockNumber, maxBlockNumber, url) => {
           }
         logIndex    
         }
-        nftTransfers{
+        nftTransfers(first: ${config.itemLimitsForFetching},where:{ blockNumber_gte: ${minBlockNumber}, blockNumber_lte: ${maxBlockNumber} }, orderBy: blockNumber, orderDirection:asc){
             id
             tokenId
             from {

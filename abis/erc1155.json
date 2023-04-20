@@ -17,6 +17,11 @@
                 "type": "address"
             },
             {
+                "internalType": "address",
+                "name": "_controller",
+                "type": "address"
+            },
+            {
                 "internalType": "string",
                 "name": "contractURI",
                 "type": "string"
@@ -29,7 +34,7 @@
         ],
         "stateMutability": "nonpayable",
         "type": "constructor"
-    },
+    },    
     {
         "anonymous": false,
         "inputs": [
@@ -316,6 +321,19 @@
         "type": "function"
     },
     {
+        "inputs": [],
+        "name": "controller",
+        "outputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
         "inputs": [
             {
                 "internalType": "uint256",
@@ -505,6 +523,11 @@
                 "type": "uint256"
             },
             {
+                "internalType": "uint256",
+                "name": "timestamp",
+                "type": "uint256"
+            },
+            {
                 "internalType": "uint8",
                 "name": "v",
                 "type": "uint8"
@@ -548,6 +571,54 @@
             }
         ],
         "name": "mint",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "id",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "timestamp",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint8",
+                "name": "v",
+                "type": "uint8"
+            },
+            {
+                "internalType": "bytes32",
+                "name": "r",
+                "type": "bytes32"
+            },
+            {
+                "internalType": "bytes32",
+                "name": "s",
+                "type": "bytes32"
+            },
+            {
+                "internalType": "uint256",
+                "name": "supply",
+                "type": "uint256"
+            },
+            {
+                "internalType": "string",
+                "name": "uri",
+                "type": "string"
+            },
+            {
+                "internalType": "address",
+                "name": "creator",
+                "type": "address"
+            }
+        ],
+        "name": "mintFromController",
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function"
@@ -685,6 +756,32 @@
             }
         ],
         "name": "setContractURI",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "_controller",
+                "type": "address"
+            }
+        ],
+        "name": "setController",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "_expiredTime",
+                "type": "uint256"
+            }
+        ],
+        "name": "setExpiredTime",
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function"

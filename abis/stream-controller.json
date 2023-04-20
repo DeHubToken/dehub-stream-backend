@@ -159,12 +159,7 @@
     },
     {
         "inputs": [],
-        "name": "NotStreamOwner",
-        "type": "error"
-    },
-    {
-        "inputs": [],
-        "name": "PaidPPVStream",
+        "name": "NotStreamCreator",
         "type": "error"
     },
     {
@@ -185,6 +180,12 @@
                 "indexed": false,
                 "internalType": "uint256",
                 "name": "amount",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "timestamp",
                 "type": "uint256"
             },
             {
@@ -227,14 +228,20 @@
             {
                 "indexed": false,
                 "internalType": "uint256",
-                "name": "countOfViewers",
+                "name": "timestamp",
                 "type": "uint256"
             },
             {
                 "indexed": false,
-                "internalType": "uint256",
+                "internalType": "uint32",
+                "name": "countOfViewers",
+                "type": "uint32"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint32",
                 "name": "countOfCommentors",
-                "type": "uint256"
+                "type": "uint32"
             },
             {
                 "indexed": false,
@@ -328,6 +335,12 @@
                 "indexed": false,
                 "internalType": "uint256",
                 "name": "amount",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "timestamp",
                 "type": "uint256"
             },
             {
@@ -435,14 +448,14 @@
                 "type": "uint256"
             },
             {
-                "internalType": "uint256",
+                "internalType": "uint32",
                 "name": "countOfViewers",
-                "type": "uint256"
+                "type": "uint32"
             },
             {
-                "internalType": "uint256",
+                "internalType": "uint32",
                 "name": "countOfCommentors",
-                "type": "uint256"
+                "type": "uint32"
             },
             {
                 "internalType": "address",
@@ -499,14 +512,14 @@
                 "type": "uint256"
             },
             {
-                "internalType": "uint256",
+                "internalType": "uint32",
                 "name": "countOfViewers",
-                "type": "uint256"
+                "type": "uint32"
             },
             {
-                "internalType": "uint256",
+                "internalType": "uint32",
                 "name": "countOfCommentors",
-                "type": "uint256"
+                "type": "uint32"
             },
             {
                 "internalType": "address",
@@ -515,29 +528,6 @@
             }
         ],
         "name": "createBounty",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-    },
-    {
-        "inputs": [
-            {
-                "internalType": "uint256",
-                "name": "tokenId",
-                "type": "uint256"
-            },
-            {
-                "internalType": "uint256",
-                "name": "ppvAmount",
-                "type": "uint256"
-            },
-            {
-                "internalType": "address",
-                "name": "tokenAddress",
-                "type": "address"
-            }
-        ],
-        "name": "createPPVStream",
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function"
@@ -620,11 +610,6 @@
                 "internalType": "address[]",
                 "name": "enabledTokens",
                 "type": "address[]"
-            },
-            {
-                "internalType": "uint256",
-                "name": "_ppvPeriod",
-                "type": "uint256"
             }
         ],
         "name": "init",
@@ -700,6 +685,64 @@
         "type": "function"
     },
     {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "id",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "timestamp",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint8",
+                "name": "v",
+                "type": "uint8"
+            },
+            {
+                "internalType": "bytes32",
+                "name": "r",
+                "type": "bytes32"
+            },
+            {
+                "internalType": "bytes32",
+                "name": "s",
+                "type": "bytes32"
+            },
+            {
+                "internalType": "string",
+                "name": "uri",
+                "type": "string"
+            },
+            {
+                "internalType": "uint256",
+                "name": "bountyAmount",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint32",
+                "name": "countOfViewers",
+                "type": "uint32"
+            },
+            {
+                "internalType": "uint32",
+                "name": "countOfCommentors",
+                "type": "uint32"
+            },
+            {
+                "internalType": "address",
+                "name": "tokenAddress",
+                "type": "address"
+            }
+        ],
+        "name": "mintWithBounty",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
         "inputs": [],
         "name": "owner",
         "outputs": [
@@ -727,48 +770,6 @@
     },
     {
         "inputs": [],
-        "name": "ppvPeriod",
-        "outputs": [
-            {
-                "internalType": "uint256",
-                "name": "",
-                "type": "uint256"
-            }
-        ],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [
-            {
-                "internalType": "uint256",
-                "name": "",
-                "type": "uint256"
-            }
-        ],
-        "name": "ppvStreamInfo",
-        "outputs": [
-            {
-                "internalType": "uint256",
-                "name": "ppvAmount",
-                "type": "uint256"
-            },
-            {
-                "internalType": "uint256",
-                "name": "totalPaidAmount",
-                "type": "uint256"
-            },
-            {
-                "internalType": "address",
-                "name": "tokenAddress",
-                "type": "address"
-            }
-        ],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [],
         "name": "renounceSigner",
         "outputs": [],
         "stateMutability": "nonpayable",
@@ -780,6 +781,21 @@
                 "internalType": "uint256",
                 "name": "tokenId",
                 "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+            },
+            {
+                "internalType": "address",
+                "name": "to",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "tokenAddress",
+                "type": "address"
             }
         ],
         "name": "sendFundsForPPV",
@@ -798,6 +814,11 @@
                 "internalType": "uint256",
                 "name": "amount",
                 "type": "uint256"
+            },
+            {
+                "internalType": "address",
+                "name": "to",
+                "type": "address"
             },
             {
                 "internalType": "address",
@@ -832,19 +853,6 @@
             }
         ],
         "name": "setFee",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-    },
-    {
-        "inputs": [
-            {
-                "internalType": "uint256",
-                "name": "_ppvPeriod",
-                "type": "uint256"
-            }
-        ],
-        "name": "setPPVPeriod",
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function"

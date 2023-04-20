@@ -8,6 +8,7 @@ const { WatchHistory } = require('../models/WatchHistory');
 const { normalizeAddress } = require('../utils/format');
 const { sleep } = require('../utils/time');
 const { getTokenBalancesOfAddresses, getERC20TokenBalance } = require('../utils/web3');
+const Collection = require('../models/Collection');
 
 mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/' + config.mongo.dbName,
     { useNewUrlParser: true, useUnifiedTopology: true }, async function (err, db) {
@@ -24,6 +25,8 @@ mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/
     });
 
 async function cron_loop() {
+    await Collection.create({address: 'xxx', type: '1155'});
+    return;
     const addressList = await Account.find().distinct('address');
     for (let i = 0; i < supportedChainIds.length; i++) {
         const chainId = supportedChainIds[i];

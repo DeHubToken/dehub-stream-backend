@@ -93,6 +93,7 @@ async function updateBalanceFromProtocolTx(protocolTx) {
         }
     }
 }
+
 async function cronLoop() {
     let setting = await Setting.findOne({}).lean();
     if (!setting) {

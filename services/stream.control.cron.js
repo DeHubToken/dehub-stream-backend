@@ -12,6 +12,7 @@ const { isInserted, isUpdated } = require("../utils/db");
 const { getHistoryFromGraphGL } = require("../utils/graphql");
 const { ethers } = require("ethers");
 const { Token } = require("../models/Token");
+const { PPVTransaction } = require("../models/PPVTransaction");
 
 const networkName = (process?.argv?.[2] || "bsc");
 const curNetwork = supportedNetworks.find(e => e.shortName === networkName);
@@ -46,18 +47,19 @@ async function updateWalletBalanceFromTransfer(transfer) {
     await Balance.updateOne({ address: to, chainId, tokenAddress }, { walletBalance: toBalance }, overrideOptions);
 }
 
-async function updateBalanceFromProtocolTx(protocolTx) {
+async function registerProtocolTx(protocolTx) {
     const type = protocolTx.type;
     const address = protocolTx.from.id;
     const tokenAddress = protocolTx.token.id;
     const amount = Number(protocolTx.amount);
     const txHash = protocolTx.transaction.id;
     const logIndex = Number(protocolTx.logIndex);
+    const tokenId = protocolTx.tokenId;
 
-    const balanceItem = protocolTx.account.balances.find(e => e.token.id === tokenAddress)
+    const balanceItem = protocolTx.from.balances.find(e => e.token.id === tokenAddress)
     const updateResult = await Transaction.updateOne(
         { chainId, txHash, logIndex },
-        { amount, from: address, tokenAddress, type: type, blockNumber: protocolTx.blockNumber },
+        { amount, from: address, tokenAddress, tokenId, type: type, blockNumber: protocolTx.blockNumber },
         overrideOptions);
     if (isInserted(updateResult)) {
         console.log('---not processed tx', type, txHash, logIndex);
@@ -65,27 +67,20 @@ async function updateBalanceFromProtocolTx(protocolTx) {
     if (type === 'STAKE' || type === 'UNSTAKE') {
         await Balance.updateOne({ address, chainId, tokenAddress }, { staked: balanceItem.staked }, overrideOptions);
     }
-    else if (type === 'CLAIM_BOUNTY') {
-        const id = Number(protocolTx.id);
-        const claimFilter = { id, chainId, tokenAddress, receiverAddress: address };
-        const claimItem = await ClaimTransaction.findOne(claimFilter, { status: 1 }).lean();
-        if (claimItem.status === 'failed') {
-            console.log('--failed claim', id);
+    else if (type === 'BOUNTY_COMMENTOR' || 'BOUNTY_VIEWER') {
+        if (isInserted(updateResult)) {
+            await Token.updateOne({ tokenId }, { $inc: { [`lockedBounty.${type === 'BOUNTY_VIEWER' ? 'viewer' : 'commentor'}`]: -protocolTx.amount } });
         }
-        const updateClaimTxResult = await ClaimTransaction.updateOne(
-            { ...claimFilter, status: { $ne: 'confirmed' } },
-            { txHash, logIndex, status: 'confirmed' });
-        if (isUpdated(updateClaimTxResult) && isInserted(updateResult)) {
-            console.log('---update claim:', address, chainId, tokenAddress, amount);
-            const updatedBalanceItem = await Balance.findOneAndUpdate({ address, chainId, tokenAddress },
-                { $inc: { claimed: amount, pending: -amount } }, overrideOptions);
-            if (updatedBalanceItem.pending < 0) {
-                console.log('-----error claim', id, txHash, logIndex, amount);
-            }
-        }
-        else if (!claimItem) {
-            console.log('--- fake claim: ', Number(protocolTx.id), txHash)
-        }
+    }
+    else if (type === 'TIP') {
+        const updateResult = await Token.updateOne({ tokenId, minter: protocolTx.to.id }, { $inc: { totalTips: amount } });
+        console.log('-----tip', updateResult);
+    }
+    else if (type === 'PPV') {
+        await PPVTransaction.create({ address, amount, streamTokenId: tokenId, tokenAddress, chainId });
+        const updateResult = await Token.updateOne({ tokenId, minter: protocolTx.to.id }, { $inc: { totalFunds: amount } });
+        console.log('-----ppv', updateResult);
+
     }
 }
 
@@ -94,7 +89,6 @@ async function updateStreamCollection(nftTransfer) {
     const toAddress = nftTransfer.to.id.toLowerCase();
     const from = nftTransfer.from.id.toLowerCase();
     const streamCollectionAddress = nftTransfer.collection.toLowerCase();
-
     let updateData = { owner: toAddress };
     if (from === ethers.constants.AddressZero) {
         updateData = { ...updateData, minter: toAddress, status: 'minted' };
@@ -122,11 +116,11 @@ async function cronLoop() {
     // always transfer transactions is more than protocol transactions
     const startBlockNumber = (setting.lastBlockFetchedForTransfer?.[chainId] || curNetwork.startBlockNumber) + 1;
     const endBlockNumber = startBlockNumber + config.blockLimitsForFetching - 1;
-    const fetchedData = await getHistoryFromGraphGL(startBlockNumber, endBlockNumber, graphUrl);    
+    const fetchedData = await getHistoryFromGraphGL(startBlockNumber, endBlockNumber, graphUrl);
     const lastSyncedBlockNumber = fetchedData?._meta?.block?.number;
     const lastSyncedTimestamp = fetchedData?._meta?.block?.timestamp || 0;
     const diffTimestamp = Date.now() / 1000 - lastSyncedTimestamp;
-    if (diffTimestamp > 60) console.log('---not sync graph!', Math.round(diffTimestamp));
+    if (diffTimestamp > 60) console.log('---not sync graph!', lastSyncedBlockNumber, Math.round(diffTimestamp),);
     await Setting.updateOne({}, { [`syncedDiffTimeOfGraph.${chainId}`]: diffTimestamp }, overrideOptions);
     let lastBlockFetchedForTransfer = 0;
     let lastBlockFetchedForProtocolTx = 0;
@@ -141,7 +135,7 @@ async function cronLoop() {
         else lastBlockFetchedForTransfer = transfers[0].blockNumber - 1; // limited with 500 options        
         const protocolTxes = fetchedData.protocolTxes;
         for (const protocolTx of protocolTxes) {
-            await updateBalanceFromProtocolTx(protocolTx);
+            await registerProtocolTx(protocolTx);
         }
 
         const nftTransfers = fetchedData.nftTransfers;

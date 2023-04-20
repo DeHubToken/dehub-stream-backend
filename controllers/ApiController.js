@@ -8,7 +8,7 @@ const { paramNames, errorMsgs, userProfileKeys, overrideOptions, supportedTokens
 const { Token } = require('../models/Token');
 const { checkFileType, normalizeAddress } = require('../utils/format');
 const { signatureForMintingNFT } = require('./mintNft');
-const { removeDuplicatedObject, isValidTipAmount } = require('../utils/validation');
+const { removeDuplicatedObject, isValidTipAmount, eligibleBountyForAccount } = require('../utils/validation');
 const { WatchHistory } = require('../models/WatchHistory');
 const { config } = require('../config');
 const { signatureForClaim, requestPPVStream, requestLike, requestTip, requestComment } = require('./user');
@@ -21,6 +21,7 @@ const { requestVote } = require('./vote');
 const { getLeaderboard } = require('./getData');
 const { isAddress } = require('ethers/lib/utils');
 const { requestFollow, unFollow, getFollowing, getFollowers } = require('./follow');
+const { signatureForClaimBounty } = require('./bounty');
 
 const expireTime = 86400000;
 const tokenTemplate = {
@@ -192,7 +193,8 @@ const ApiController = {
         const limit = req.body.limit || req.query.limit || 1000;
         const owner = req.body.owner || req.query.owner;
         if (!owner) return res.json({ error: 'no owner field!' });
-        const filter = { status: 'minted', $or: [{ owner: owner.toLowerCase() }, { minter: owner.toLowerCase() }] };
+        // const filter = { status: 'minted', $or: [{ owner: owner.toLowerCase() }, { minter: owner.toLowerCase() }] };
+        const filter = { status: 'minted', minter: owner.toLowerCase() };
         const totalCount = await Token.find(filter, tokenTemplate).count();
         const all = await Token.find(filter, tokenTemplate)
             .sort({ updatedAt: -1 })
@@ -224,7 +226,7 @@ const ApiController = {
 
             if (!page) page = 0;
             let aggregateQuery = []
-            if (minter) searchQuery['$match'] = { minter: minter.toLowerCase() };
+            if (minter) searchQuery['$match'] = { minter: minter.toLowerCase(), $or: [{ status: 'minted' }, { status: 'pending' }] };
             if (owner) searchQuery['$match'] = { owner: owner.toLowerCase() };
             if (search) {
                 var re = new RegExp(search, "gi")
@@ -300,7 +302,7 @@ const ApiController = {
         const unlockedPPVStreams = await PPVTransaction.find({ address: normalizeAddress(walletAddress), createdAt: { $gt: new Date(Date.now() - config.availableTimeForPPVStream) } }, { streamTokenId: 1 }).distinct('streamTokenId');
         accountInfo.balances = balanceData;
         accountInfo.unlocked = unlockedPPVStreams;
-        accountInfo.uploads = await Token.find({ minter: walletAddress.toLowerCase() }, {}).countDocuments();
+        accountInfo.uploads = await Token.find({ minter: walletAddress.toLowerCase(), $or: [{ status: { $ne: 'failed' } }, { staus: { $ne: 'deleted' } }] }, {}).countDocuments();
         accountInfo.likes = await Feature.find({ address: walletAddress.toLowerCase() }, {}).distinct('tokenId');
         accountInfo.followings = await getFollowing(walletAddress);
         accountInfo.followers = await getFollowers(walletAddress);
@@ -465,6 +467,24 @@ const ApiController = {
             console.log('-----request follow error', err);
             return res.json({ result: false, error: 'following was failed' });
         }
+    },
+    getSignForClaimBounty: async function (req, res, next) {
+        const address = reqParam(req, paramNames.address);
+        const tokenId = reqParam(req, 'tokenId');
+        if (!address || !tokenId) return res.json({ result: false, error: 'not params' });
+        const eligibleResult = await eligibleBountyForAccount(address, tokenId);
+        const result = { error: false, result: {} };
+        if (eligibleResult.viewer) {
+            const sigResult = await signatureForClaimBounty(address, tokenId, 0);
+            result.result.viewer = sigResult;
+        }
+        if (eligibleResult.commentor) {
+            const sigResult = await signatureForClaimBounty(address, tokenId, 1);
+            result.result.commentor = sigResult;
+        }
+        if (result.result.viewer || result.result.commentor) return res.json(result);
+        else return res.json({ error: 'not eligible', result: false });
+
     },
 }
 module.exports = { ApiController };

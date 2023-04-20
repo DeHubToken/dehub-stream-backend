@@ -166,7 +166,8 @@ const requestComment = async (account, tokenId, content, commentId) => {
     else {
         await Comment.create({ tokenId, address: account, content });
     }
-    await payBounty(account, tokenId, RewardType.BountyForCommentor);
+    // claim on chain
+    // await payBounty(account, tokenId, RewardType.BountyForCommentor);
     return { result: true };
 }
 
