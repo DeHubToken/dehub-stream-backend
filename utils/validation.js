@@ -43,27 +43,22 @@ const eligibleBountyForAccount = async (account, tokenId) => {
     const counterOfViewers = tokenItem?.streamInfo?.[streamInfoKeys.addBountyFirstXViewers];
     const counterOfCommentors = tokenItem?.streamInfo?.[streamInfoKeys.addBountyFirstXComments];
 
-    if (tokenItem?.lockedBounty?.['viewer'] > 0.00001) {
-        const claimTx = await Transaction.findOne({ from: account, tokenId, type: 'BOUNTY_VIEWER' }, { createdAt: 1 }).lean();
-        if (!claimTx) {
-            const watchStreams = await WatchHistory.find({ tokenId, status: 'confirmed' }).sort({ createdAt: 1 }).distinct('watcherAddress');
-            const index = watchStreams.findIndex(e => e === account);
-            if (index >= 0 && index < counterOfViewers) result.viewer = true;
-        }
-        else {
-            result.viewer_claimed = true;
-        }
+    // check history
+    const claimTxes = await Transaction.find({ from: account, tokenId, $or: [{ type: 'BOUNTY_VIEWER' }, { type: 'BOUNTY_COMMENTOR' }] }, { type: 1, _id: 0, }).lean();    
+    if (claimTxes.find(e => e.type === 'BOUNTY_VIEWER')) {
+        result.viewer_claimed = true;
     }
-    if (tokenItem?.lockedBounty?.['commentor'] > 0.0001) {
-        const claimTx = await Transaction.findOne({ from: account, tokenId, type: 'BOUNTY_COMMENTROR' }, { createdAt: 1 }).lean();
-        if (!claimTx) {
-            const comments = await Comment.find({ tokenId }, { watcherAddress: 1 }).sort({ createdAt: 1 }).distinct('address');
-            const index = comments.findIndex(e => e === account);
-            if (index >= 0 && index < counterOfCommentors) result.commentor = true;
-        } else
-        {
-            result.commentor_claimed = true;
-        }
+    else if (tokenItem?.lockedBounty?.['viewer'] > 0.00001) {
+        const watchStreams = await WatchHistory.find({ tokenId, status: 'confirmed' }).sort({ createdAt: 1 }).distinct('watcherAddress');
+        const index = watchStreams.findIndex(e => e === account);
+        if (index >= 0 && index < counterOfViewers) result.viewer = true;
+    }
+    if (claimTxes.find(e => e.type === 'BOUNTY_COMMENTOR')) {
+        result.commentor_claimed = true;
+    } else if (tokenItem?.lockedBounty?.['commentor'] > 0.0001) {
+        const comments = await Comment.find({ tokenId }, { watcherAddress: 1 }).sort({ createdAt: 1 }).distinct('address');
+        const index = comments.findIndex(e => e === account);
+        if (index >= 0 && index < counterOfCommentors) result.commentor = true;
     }
     return result;
 }

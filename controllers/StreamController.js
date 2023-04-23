@@ -1,4 +1,3 @@
-let BaseController = require('./BaseController');
 const { Account } = require('../models/Account');
 const path = require("path");
 const fs = require('fs');
@@ -12,8 +11,6 @@ const { streamInfoKeys, supportedTokens, overrideOptions } = require('../config/
 const { config } = require('../config');
 const { isAddress } = require('ethers/lib/utils');
 const { Balance } = require('../models/Balance');
-const { updateWalletBalance } = require('./user');
-const { isInserted } = require('../utils/db');
 const { normalizeAddress } = require('../utils/format');
 const { isUnlockedPPVStream } = require('../utils/validation');
 const defaultLimitBuffer = 1 * 1024 * 1024; // 2M
@@ -99,7 +96,7 @@ const StreamController = {
                     }
                 }
             }
-            console.log('---call stream', nowTimestamp, signParams?.account, signParams?.chainId, tokenId, req.headers.range, end);
+            console.log('---call stream', nowTimestamp, signParams?.account, signParams?.chainId, tokenId, req.headers.range, end, fileSize);
             const file = fs.createReadStream(videoPath, { start, end });
             const header = {
                 "Content-Range": `bytes ${start}-${end}/${fileSize}`,
@@ -109,13 +106,13 @@ const StreamController = {
             };
 
             res.writeHead(206, header);
-            file.pipe(res);
-            // console.log('--- time without history: ', Date.now() - nowTimestamp);
-            // if (userAddress && isAddress(userAddress)) {
+            file.pipe(res);                        
             let filter = { tokenId, exitedAt: { $gt: new Date(nowTimestamp - config.extraPeriodForHistory) } };
-            if (userAddress && isAddress(userAddress)) filter = { ...filter, watcherAddress: userAddress };
-            if (chainId) filter = { ...filter, chainId };
-            await WatchHistory.updateOne(filter, { exitedAt: new Date(nowTimestamp), lastWatchedFrame: end }, overrideOptions);
+            if (userAddress && isAddress(userAddress)) {
+                filter = { ...filter, watcherAddress: userAddress };
+                if (chainId) filter = { ...filter, chainId };
+                await WatchHistory.updateOne(filter, { exitedAt: new Date(nowTimestamp), lastWatchedFrame: end }, overrideOptions);
+            }
         }
         else return res.status(500).send('error!');
     },

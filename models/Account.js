@@ -3,8 +3,8 @@ const Schema = mongoose.Schema;
 
 let AccountSchema = new Schema({
     // "Account address"
-    address: String,    
-    lastLoginTimestamp: Number,    
+    address: String,
+    lastLoginTimestamp: Number,
     username: String,  // user profile
     email: String,
     avatarImageUrl: String,
@@ -14,6 +14,10 @@ let AccountSchema = new Schema({
     twitterLink: String,
     discordLink: String,
     instagramLink: String,
+    sentTips: Number,
+    receivedTips: Number,
+    // count of streams uploaded by the account
+    uploads: Number,
 }, { timestamps: true });
 
 AccountSchema.index({ address: 1 });

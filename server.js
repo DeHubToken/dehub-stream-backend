@@ -72,7 +72,7 @@ mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/
                 res.send("404 Error");
             }); 1
             app.use((err, req, res, next) => {
-                console.log('------error', err);
+                // console.log('------error', err);
                 res.status(err.status || 500);
                 res.send('500 Error');
             });

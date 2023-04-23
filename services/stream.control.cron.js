@@ -13,6 +13,7 @@ const { getHistoryFromGraphGL } = require("../utils/graphql");
 const { ethers } = require("ethers");
 const { Token } = require("../models/Token");
 const { PPVTransaction } = require("../models/PPVTransaction");
+const { Account } = require("../models/Account");
 
 const networkName = (process?.argv?.[2] || "bsc");
 const curNetwork = supportedNetworks.find(e => e.shortName === networkName);
@@ -67,13 +68,15 @@ async function registerProtocolTx(protocolTx) {
     if (type === 'STAKE' || type === 'UNSTAKE') {
         await Balance.updateOne({ address, chainId, tokenAddress }, { staked: balanceItem.staked }, overrideOptions);
     }
-    else if (type === 'BOUNTY_COMMENTOR' || 'BOUNTY_VIEWER') {
+    else if (type === 'BOUNTY_COMMENTOR' || type === 'BOUNTY_VIEWER') {
         if (isInserted(updateResult)) {
-            await Token.updateOne({ tokenId }, { $inc: { [`lockedBounty.${type === 'BOUNTY_VIEWER' ? 'viewer' : 'commentor'}`]: -protocolTx.amount } });
+            await Token.updateOne({ tokenId }, { $inc: { [`lockedBounty.${type === 'BOUNTY_VIEWER' ? 'viewer' : 'commentor'}`]: -protocolTx.amount } }, overrideOptions);
         }
     }
     else if (type === 'TIP') {
-        const updateResult = await Token.updateOne({ tokenId, minter: protocolTx.to.id }, { $inc: { totalTips: amount } });
+        const updateResult = await Token.updateOne({ tokenId, minter: protocolTx.to.id }, { $inc: { totalTips: amount } }, overrideOptions);
+        await Account.updateOne({ address }, { $inc: { sentTips: amount } }, overrideOptions);
+        await Account.updateOne({ address: protocolTx.to.id }, { $inc: { receivedTips: amount }, overrideOptions });
         console.log('-----tip', updateResult);
     }
     else if (type === 'PPV') {
@@ -93,6 +96,7 @@ async function updateStreamCollection(nftTransfer) {
     if (from === ethers.constants.AddressZero) {
         updateData = { ...updateData, minter: toAddress, status: 'minted' };
         console.log('--minted', streamCollectionAddress, tokenIdInt, toAddress);
+        await Account.updateOne({ address: toAddress }, { $inc: { uploads: 1 } });
     }
     let updatedTokenItem;
     try {

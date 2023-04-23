@@ -18,7 +18,7 @@ const { PPVTransaction } = require('../models/PPVTransaction');
 const Feature = require('../models/Feature');
 const { commentsForTokenId } = require('./comments');
 const { requestVote } = require('./vote');
-const { getLeaderboard } = require('./getData');
+const { getLeaderboard, getStreamNfts } = require('./getData');
 const { isAddress } = require('ethers/lib/utils');
 const { requestFollow, unFollow, getFollowing, getFollowers } = require('./follow');
 const { signatureForClaimBounty } = require('./bounty');
@@ -59,6 +59,9 @@ const accountTemplate = {
     [userProfileKeys.discordLink]: 1,
     [userProfileKeys.instagramLink]: 1,
     createdAt: 1,
+    sentTips: 1,
+    receivedTips: 1,
+    uploads: 1,
     _id: 0,
 };
 const ApiController = {
@@ -181,11 +184,12 @@ const ApiController = {
         const limit = req.body.limit || req.query.limit || 1000;
         const filter = { status: "minted" };
         const totalCount = await Token.find(filter, tokenTemplate).count();
-        const all = await Token.find(filter, tokenTemplate)
-            .sort({ updatedAt: -1 })
-            .skip(skip)
-            .limit(limit)
-            .lean();
+        // const all = await Token.find(filter, tokenTemplate)
+        //     .sort({ updatedAt: -1 })
+        //     .skip(skip)
+        //     .limit(limit)
+        //     .lean();
+        const all = await getStreamNfts(filter, skip, limit);
         return res.json({ result: { items: all, totalCount, skip, limit } });
     },
     getMyNfts: async function (req, res, next) {
@@ -249,7 +253,20 @@ const ApiController = {
             aggregateQuery = !searchQuery['$match'] ? [{ $sort: sortRule }] : [...aggregateQuery, { $sort: sortRule }];
             if (unit) aggregateQuery = [...aggregateQuery, { $limit: parseInt(unit * page + unit * 1) }];
             if (page) aggregateQuery = [...aggregateQuery, { $skip: parseInt(unit * page) }];
-            aggregateQuery.push({ $project: tokenTemplate });
+            aggregateQuery.push({
+                $lookup: {
+                    from: 'accounts',
+                    localField: 'address',
+                    foreignField: 'minter',
+                    as: 'account'
+                }
+            });
+            aggregateQuery.push({
+                $project: {
+                    ...tokenTemplate, mintername: { $first: '$account.username' },
+                    minterAvatarUrl: { $first: '$account.avatarImageUrl' },
+                }
+            });
             let filteredNfts = await Token.aggregate(aggregateQuery);
             const tmpResult = filteredNfts;
             const ret = removeDuplicatedObject(tmpResult, 'tokenId');
@@ -271,7 +288,8 @@ const ApiController = {
         watcherAddress = watcherAddress.toLowerCase();
         const watchedTokenIds = await WatchHistory.find({ watcherAddress }).limit(20).distinct('tokenId');
         if (!watchedTokenIds || watchedTokenIds.length < 1) return res.json({ result: [] });
-        const myWatchedNfts = await Token.find({ tokenId: { $in: watchedTokenIds } }, tokenTemplate);
+        // const myWatchedNfts = await Token.find({ tokenId: { $in: watchedTokenIds } }, tokenTemplate);
+        const myWatchedNfts = await getStreamNfts({ tokenId: { $in: watchedTokenIds } }, 0, 20);
         myWatchedNfts.map(e => {
             e.imageUrl = process.env.DEFAULT_DOMAIN + "/" + e.imageUrl;
             e.videoUrl = process.env.DEFAULT_DOMAIN + "/" + e.videoUrl;
@@ -290,20 +308,20 @@ const ApiController = {
         return res.json({ result: nftInfo });
     },
     getAccountInfo: async function (req, res, next) {
-        const walletAddress = req.query.id || req.query.id || req.params?.id;
+        let walletAddress = req.query.id || req.query.id || req.params?.id;
         if (!walletAddress) return res.json({ error: 'not define wallet' });
-        let accountInfo = await Account.findOne({ address: walletAddress.toLowerCase() }, accountTemplate).lean();
+        walletAddress = normalizeAddress(walletAddress);
+        let accountInfo = await Account.findOne({ address: walletAddress }, accountTemplate).lean();
         if (accountInfo) {
             if (accountInfo.avatarImageUrl) accountInfo.avatarImageUrl = `${process.env.DEFAULT_DOMAIN}/${accountInfo.avatarImageUrl}`;
             if (accountInfo.coverImageUrl) accountInfo.coverImageUrl = `${process.env.DEFAULT_DOMAIN}/${accountInfo.coverImageUrl}`;
         }
         else accountInfo = {};
-        const balanceData = await Balance.find({ address: walletAddress.toLowerCase() }, { chainId: 1, tokenAddress: 1, balance: 1, _id: 0 });
-        const unlockedPPVStreams = await PPVTransaction.find({ address: normalizeAddress(walletAddress), createdAt: { $gt: new Date(Date.now() - config.availableTimeForPPVStream) } }, { streamTokenId: 1 }).distinct('streamTokenId');
-        accountInfo.balances = balanceData;
+        balanceData = await Balance.find({ address: walletAddress.toLowerCase() }, { chainId: 1, tokenAddress: 1, walletBalance: 1, staked: 1, _id: 0 });
+        const unlockedPPVStreams = await PPVTransaction.find({ address: walletAddress, createdAt: { $gt: new Date(Date.now() - config.availableTimeForPPVStream) } }, { streamTokenId: 1 }).distinct('streamTokenId');
+        accountInfo.balanceData = balanceData.filter(e => e.walletBalance > 0 || e.staked > 0);
         accountInfo.unlocked = unlockedPPVStreams;
-        accountInfo.uploads = await Token.find({ minter: walletAddress.toLowerCase(), $or: [{ status: { $ne: 'failed' } }, { staus: { $ne: 'deleted' } }] }, {}).countDocuments();
-        accountInfo.likes = await Feature.find({ address: walletAddress.toLowerCase() }, {}).distinct('tokenId');
+        accountInfo.likes = await Feature.find({ address: walletAddress }, {}).distinct('tokenId');
         accountInfo.followings = await getFollowing(walletAddress);
         accountInfo.followers = await getFollowers(walletAddress);
         return res.json({ result: accountInfo, });
@@ -459,7 +477,7 @@ const ApiController = {
             return res.json({ error: true, msg: "following param is missing" });
         try {
             let result = undefined;
-            if (!unFollowing) result = await requestFollow(address, following);
+            if (unFollowing != 'true') result = await requestFollow(address, following);
             else result = await unFollow(address, following);
             return res.json(result);
         }
@@ -473,7 +491,10 @@ const ApiController = {
         const tokenId = reqParam(req, 'tokenId');
         if (!address || !tokenId) return res.json({ result: false, error: 'not params' });
         const eligibleResult = await eligibleBountyForAccount(address, tokenId);
-        const result = { error: false, result: {} };
+        const result = { error: false, result: {}, claimed: {} };
+        if (eligibleResult?.viewer_claimed) result.result.viewer_claimed = true;
+        if (eligibleResult?.commentor_claimed) result.result.commentor_claimed = true;
+
         if (eligibleResult.viewer) {
             const sigResult = await signatureForClaimBounty(address, tokenId, 0);
             result.result.viewer = sigResult;
@@ -483,7 +504,10 @@ const ApiController = {
             result.result.commentor = sigResult;
         }
         if (result.result.viewer || result.result.commentor) return res.json(result);
-        else return res.json({ error: 'not eligible', result: false });
+        else {
+            result.error = 'not eligible';
+            return res.json(result);
+        }
 
     },
 }
