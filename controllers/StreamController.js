@@ -36,8 +36,19 @@ const StreamController = {
         const tokenItem = await Token.findOne({ tokenId, status: 'minted' }, tokenTemplateForStream).lean();
         if (!tokenItem) return res.json({ error: 'no stream!' });
         const videoPath = `${path.dirname(__dirname)}/assets/videos/${tokenId}.mp4`;
-        const videoStat = fs.statSync(videoPath);
-        const fileSize = videoStat.size;
+        let fileSize;
+        if (tokenItem.videoInfo?.size) {
+            fileSize = tokenItem.videoInfo?.size;
+        }
+        else {
+            try {
+                let videoStat;
+                videoStat = fs.statSync(videoPath);
+                fileSize = videoStat.size;
+            } catch {
+
+            }
+        }
         const videoRange = req.headers.range;
         const nowTimestamp = Date.now();
         const userAddress = signParams?.account?.toLowerCase();
@@ -106,7 +117,7 @@ const StreamController = {
             };
 
             res.writeHead(206, header);
-            file.pipe(res);                        
+            file.pipe(res);
             let filter = { tokenId, exitedAt: { $gt: new Date(nowTimestamp - config.extraPeriodForHistory) } };
             if (userAddress && isAddress(userAddress)) {
                 filter = { ...filter, watcherAddress: userAddress };

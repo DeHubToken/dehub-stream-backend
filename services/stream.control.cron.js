@@ -154,7 +154,7 @@ async function cronLoop() {
         await Setting.updateOne({}, {
             lastBlockFetchedForTransfer: { [chainId]: lastBlockFetchedForTransfer },
             lastBlockFetchedForProtocolTx: { [chainId]: lastBlockFetchedForProtocolTx }
-        });
+        }, overrideOptions);
     }
     else {
         console.log('-- no data', chainId, 'synced block:', lastSyncedBlockNumber);

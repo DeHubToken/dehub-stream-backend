@@ -4,6 +4,8 @@ let { config } = require('../config');
 const { overrideOptions } = require('../config/constants');
 const { Account } = require('../models/Account');
 const { Token } = require('../models/Token');
+const fs = require('fs');
+const { defaultVideoFilePath } = require('../utils/file');
 
 mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/' + config.mongo.dbName,
     { useNewUrlParser: true, useUnifiedTopology: true }, async function (err, db) {
@@ -37,5 +39,22 @@ async function cron_loop() {
         await Account.updateOne({ address: account._id }, { uploads: account.uploads }, overrideOptions);
     }
     console.log('-- uploads of accounts are calculated');
+
+    const tokenItems = await Token.find({ ['videoInfo.size']: null }, { tokenId: 1, videoExt: 1 }).lean();
+    for (const tokenItem of tokenItems) {
+        const videoFilePath = defaultVideoFilePath(tokenItem.tokenId, tokenItem.videoExt);
+        let videoStat;
+        try {
+            videoStat = fs.statSync(videoFilePath);
+        } catch (e) {
+            console.log('----error when fetching for video size', e);
+        }
+        if (videoStat) {
+            const fileSize = videoStat?.size;
+            const result = await Token.updateOne({ tokenId: tokenItem.tokenId }, { ['videoInfo.size']: fileSize });
+            console.log(tokenItem.tokenId, fileSize);
+        }
+    }
+
     process.exit(0);
 }

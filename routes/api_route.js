@@ -38,13 +38,14 @@ router.get("/nft_info/:id", async function (req, res, next) {
 router.get("/account_info/:id", async function (req, res, next) {
     return ApiController.getAccountInfo(req, res, next);
 });
-router.get('/claim', async function (req, res, next) {
-    return ApiController.getSignDataForClaim(req, res, next);
-})
-// update apis
-router.post('/claim', async function (req, res, next) {
-    return ApiController.getSignDataForClaim(req, res, next);
-})
+// deprecated claim transaction
+// router.get('/claim', async function (req, res, next) {
+//     return ApiController.getSignDataForClaim(req, res, next);
+// })
+// // update apis
+// router.post('/claim', async function (req, res, next) {
+//     return ApiController.getSignDataForClaim(req, res, next);
+// })
 router.post("/update_profile", upload.fields([{ name: "coverImg", maxCount: 1 }, { name: "avatarImg", maxCount: 1 },]), async function (req, res, next) {
     return ApiController.updateProfile(req, res, next);
 });

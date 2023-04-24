@@ -26,11 +26,19 @@ const updateVideoInfo = async (tokenId, videoExt) => {
         channelLayout = audioStream.channel_layout;
         bitrate += Number(audioStream.bit_rate);
     }
-    let updateTokenOption = {}
+    let updateTokenOption = {};
+    let videoStat;
+    try {
+        videoStat = fs.statSync(videoFilePath);
+    } catch (e) {
+        console.log('----error when fetching for video size', e);
+    }
+    const fileSize = videoStat?.size;
     if (videoExt === 'mp4' && videoStream.start_time === '0.000000' && videoStream.codec_name === 'h264' && videoStream.is_avc === 'true')
         updateTokenOption.transcodingStatus = 'done';
+
     updateTokenOption.videoDuration = videoDuration;
-    updateTokenOption.videoInfo = { w, h, bitrate, channelLayout, lang };
+    updateTokenOption.videoInfo = { w, h, bitrate, channelLayout, lang, size: fileSize };
     updateTokenOption.videoExt = videoExt;
     await Token.updateOne({ tokenId: tokenId }, updateTokenOption);
     console.log('updated video info', tokenId);

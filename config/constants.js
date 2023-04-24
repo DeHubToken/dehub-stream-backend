@@ -109,28 +109,32 @@ const multicallContractAddresses = {
 
 // this contract addresses should be unique for each network
 const streamCollectionAddresses = {
-    [ChainId.MAINNET]: '0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696',
-    [ChainId.GORLI]: '0xfdFe40A30416e0aEcF4814d1d140e027253c00c7',
-    [ChainId.KOVAN]: '0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696',
-    [ChainId.BSC_MAINNET]: '0x41B90b73a88804f2aed1C4672b3dbA74eb9A92ce',
+    // deployed live networks
+    [ChainId.MAINNET]: '0x1065F5922a336C75623B55D22c4a0C760efCe947',        
+    [ChainId.BSC_MAINNET]: '0x1065F5922a336C75623B55D22c4a0C760efCe947',
+    [ChainId.POLYGON_MAINNET]: '0x1065F5922a336C75623B55D22c4a0C760efCe947',
+    // testnets
+    [ChainId.GORLI]: '0xfdFe40A30416e0aEcF4814d1d140e027253c00c7',    
     [ChainId.BSC_TESTNET]: '0x5Ae62dF56fF1E68Fb1772a337859b856CAEEFab6',
+
     [ChainId.FANTOM_MAINNET]: '0xbb804a896E1A6962837c0813a5F89fDb771d808f',
     [ChainId.AVALANCHE_MAINNET]: '0x84514BeaaF8f9a4cbe25A9C5a7EBdd16B4FE7154',
-    [ChainId.OKEX_MAINNET]: '0xdf4CDd4b8F1790f62a91Bcc4cb793159c641B1bd',
-    [ChainId.POLYGON_MAINNET]: '0x275617327c958bD06b5D6b871E7f491D76113dd8',
+    [ChainId.OKEX_MAINNET]: '0xdf4CDd4b8F1790f62a91Bcc4cb793159c641B1bd',    
 };
 
 // this contract addresses should be unique for each network
 const streamControllerContractAddresses = {
-    [ChainId.MAINNET]: '0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696',
+    // deployed mainnets
+    [ChainId.MAINNET]: '0x6e19ba22da239c46941582530c0ef61400b0e3e6',
+    [ChainId.BSC_MAINNET]: '0x6e19ba22da239c46941582530c0ef61400b0e3e6',
+    [ChainId.POLYGON_MAINNET]: '0x6e19ba22da239c46941582530c0ef61400b0e3e6',
+    // testnets
     [ChainId.GORLI]: '0x2b44a04d2e62d84395eb30f9cf71a256bc7b158a',
-    [ChainId.KOVAN]: '0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696',
-    [ChainId.BSC_MAINNET]: '0x41B90b73a88804f2aed1C4672b3dbA74eb9A92ce',
     [ChainId.BSC_TESTNET]: '0x5Ae62dF56fF1E68Fb1772a337859b856CAEEFab6',
+
     [ChainId.FANTOM_MAINNET]: '0xbb804a896E1A6962837c0813a5F89fDb771d808f',
     [ChainId.AVALANCHE_MAINNET]: '0x84514BeaaF8f9a4cbe25A9C5a7EBdd16B4FE7154',
     [ChainId.OKEX_MAINNET]: '0xdf4CDd4b8F1790f62a91Bcc4cb793159c641B1bd',
-    [ChainId.POLYGON_MAINNET]: '0x275617327c958bD06b5D6b871E7f491D76113dd8',
 };
 
 const overrideOptions = { new: true, upsert: true, returnOriginal: false };
@@ -292,12 +296,14 @@ const mainNetworks = [
         shortName: `mainnet`,
         rpcUrls: [`https://mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`,],
         startBlockNumber: 16428469,
+        graphUrl: process.env.ETHEREUM_GRAPH_API_ENDPOINT,
     },
     {
         chainId: ChainId.POLYGON_MAINNET,
         shortName: `polygon`,
         rpcUrls: [`https://polygon-mainnet.rpcfast.com?api_key=xbhWBI1Wkguk8SNMu1bvvLurPGLXmgwYeC4S6g2H7WdwFigZSmPWVZRxrskEQwIf`,],
         startBlockNumber: 38197541,
+        graphUrl: process.env.POLYGON_GRAPH_API_ENDPOINT,
     }
 ];
 const testNetworks = [
