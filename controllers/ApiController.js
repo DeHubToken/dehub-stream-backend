@@ -256,8 +256,8 @@ const ApiController = {
             aggregateQuery.push({
                 $lookup: {
                     from: 'accounts',
-                    localField: 'address',
-                    foreignField: 'minter',
+                    localField: 'minter',
+                    foreignField: 'address',
                     as: 'account'
                 }
             });

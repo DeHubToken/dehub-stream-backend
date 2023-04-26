@@ -77,8 +77,8 @@ const getStreamNfts = async (filter, skip, limit) => {
             {
                 $lookup: {
                     from: 'accounts',
-                    localField: 'address',
-                    foreignField: 'minter',
+                    localField: 'minter',
+                    foreignField: 'address',
                     as: 'account'
                 }
             },

@@ -152,8 +152,8 @@ async function cronLoop() {
         else lastBlockFetchedForProtocolTx = protocolTxes[0].blockNumber - 1; // limited with 500 options
         console.log("--fetched", startBlockNumber, lastBlockFetchedForTransfer, lastBlockFetchedForProtocolTx, transfers.length, protocolTxes.length);
         await Setting.updateOne({}, {
-            lastBlockFetchedForTransfer: { [chainId]: lastBlockFetchedForTransfer },
-            lastBlockFetchedForProtocolTx: { [chainId]: lastBlockFetchedForProtocolTx }
+            [`lastBlockFetchedForTransfer.${chainId}`]: lastBlockFetchedForTransfer,
+            [`lastBlockFetchedForProtocolTx.${chainId}`]: lastBlockFetchedForProtocolTx,
         }, overrideOptions);
     }
     else {
