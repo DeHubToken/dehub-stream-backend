@@ -110,16 +110,16 @@ const multicallContractAddresses = {
 // this contract addresses should be unique for each network
 const streamCollectionAddresses = {
     // deployed live networks
-    [ChainId.MAINNET]: '0x1065F5922a336C75623B55D22c4a0C760efCe947',        
+    [ChainId.MAINNET]: '0x1065F5922a336C75623B55D22c4a0C760efCe947',
     [ChainId.BSC_MAINNET]: '0x1065F5922a336C75623B55D22c4a0C760efCe947',
     [ChainId.POLYGON_MAINNET]: '0x1065F5922a336C75623B55D22c4a0C760efCe947',
     // testnets
-    [ChainId.GORLI]: '0xfdFe40A30416e0aEcF4814d1d140e027253c00c7',    
+    [ChainId.GORLI]: '0xfdFe40A30416e0aEcF4814d1d140e027253c00c7',
     [ChainId.BSC_TESTNET]: '0x5Ae62dF56fF1E68Fb1772a337859b856CAEEFab6',
 
     [ChainId.FANTOM_MAINNET]: '0xbb804a896E1A6962837c0813a5F89fDb771d808f',
     [ChainId.AVALANCHE_MAINNET]: '0x84514BeaaF8f9a4cbe25A9C5a7EBdd16B4FE7154',
-    [ChainId.OKEX_MAINNET]: '0xdf4CDd4b8F1790f62a91Bcc4cb793159c641B1bd',    
+    [ChainId.OKEX_MAINNET]: '0xdf4CDd4b8F1790f62a91Bcc4cb793159c641B1bd',
 };
 
 // this contract addresses should be unique for each network
@@ -273,6 +273,56 @@ const productionTokens = [
         address: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F',
         iconUrl: 'assets/icons/tokens/USDT.png',
         decimals: 18,
+    },
+    {
+        value: 'doge',
+        label: 'DOGE',
+        symbol: 'DOGE',
+        customAbbreviation: 'doge',
+        chainId: 56,
+        address: '0xbA2aE424d960c26247Dd6c32edC70B295c744C43',
+        iconUrl: 'https://tokens.pancakeswap.finance/images/0xbA2aE424d960c26247Dd6c32edC70B295c744C43.png',
+        decimals: 8,
+    },
+    {
+        value: 'shib',
+        label: 'SHIB',
+        symbol: 'SHIB',
+        customAbbreviation: 'shib',
+        chainId: 1,
+        address: '0x95ad61b0a150d79219dcf64e1e6cc01f0b64c4ce',
+        iconUrl: 'https://assets.coingecko.com/coins/images/11939/thumb/shiba.png?1622619446',
+        decimals: 18,
+    },
+    {
+        value: 'pepe',
+        label: 'PEPE',
+        symbol: 'PEPE',
+        customAbbreviation: 'pepe',
+        chainId: 1,
+        address: '0x6982508145454ce325ddbe47a25d4ec3d2311933',
+        iconUrl: 'https://assets.coingecko.com/coins/images/29850/small/pepe-token.jpeg?1682922725',
+        decimals: 18,
+    },
+    {
+        value: 'floki',
+        label: 'FLOKI',
+        symbol: 'FLOKI',
+        customAbbreviation: 'floki',
+        chainId: 1,
+        address: '0xcf0c122c6b73ff809c693db761e7baebe62b6a2e',
+        iconUrl: 'https://assets.coingecko.com/coins/images/16746/small/PNG_image.png?1643184642',
+        decimals: 9,
+    },
+    {
+        value: 'floki',
+        label: 'FLOKI',
+        symbol: 'FLOKI',
+        customAbbreviation: 'floki',
+        chainId: 56,
+        address: '0xfb5b838b6cfeedc2873ab27866079ac55363d37e',
+        iconUrl: 'https://assets.coingecko.com/coins/images/16746/small/PNG_image.png?1643184642',
+        decimals: 9,
     },
 ];
 
