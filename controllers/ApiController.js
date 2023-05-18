@@ -22,6 +22,7 @@ const { getLeaderboard, getStreamNfts } = require('./getData');
 const { isAddress } = require('ethers/lib/utils');
 const { requestFollow, unFollow, getFollowing, getFollowers } = require('./follow');
 const { signatureForClaimBounty } = require('./bounty');
+const { Category } = require('../models/Category');
 
 const expireTime = 86400000;
 const tokenTemplate = {
@@ -162,7 +163,7 @@ const ApiController = {
         return res.json({ status: true, result: { data1, data2 } });
     },
     getSignedDataForUserMint: async function (req, res, next) {
-        const { address, name, description, streamInfo, chainId } = req.body;
+        const { address, name, description, streamInfo, chainId, category } = req.body;
         console.log('upload:', name, description, streamInfo, chainId);
         const uploadedFiles = req.files.files;
         if (uploadedFiles?.length < 2) return res.json({ error: true, msg: "upload image and video file" });
@@ -171,7 +172,7 @@ const ApiController = {
         const imageFile = uploadedFiles[1];
         if (!checkFileType(imageFile, 'image')) return res.json({ error: true, msg: errorMsgs.not_supported_image });
         try {
-            const result = await signatureForMintingNFT(videoFile, imageFile, name, description, JSON.parse(streamInfo), address, Number(chainId));
+            const result = await signatureForMintingNFT(videoFile, imageFile, name, description, JSON.parse(streamInfo), address, Number(chainId), category);
             return res.json(result);
         }
         catch (err) {
@@ -508,7 +509,28 @@ const ApiController = {
             result.error = 'not eligible';
             return res.json(result);
         }
-
+    },
+    addCategory: async function (req, res, next) {
+        const name = reqParam(req, 'name');
+        try {
+            const result = await Category.updateOne({ name }, { name }, overrideOptions);
+            if(result.upserted) return res.json({result: true});
+            else return res.json({result: false, error: 'Already exists the category'});
+        }
+        catch (err) {
+            console.log('-----add category error', err);
+            return res.json({ result: false, error: 'adding category was failed' });
+        }
+    },
+    getCategories: async function (req, res, next) {
+        try {
+            let result = await Category.find({}, { _id: 0, name: 1 }).distinct('name');
+            return res.json(result);
+        }
+        catch (err) {
+            console.log('-----request follow error', err);
+            return res.json({ result: false, error: 'following was failed' });
+        }
     },
 }
 module.exports = { ApiController };

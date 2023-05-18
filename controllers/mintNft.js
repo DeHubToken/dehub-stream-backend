@@ -13,7 +13,7 @@ const { config } = require("../config");
 
 const signer = new ethers.Wallet(process.env.SIGNER_KEY);
 
-const signatureForMintingNFT = async (videoFile, imageFile, name, description, streamInfo, address, chainId) => {
+const signatureForMintingNFT = async (videoFile, imageFile, name, description, streamInfo, address, chainId, category) => {
 
   const collectionAddress = normalizeAddress(streamCollectionAddresses[chainId]);
   let videoExt = videoFile.mimetype.toString().substr(videoFile.mimetype.toString().indexOf("/") + 1);
@@ -21,23 +21,11 @@ const signatureForMintingNFT = async (videoFile, imageFile, name, description, s
   const imageExt = imageFile.mimetype.toString().substr(imageFile.mimetype.toString().indexOf("/") + 1);
 
   const addedOptions = {};
-  // 1. check balance and lock for bounty 
-  if (streamInfo[streamInfoKeys.isAddBounty]) {
-    const addBountyTotalAmount = getTotalBountyAmount(streamInfo);
-    // const bountyAmountWithFee = getTotalBountyAmount(streamInfo, true);
-    // adjust precision of bountyAmount
+  // 1. store lock for bounty 
+  if (streamInfo[streamInfoKeys.isAddBounty]) {    
     const precision = 5;
     const bountyAmount = Math.round(streamInfo[streamInfoKeys.addBountyAmount] * 10 ** precision) / (10 ** precision);
-    streamInfo[streamInfoKeys.addBountyAmount] = bountyAmount;
-    // const bountyToken = supportedTokens.find(e => e.symbol === streamInfo[streamInfoKeys.addBountyTokenSymbol] && e.chainId === Number(streamInfo[streamInfoKeys.addBountyChainId]));
-    // const balanceFilter = { address: normalizeAddress(address), tokenAddress: bountyToken?.address?.toLowerCase(), chainId: Number(streamInfo[streamInfoKeys.addBountyChainId]) };
-    // const balanceItem = await Balance.findOne(balanceFilter).lean();
-    // if (balanceItem.walletbalance < bountyAmountWithFee) return { result: false, error: 'insufficient balance to add bounty' };
-    // const updatedBalanceItem = await Balance.findOneAndUpdate(balanceFilter, { $inc: { balance: -bountyAmountWithFee, lockForBounty: addBountyTotalAmount } }, { returnOriginal: false });
-    // if (updatedBalanceItem?.walletbalance < 0) {
-    //   return { result: false, error: 'insufficient balance to add bounty' };
-    // }
-    // await Balance.updateOne({ ...balanceFilter, address: config.devWalletAddress }, { $inc: { balance: bountyAmountWithFee - addBountyTotalAmount } }, overrideOptions);
+    streamInfo[streamInfoKeys.addBountyAmount] = bountyAmount;    
     addedOptions['lockedBounty'] = {
       viewer: streamInfo[streamInfoKeys.addBountyAmount] * streamInfo[streamInfoKeys.addBountyFirstXViewers],
       commentor: streamInfo[streamInfoKeys.addBountyAmount] * streamInfo[streamInfoKeys.addBountyFirstXComments],
@@ -53,6 +41,7 @@ const signatureForMintingNFT = async (videoFile, imageFile, name, description, s
     videoExt,
     imageExt,
     chainId,
+    category,
     minter: normalizeAddress(address),
     ...addedOptions
   });

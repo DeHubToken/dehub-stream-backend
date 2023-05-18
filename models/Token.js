@@ -19,7 +19,7 @@ let TokenSchema = new Schema({
     videoUrl: String, //related path
     site: String, //
     contractAddress: String,
-    minter: String,    
+    minter: String,
     owner: String,
     streamInfo: Object,
     videoExt: String,
@@ -28,19 +28,20 @@ let TokenSchema = new Schema({
     videoInfo: Object,
     videoDuration: { type: Number, index: true }, // in second unit
     videoFilePath: { type: String },
-    likes: {type: Number, index: true},
-    views: {type: Number, index: true},
-    comments: {type: Number, index: true},
+    likes: { type: Number, index: true },
+    views: { type: Number, index: true },
+    comments: { type: Number, index: true },
     totalVotes: Object, // ex: {for: 15, against: 1}
     lockedBounty: Object,
-    totalTips: {type: Number, index: true}, // total tips received from any users
-    totalFunds: {type: Number, index: true}, // total funds received from pay per view
+    totalTips: { type: Number, index: true }, // total tips received from any users
+    totalFunds: { type: Number, index: true }, // total funds received from pay per view
     status: {
         type: String,
         default: "signed",
         enum: ["signed", "pending", "minted", "deleted", "failed", "burned", "checking"],
     },
     transcodingStatus: String,
+    category: String,
 }, { timestamps: true });
 
 
@@ -63,6 +64,7 @@ TokenSchema.pre("save", function (next) {
     else next();
 });
 
-TokenSchema.index({minter: 1});
+TokenSchema.index({ minter: 1 });
+TokenSchema.index({ category: 1 });
 
 module.exports.Token = mongoose.model('tokens', TokenSchema);
