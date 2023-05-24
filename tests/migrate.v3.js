@@ -1,3 +1,4 @@
+// migrated at 2023/05/24
 require('dotenv').config();
 let mongoose = require('mongoose');
 let { config } = require('../config');
@@ -25,7 +26,7 @@ async function cron_loop() {
     console.log('update accounts:', accounts.length);
     for (const account of accounts) {
         account.displayName = account.username.trim();
-        account.username = account.username.trim().toLowerCase().replace(" ", "_");        
+        account.username = account.username.trim().replace(" ", "_");
         await account.save();
     }
     process.exit(0);
