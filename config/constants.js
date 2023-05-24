@@ -50,6 +50,7 @@ const RewardType = {
 
 const userProfileKeys = {
     username: 'username',
+    displayName: 'displayName',
     email: 'email',
     avatarImageUrl: 'avatarImageUrl',
     coverImageUrl: 'coverImageUrl',
@@ -374,7 +375,27 @@ const testNetworks = [
 
 const supportedNetworks = isDevMode ? testNetworks : mainNetworks;
 
-
+const tokenTemplate = {
+    name: 1,
+    description: 1,
+    tokenId: 1,
+    imageUrl: 1,
+    videoUrl: 1,
+    // owner: 1,
+    minter: 1,
+    streamInfo: 1,
+    videoInfo: 1,
+    videoDuration: 1,
+    videoExt: 1,
+    views: 1,
+    likes: 1,
+    totalTips: 1,
+    lockedBounty: 1,
+    totalVotes: 1,
+    status: 1,
+    transcodingStatus: 1,
+    _id: 0,
+};
 
 module.exports = {
     paramNames,
@@ -399,4 +420,5 @@ module.exports = {
     stakingContractAddresses,
     streamCollectionAddresses,
     streamControllerContractAddresses,
+    tokenTemplate
 }

@@ -6,6 +6,7 @@ const { Transaction } = require("../models/Transaction");
 const { Token } = require("../models/Token");
 const { WatchHistory } = require("../models/WatchHistory");
 const { normalizeAddress } = require("./format");
+const { Account } = require("../models/Account");
 
 function removeDuplicatedObject(arr, subKey,) {
     var m = {};
@@ -44,7 +45,7 @@ const eligibleBountyForAccount = async (account, tokenId) => {
     const counterOfCommentors = tokenItem?.streamInfo?.[streamInfoKeys.addBountyFirstXComments];
 
     // check history
-    const claimTxes = await Transaction.find({ from: account, tokenId, $or: [{ type: 'BOUNTY_VIEWER' }, { type: 'BOUNTY_COMMENTOR' }] }, { type: 1, _id: 0, }).lean();    
+    const claimTxes = await Transaction.find({ from: account, tokenId, $or: [{ type: 'BOUNTY_VIEWER' }, { type: 'BOUNTY_COMMENTOR' }] }, { type: 1, _id: 0, }).lean();
     if (claimTxes.find(e => e.type === 'BOUNTY_VIEWER')) {
         result.viewer_claimed = true;
     }
@@ -63,11 +64,19 @@ const eligibleBountyForAccount = async (account, tokenId) => {
     return result;
 }
 
+const isValidUsername = async (address, username) => {
+    if (username === 'mine') return { result: false, error: true, error_msg: `username can't be 'mine'` };
+    if (!/^[a-zA-Z0-9_-]+$/.test(username)) return { result: false, error: true, error_msg: 'username can only contain letters, numbers, hyphens (-), and underscores' };
+    const accountWithSameName = await Account.findOne({ username, address: { $ne: address } }, { username: 1 }).lean();
+    if (accountWithSameName) return { result: false, error: true, error_msg: 'The username is already in use' };
+    return { result: true };
+}
 
 module.exports = {
     removeDuplicatedObject,
     isUnlockedPPVStream,
     isValidTipAmount,
     isSupportedChain,
-    eligibleBountyForAccount
+    eligibleBountyForAccount,
+    isValidUsername,
 }

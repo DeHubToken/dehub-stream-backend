@@ -6,6 +6,7 @@ let AccountSchema = new Schema({
     address: String,
     lastLoginTimestamp: Number,
     username: String,  // user profile
+    displayName: String, // this can be overrided.
     email: String,
     avatarImageUrl: String,
     coverImageUrl: String,

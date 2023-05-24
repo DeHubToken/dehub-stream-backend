@@ -64,5 +64,7 @@ router.get('/add_category', /* isAuthorized, */ ApiController.addCategory);
 // get apis
 router.get('/leaderboard', ApiController.leaderboard);
 router.get('/get_categories', ApiController.getCategories);
+router.get('/usernames', ApiController.getUsernames);
+router.get('/is_valid_username', ApiController.isValidUsername);
 
 module.exports = router;

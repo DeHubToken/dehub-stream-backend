@@ -41,7 +41,7 @@ const isValidAccount = (address, timestamp, sig) => {
 
 const reqParam = (req, paramName) => {
     if (!req) return null;
-    const result = req.query?.[paramName] || req.body?.[paramName] || req.params?.[paramName];
+    const result = req.query?.[paramName]?.trim() || req.body?.[paramName]?.trim() || req.params?.[paramName]?.trim();
     return result?.trim();
 }
 

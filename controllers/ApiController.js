@@ -4,11 +4,11 @@ require("dotenv").config();
 const { ethers } = require('ethers');
 const { isValidAccount, reqParam } = require('../utils/auth');
 const { decryptWithSourceKey, encryptWithSourceKey } = require('../utils/encrypt');
-const { paramNames, errorMsgs, userProfileKeys, overrideOptions, supportedTokens } = require('../config/constants');
+const { paramNames, errorMsgs, userProfileKeys, overrideOptions, tokenTemplate } = require('../config/constants');
 const { Token } = require('../models/Token');
 const { checkFileType, normalizeAddress } = require('../utils/format');
 const { signatureForMintingNFT } = require('./mintNft');
-const { removeDuplicatedObject, isValidTipAmount, eligibleBountyForAccount } = require('../utils/validation');
+const { removeDuplicatedObject, isValidTipAmount, eligibleBountyForAccount, isValidUsername } = require('../utils/validation');
 const { WatchHistory } = require('../models/WatchHistory');
 const { config } = require('../config');
 const { signatureForClaim, requestPPVStream, requestLike, requestTip, requestComment } = require('./user');
@@ -25,30 +25,12 @@ const { signatureForClaimBounty } = require('./bounty');
 const { Category } = require('../models/Category');
 
 const expireTime = 86400000;
-const tokenTemplate = {
-    name: 1,
-    description: 1,
-    tokenId: 1,
-    imageUrl: 1,
-    videoUrl: 1,
-    owner: 1,
-    minter: 1,
-    streamInfo: 1,
-    videoInfo: 1,
-    videoDuration: 1,
-    videoExt: 1,
-    views: 1,
-    likes: 1,
-    totalTips: 1,
-    lockedBounty: 1,
-    totalVotes: 1,
-    status: 1,
-    transcodingStatus: 1,
-    _id: 0,
-};
+
 const accountTemplate = {
     username: 1,
+    displayName: 1,
     balance: 1,
+    address: 1,
     // deposited: 1,
     [userProfileKeys.avatarImageUrl]: 1,
     [userProfileKeys.coverImageUrl]: 1,
@@ -264,7 +246,9 @@ const ApiController = {
             });
             aggregateQuery.push({
                 $project: {
-                    ...tokenTemplate, mintername: { $first: '$account.username' },
+                    ...tokenTemplate,
+                    mintername: { $first: '$account.username' },
+                    minterDisplayName: { $first: '$account.displayName' },
                     minterAvatarUrl: { $first: '$account.avatarImageUrl' },
                 }
             });
@@ -300,7 +284,8 @@ const ApiController = {
     getNftInfo: async function (req, res, next) {
         let tokenId = req.query.id || req.query.id || req.params?.id;
         if (!tokenId) return res.json({ error: 'not define tokenId' });
-        const nftInfo = await Token.findOne({ tokenId }, tokenTemplate).lean();
+        // const nftInfo = await Token.findOne({ tokenId }, tokenTemplate).lean();
+        const nftInfo = (await getStreamNfts({ tokenId: Number(tokenId) }, 0, 1))?.[0];
         if (!nftInfo) return res.json({ error: 'no nft' });
         nftInfo.imageUrl = process.env.DEFAULT_DOMAIN + "/" + nftInfo.imageUrl;
         nftInfo.videoUrl = process.env.DEFAULT_DOMAIN + "/" + nftInfo.videoUrl;
@@ -311,8 +296,8 @@ const ApiController = {
     getAccountInfo: async function (req, res, next) {
         let walletAddress = req.query.id || req.query.id || req.params?.id;
         if (!walletAddress) return res.json({ error: 'not define wallet' });
+        let accountInfo = await Account.findOne({ $or: [{ address: normalizeAddress(walletAddress) }, { username: walletAddress }] }, accountTemplate).lean();
         walletAddress = normalizeAddress(walletAddress);
-        let accountInfo = await Account.findOne({ address: walletAddress }, accountTemplate).lean();
         if (accountInfo) {
             if (accountInfo.avatarImageUrl) accountInfo.avatarImageUrl = `${process.env.DEFAULT_DOMAIN}/${accountInfo.avatarImageUrl}`;
             if (accountInfo.coverImageUrl) accountInfo.coverImageUrl = `${process.env.DEFAULT_DOMAIN}/${accountInfo.coverImageUrl}`;
@@ -347,17 +332,21 @@ const ApiController = {
     },
     updateProfile: async function (req, res, next) {
         let address = reqParam(req, paramNames.address);
+        address = normalizeAddress(address);
         const authResult = isValidAccount(address, reqParam(req, paramNames.timestamp), reqParam(req, paramNames.sig));
         if (!authResult) return res.json({ error: true });
         const updateAccountOptions = {};
+        let username = reqParam(req, userProfileKeys.username);
+        if (username) {
+            const validation = await isValidUsername(address, username);
+            if (validation.error) return res.json(validation);
+        }
         Object.keys(userProfileKeys).map(key => {
             const reqVal = reqParam(req, userProfileKeys[key]);
             if (reqVal && reqVal !== 'undefined' && reqVal !== 'null') updateAccountOptions[key] = reqVal;
         });
         const coverImgFile = req.files?.coverImg?.[0];
         const avatarImgFile = req.files?.avatarImg?.[0];
-        // console.log(JSON.parse(JSON.stringify(req.body)), req.body);
-        const accountItem = await Account.findOne({ address: address.toLowerCase() }).lean();
         if (coverImgFile) {
             const imageExt = coverImgFile.mimetype.toString().substr(coverImgFile.mimetype.toString().indexOf("/") + 1);
             const coverImagePath = `${path.dirname(__dirname)}/assets/covers/${address.toLowerCase()}.${imageExt}`;
@@ -370,7 +359,23 @@ const ApiController = {
             moveFile(avatarImgFile.path, avatarImagePath);
             updateAccountOptions[userProfileKeys.avatarImageUrl] = `statics/avatars/${address.toLowerCase()}.${avatarImageExt}`;
         }
-        await Account.updateOne({ address: address.toLowerCase() }, updateAccountOptions, overrideOptions);
+        const updatedAccount = await Account.findOneAndUpdate({ address: address.toLowerCase() }, updateAccountOptions, overrideOptions);
+        if (updatedAccount.displayName && !updatedAccount.username) {
+            // set default username
+            username = updatedAccount.displayName.replace(' ', '_');
+            let tailNumber = 0;
+            for (let i = 0; i < 10000; i++) {
+                const updatedUsername = tailNumber === 0 ? username : `${username}_${tailNumber}`;
+                const validation = await isValidUsername(address, updatedUsername);
+                if (validation.result) {
+                    await Account.updateOne({ address }, { username: updatedUsername });
+                    break;
+                }
+                else {
+                    tailNumber++;
+                }
+            }
+        }
         let result = { result: true };
         return res.json(result);
 
@@ -514,8 +519,8 @@ const ApiController = {
         const name = reqParam(req, 'name');
         try {
             const result = await Category.updateOne({ name }, { name }, overrideOptions);
-            if(result.upserted) return res.json({result: true});
-            else return res.json({result: false, error: 'Already exists the category'});
+            if (result.upserted) return res.json({ result: true });
+            else return res.json({ result: false, error: 'Already exists the category' });
         }
         catch (err) {
             console.log('-----add category error', err);
@@ -526,6 +531,27 @@ const ApiController = {
         try {
             let result = await Category.find({}, { _id: 0, name: 1 }).distinct('name');
             return res.json(result);
+        }
+        catch (err) {
+            console.log('-----request follow error', err);
+            return res.json({ result: false, error: 'following was failed' });
+        }
+    },
+    getUsernames: async function (req, res, next) {
+        try {
+            let result = await Account.find({}, { username: 1 }).distinct('username');
+            return res.json(result);
+        }
+        catch (err) {
+            console.log('-----request follow error', err);
+            return res.json({ result: false, error: 'following was failed' });
+        }
+    },
+    isValidUsername: async function (req, res, next) {
+        const username = reqParam(req, userProfileKeys.username);
+        const address = reqParam(req, 'address');
+        try {
+            return res.json(await isValidUsername(normalizeAddress(address), username));
         }
         catch (err) {
             console.log('-----request follow error', err);

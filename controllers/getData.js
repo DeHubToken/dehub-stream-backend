@@ -3,7 +3,7 @@
  */
 require('dotenv').config();
 const { config } = require("../config");
-const { supportedTokens } = require("../config/constants");
+const { supportedTokens, tokenTemplate } = require("../config/constants");
 const { Balance } = require("../models/Balance");
 const { Token } = require('../models/Token');
 const { normalizeAddress } = require("../utils/format");
@@ -43,6 +43,7 @@ const getLeaderboard = async () => {
                     _id: 0,
                     total: '$sumBalance',
                     username: { $first: '$account.username' },
+                    userDisplayName: { $first: '$account.displayName' },
                     avatarUrl: { $first: '$account.avatarImageUrl' },
                 }
             },
@@ -84,26 +85,9 @@ const getStreamNfts = async (filter, skip, limit) => {
             },
             {
                 $project: {
-                    tokenId: 1,
-                    name: 1,
-                    description: 1,
-                    tokenId: 1,
-                    imageUrl: 1,
-                    videoUrl: 1,
-                    owner: 1,
-                    minter: 1,
-                    streamInfo: 1,
-                    videoInfo: 1,
-                    videoDuration: 1,
-                    videoExt: 1,
-                    views: 1,
-                    likes: 1,
-                    totalTips: 1,
-                    lockedBounty: 1,
-                    totalVotes: 1,
-                    status: 1,
-                    transcodingStatus: 1,
+                    ...tokenTemplate,
                     mintername: { $first: '$account.username' },
+                    minterDisplayName: { $first: '$account.displayName' },
                     minterAvatarUrl: { $first: '$account.avatarImageUrl' },
                 }
             },
@@ -127,6 +111,7 @@ const getStreamNfts = async (filter, skip, limit) => {
         return { result: false, error: 'fetching was failed' };
     }
 }
+
 module.exports = {
     getLeaderboard,
     getStreamNfts
