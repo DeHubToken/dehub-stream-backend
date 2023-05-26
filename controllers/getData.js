@@ -3,7 +3,7 @@
  */
 require('dotenv').config();
 const { config } = require("../config");
-const { supportedTokens, tokenTemplate } = require("../config/constants");
+const { supportedTokens, tokenTemplate, blacklistOnLeaderboard } = require("../config/constants");
 const { Balance } = require("../models/Balance");
 const { Token } = require('../models/Token');
 const { normalizeAddress } = require("../utils/format");
@@ -59,7 +59,7 @@ const getLeaderboard = async () => {
         let result = await Balance.aggregate(query);
 
         if (result) { // exclude by blacklist
-            result = result.filter(e => e.account !== '0xbf3039b0bb672b268e8384e30d81b1e6a8a43b2c')
+            result = result.filter(e => !blacklistOnLeaderboard.includes(e.account))
         }
         return { result: { byWalletBalance: result } };
     }

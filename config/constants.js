@@ -397,6 +397,12 @@ const tokenTemplate = {
     _id: 0,
 };
 
+const blacklistOnLeaderboard = [
+    '0xbf3039b0bb672b268e8384e30d81b1e6a8a43b2c',
+    '0x26d2cd7763106fdce443fadd36163e2ad33a76e6', // staking address
+    '0x000000000000000000000000000000000000dead', // burned address
+    '0x0d0707963952f2fba59dd06f2b425ace40b492fe', // exchange address
+]
 module.exports = {
     paramNames,
     supportedVideoTypes,
@@ -420,5 +426,6 @@ module.exports = {
     stakingContractAddresses,
     streamCollectionAddresses,
     streamControllerContractAddresses,
-    tokenTemplate
+    tokenTemplate,
+    blacklistOnLeaderboard,
 }
