@@ -146,7 +146,7 @@ const ApiController = {
     },
     getSignedDataForUserMint: async function (req, res, next) {
         const { address, name, description, streamInfo, chainId, category } = req.body;
-        console.log('upload:', name, description, streamInfo, chainId);
+        console.log('upload:', name, description, streamInfo, chainId, JSON.parse(category));
         const uploadedFiles = req.files.files;
         if (uploadedFiles?.length < 2) return res.json({ error: true, msg: "upload image and video file" });
         const videoFile = uploadedFiles[0];
@@ -154,7 +154,7 @@ const ApiController = {
         const imageFile = uploadedFiles[1];
         if (!checkFileType(imageFile, 'image')) return res.json({ error: true, msg: errorMsgs.not_supported_image });
         try {
-            const result = await signatureForMintingNFT(videoFile, imageFile, name, description, JSON.parse(streamInfo), address, Number(chainId), category);
+            const result = await signatureForMintingNFT(videoFile, imageFile, name, description, JSON.parse(streamInfo), address, Number(chainId), JSON.parse(category));
             return res.json(result);
         }
         catch (err) {
@@ -192,7 +192,7 @@ const ApiController = {
     },
     getFilteredNfts: async function (req, res, next) {
         try {
-            let { search, page, unit, sortMode, bulkIdList, verifiedOnly, isSales, minter, owner } = req.query
+            let { search, page, unit, sortMode, bulkIdList, verifiedOnly, isSales, minter, owner, category } = req.query;
             const searchQuery = {};
             if (!unit) unit = 20;
             if (unit > 100) unit = 100;
@@ -215,6 +215,9 @@ const ApiController = {
             let aggregateQuery = []
             if (minter) searchQuery['$match'] = { minter: minter.toLowerCase(), $or: [{ status: 'minted' }, { status: 'pending' }] };
             if (owner) searchQuery['$match'] = { owner: owner.toLowerCase() };
+            if (category) {
+                searchQuery['$match']['category'] = { $elemMatch: { $eq: category } }
+            }
             if (search) {
                 var re = new RegExp(search, "gi")
                 searchQuery['$match'] = { ...searchQuery['$match'], $or: [{ name: re }, { description: re }, { minter: re }, { owner: re }] }
@@ -269,12 +272,12 @@ const ApiController = {
     },
     getMyWatchedNfts: async function (req, res, next) {
         let watcherAddress = req.query.watcherAddress || req.query.watcherAddress;
+        const category = reqParam(req, 'category');
         if (!watcherAddress) return res.json({ error: 'not define watcherAddress' });
         watcherAddress = watcherAddress.toLowerCase();
         const watchedTokenIds = await WatchHistory.find({ watcherAddress }).limit(20).distinct('tokenId');
-        if (!watchedTokenIds || watchedTokenIds.length < 1) return res.json({ result: [] });
-        // const myWatchedNfts = await Token.find({ tokenId: { $in: watchedTokenIds } }, tokenTemplate);
-        const myWatchedNfts = await getStreamNfts({ tokenId: { $in: watchedTokenIds } }, 0, 20);
+        if (!watchedTokenIds || watchedTokenIds.length < 1) return res.json({ result: [] });                
+        const myWatchedNfts = await getStreamNfts({ tokenId: { $in: watchedTokenIds }, category: category ? { $elemMatch: { $eq: category } } : null }, 0, 20);
         myWatchedNfts.map(e => {
             e.imageUrl = process.env.DEFAULT_DOMAIN + "/" + e.imageUrl;
             e.videoUrl = process.env.DEFAULT_DOMAIN + "/" + e.videoUrl;
