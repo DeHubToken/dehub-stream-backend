@@ -19,6 +19,9 @@ let AccountSchema = new Schema({
     receivedTips: Number,
     // count of streams uploaded by the account
     uploads: Number,
+    followers: Number,
+    likes: Number,
+    
 }, { timestamps: true });
 
 AccountSchema.index({ address: 1 });

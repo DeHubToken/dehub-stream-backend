@@ -8,7 +8,7 @@ const { Balance } = require("../models/Balance");
 const { Token } = require('../models/Token');
 const { normalizeAddress } = require("../utils/format");
 
-const getLeaderboard = async () => {
+const getLeaderboard = async (sort = null) => {
     try {
         const mainTokenAddresses = supportedTokens.filter(e => e.symbol === config.defaultTokenSymbol).map(f => {
             return { tokenAddress: normalizeAddress(f.address) };
@@ -16,6 +16,9 @@ const getLeaderboard = async () => {
         // @dev only
         const dhbAddressOnBSC = normalizeAddress("0x680D3113caf77B61b510f332D5Ef4cf5b41A761D")
         if (!mainTokenAddresses.includes(dhbAddressOnBSC)) mainTokenAddresses.push({ tokenAddress: dhbAddressOnBSC });
+        const sortOption = {
+            $sort: (sort === null || sort === 'holdings') ? { total: -1 } : (sort === 'sentTips' ? { sentTips: -1 } : { receivedTips: -1 })
+        }
         const query = [
             {
                 $match: {
@@ -45,13 +48,11 @@ const getLeaderboard = async () => {
                     username: { $first: '$account.username' },
                     userDisplayName: { $first: '$account.displayName' },
                     avatarUrl: { $first: '$account.avatarImageUrl' },
+                    sentTips: { $first: '$account.sentTips' },
+                    receivedTips: { $first: '$account.receivedTips' },
                 }
             },
-            {
-                $sort: {
-                    total: -1
-                }
-            },
+            sortOption,
             {
                 $limit: 20
             }

@@ -420,7 +420,8 @@ const ApiController = {
         }
     },
     leaderboard: async function (req, res, next) {
-        return res.json(await getLeaderboard());
+        const sort = reqParam(req, 'sort');
+        return res.json(await getLeaderboard(sort));
     },
     requestTip: async function (req, res, next) {
         const address = reqParam(req, paramNames.address);

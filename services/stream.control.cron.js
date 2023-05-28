@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 require('dotenv').config();
-const { overrideOptions, supportedNetworks, ChainId } = require("../config/constants");
+const { overrideOptions, supportedNetworks, ChainId, RewardType } = require("../config/constants");
 const { config } = require('../config');
 
 const { Transaction } = require("../models/Transaction");
@@ -14,6 +14,7 @@ const { ethers } = require("ethers");
 const { Token } = require("../models/Token");
 const { PPVTransaction } = require("../models/PPVTransaction");
 const { Account } = require("../models/Account");
+const { Reward } = require("../models/Reward");
 
 const networkName = (process?.argv?.[2] || "bsc");
 const curNetwork = supportedNetworks.find(e => e.shortName === networkName);
@@ -60,7 +61,7 @@ async function registerProtocolTx(protocolTx) {
     const balanceItem = protocolTx.from.balances.find(e => e.token.id === tokenAddress)
     const updateResult = await Transaction.updateOne(
         { chainId, txHash, logIndex },
-        { amount, from: address, tokenAddress, tokenId, type: type, blockNumber: protocolTx.blockNumber },
+        { amount, from: address, tokenAddress, tokenId, type: type, blockNumber: protocolTx.blockNumber, to: protocolTx?.to?.id },
         overrideOptions);
     if (isInserted(updateResult)) {
         console.log('---not processed tx', type, txHash, logIndex);
@@ -77,6 +78,7 @@ async function registerProtocolTx(protocolTx) {
         const updateResult = await Token.updateOne({ tokenId, minter: protocolTx.to.id }, { $inc: { totalTips: amount } }, overrideOptions);
         await Account.updateOne({ address }, { $inc: { sentTips: amount } }, overrideOptions);
         await Account.updateOne({ address: protocolTx.to.id }, { $inc: { receivedTips: amount }, overrideOptions });
+        await Reward.create({ address: protocolTx.to.id, from: address, rewardAmount: amount, chainId, tokenId, type: RewardType.Tip })
         console.log('-----tip', updateResult);
     }
     else if (type === 'PPV') {
