@@ -70,7 +70,7 @@ const getLeaderboard = async (sort = null) => {
     }
 }
 
-const getStreamNfts = async (filter, skip, limit) => {
+const getStreamNfts = async (filter, skip, limit, sortOption = null) => {
     try {
         const query = [
             {
@@ -85,16 +85,37 @@ const getStreamNfts = async (filter, skip, limit) => {
                 }
             },
             {
+                $lookup: {
+                    from: 'balances',
+                    localField: 'minter',
+                    foreignField: 'address',
+                    pipeline: [
+                        {
+                            $match: {
+                                tokenAddress: '0x680d3113caf77b61b510f332d5ef4cf5b41a761d'
+                            }
+                        },
+                        {
+                            $project: {
+                                staked: 1, _id: 0
+                            }
+                        }
+                    ],
+                    as: 'balance'
+                }
+            },
+            {
                 $project: {
                     ...tokenTemplate,
                     mintername: { $first: '$account.username' },
                     minterDisplayName: { $first: '$account.displayName' },
                     minterAvatarUrl: { $first: '$account.avatarImageUrl' },
+                    minterStaked: { $first: '$balance.staked' },
                 }
             },
             {
-                $sort: {
-                    updatedAt: -1
+                $sort: sortOption ? sortOption : {
+                    createdAt: -1
                 }
             },
             {

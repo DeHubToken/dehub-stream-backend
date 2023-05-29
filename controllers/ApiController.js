@@ -167,11 +167,6 @@ const ApiController = {
         const limit = req.body.limit || req.query.limit || 1000;
         const filter = { status: "minted" };
         const totalCount = await Token.find(filter, tokenTemplate).count();
-        // const all = await Token.find(filter, tokenTemplate)
-        //     .sort({ updatedAt: -1 })
-        //     .skip(skip)
-        //     .limit(limit)
-        //     .lean();
         const all = await getStreamNfts(filter, skip, limit);
         return res.json({ result: { items: all, totalCount, skip, limit } });
     },
@@ -212,7 +207,6 @@ const ApiController = {
             }
 
             if (!page) page = 0;
-            let aggregateQuery = []
             if (minter) searchQuery['$match'] = { minter: minter.toLowerCase(), $or: [{ status: 'minted' }, { status: 'pending' }] };
             if (owner) searchQuery['$match'] = { owner: owner.toLowerCase() };
             if (category) {
@@ -221,7 +215,6 @@ const ApiController = {
             if (search) {
                 var re = new RegExp(search, "gi")
                 searchQuery['$match'] = { ...searchQuery['$match'], $or: [{ name: re }, { description: re }, { minter: re }, { owner: re }] }
-                aggregateQuery = [searchQuery]
             }
             if (bulkIdList) {
                 let idList = bulkIdList.split("-");
@@ -234,35 +227,8 @@ const ApiController = {
             if ((verifiedOnly + '').toLowerCase() === 'true' || verifiedOnly === '1') {
                 searchQuery['$match'] = { ...searchQuery['$match'], verified: true };
             }
-            // searchQuery["$sort"] = sortRule;
-            aggregateQuery = [searchQuery];
-            aggregateQuery = !searchQuery['$match'] ? [{ $sort: sortRule }] : [...aggregateQuery, { $sort: sortRule }];
-            if (unit) aggregateQuery = [...aggregateQuery, { $limit: parseInt(unit * page + unit * 1) }];
-            if (page) aggregateQuery = [...aggregateQuery, { $skip: parseInt(unit * page) }];
-            aggregateQuery.push({
-                $lookup: {
-                    from: 'accounts',
-                    localField: 'minter',
-                    foreignField: 'address',
-                    as: 'account'
-                }
-            });
-            aggregateQuery.push({
-                $project: {
-                    ...tokenTemplate,
-                    mintername: { $first: '$account.username' },
-                    minterDisplayName: { $first: '$account.displayName' },
-                    minterAvatarUrl: { $first: '$account.avatarImageUrl' },
-                }
-            });
-            let filteredNfts = await Token.aggregate(aggregateQuery);
-            const tmpResult = filteredNfts;
-            const ret = removeDuplicatedObject(tmpResult, 'tokenId');
-            ret.map(e => {
-                e.imageUrl = process.env.DEFAULT_DOMAIN + "/" + e.imageUrl;
-                e.videoUrl = process.env.DEFAULT_DOMAIN + "/" + e.videoUrl;
-                delete e.duplicatedCnt;
-            });
+
+            const ret = await getStreamNfts(searchQuery['$match'], parseInt(unit * page), parseInt(unit * page + unit * 1), sortRule);
             res.send({ result: ret });
         } catch (e) {
             console.log('   ...', new Date(), ' -- index/tokens-search err: ', e);
@@ -276,7 +242,7 @@ const ApiController = {
         if (!watcherAddress) return res.json({ error: 'not define watcherAddress' });
         watcherAddress = watcherAddress.toLowerCase();
         const watchedTokenIds = await WatchHistory.find({ watcherAddress }).limit(20).distinct('tokenId');
-        if (!watchedTokenIds || watchedTokenIds.length < 1) return res.json({ result: [] });                
+        if (!watchedTokenIds || watchedTokenIds.length < 1) return res.json({ result: [] });
         const myWatchedNfts = await getStreamNfts({ tokenId: { $in: watchedTokenIds }, category: category ? { $elemMatch: { $eq: category } } : null }, 0, 20);
         myWatchedNfts.map(e => {
             e.imageUrl = process.env.DEFAULT_DOMAIN + "/" + e.imageUrl;
