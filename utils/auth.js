@@ -15,7 +15,9 @@ const expireSecond = config.isDevMode ? 60 * 60 * 2 : 60 * 60 * 24; // 2 hours f
 const isValidAccount = (address, timestamp, sig) => {
     if (!sig || !address || !timestamp)
         return false;
-    const signedMsg = `${address.toLowerCase()}-${timestamp}`;
+    // const signedMsg = `${address.toLowerCase()}-${timestamp}`;
+    const displayedDate = new Date(timestamp * 1000);    
+    const signedMsg = `Welcome to DeHub.io!\n\nClick to sign in for authentication.\nSignatures are valid for ${expireSecond / 3600} hours.\nYour wallet address is ${address.toLowerCase()}.\nIt is ${displayedDate.toUTCString()}.`;    
     try {
         const signedAddress = ethers.utils
             .verifyMessage(signedMsg, sig)
@@ -27,10 +29,6 @@ const isValidAccount = (address, timestamp, sig) => {
         // console.log(nowTime - expireSecond - Number(timestamp),signedAddress.toLowerCase() != address.toLowerCase());
         if ((nowTime - expireSecond > Number(timestamp) || signedAddress.toLowerCase() != address.toLowerCase()) /* && !config.isDevMode */) return false;
         return true;
-        // const accountItem = await Account.findOne({ address: address.toLowerCase() }).lean();
-        // if (!config.isDevMode && accountItem && timestamp - accountItem.lastLoginTimestamp < config.expireSigninTime)
-        //     accountItem;
-        // else return false;
     }
     catch (e) {
         console.log('check account:', e);

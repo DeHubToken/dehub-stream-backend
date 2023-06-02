@@ -403,6 +403,9 @@ const blacklistOnLeaderboard = [
     '0x000000000000000000000000000000000000dead', // burned address
     '0x0d0707963952f2fba59dd06f2b425ace40b492fe', // exchange address
 ]
+
+const publicChatChannelId = 'public_chn';
+
 module.exports = {
     paramNames,
     supportedVideoTypes,
@@ -428,4 +431,5 @@ module.exports = {
     streamControllerContractAddresses,
     tokenTemplate,
     blacklistOnLeaderboard,
+    publicChatChannelId
 }

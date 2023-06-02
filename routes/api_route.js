@@ -1,7 +1,7 @@
-const { ethers } = require("ethers");
+// const { ethers } = require("ethers");
 let express = require("express");
 const fs = require("fs");
-const path = require("path");
+// const path = require("path");
 const { ApiController } = require("../controllers/ApiController");
 let router = express.Router();
 var multer = require("multer");
@@ -11,33 +11,15 @@ const upload = multer({ dest: "uploads/" });
 /**
  * return server time as second unit
  */
-router.get("/getServerTime", async function (req, res, next) {
-    return ApiController.getServerTime(req, res, next);
-});
-router.post("/signinWithWallet", async function (req, res, next) {
-    return ApiController.signWithWallet(req, res, next);
-});
-router.post("/user_mint", upload.fields([{ name: "files", maxCount: 2 }]), isAuthorized, async function (req, res, next) {
-    return ApiController.getSignedDataForUserMint(req, res, next);
-});
-router.get("/all_nfts", async function (req, res, next) {
-    return ApiController.getAllNfts(req, res, next);
-});
-router.get("/my_nfts", async function (req, res, next) {
-    return ApiController.getMyNfts(req, res, next);
-});
-router.get("/search_nfts", async function (req, res, next) {
-    return ApiController.getFilteredNfts(req, res, next);
-});
-router.get("/my_watched_nfts", async function (req, res, next) {
-    return ApiController.getMyWatchedNfts(req, res, next);
-});
-router.get("/nft_info/:id", async function (req, res, next) {
-    return ApiController.getNftInfo(req, res, next);
-});
-router.get("/account_info/:id", async function (req, res, next) {
-    return ApiController.getAccountInfo(req, res, next);
-});
+router.get("/getServerTime", ApiController.getServerTime);
+router.post("/signinWithWallet", isAuthorized, ApiController.signWithWallet);
+router.post("/user_mint", upload.fields([{ name: "files", maxCount: 2 }]), isAuthorized, ApiController.getSignedDataForUserMint);
+router.get("/all_nfts", ApiController.getAllNfts);
+router.get("/my_nfts", ApiController.getMyNfts);
+router.get("/search_nfts", ApiController.getFilteredNfts);
+router.get("/my_watched_nfts", ApiController.getMyWatchedNfts);
+router.get("/nft_info/:id", ApiController.getNftInfo);
+router.get("/account_info/:id", ApiController.getAccountInfo);
 // deprecated claim transaction
 // router.get('/claim', async function (req, res, next) {
 //     return ApiController.getSignDataForClaim(req, res, next);
@@ -46,14 +28,11 @@ router.get("/account_info/:id", async function (req, res, next) {
 // router.post('/claim', async function (req, res, next) {
 //     return ApiController.getSignDataForClaim(req, res, next);
 // })
-router.post("/update_profile", upload.fields([{ name: "coverImg", maxCount: 1 }, { name: "avatarImg", maxCount: 1 },]), async function (req, res, next) {
-    return ApiController.updateProfile(req, res, next);
-});
-router.post('/request_ppv_stream', async function (req, res, next) {
-    return ApiController.requestPPVStream(req, res, next);
-});
-router.get('/request_ppv_stream', ApiController.requestPPVStream);
-router.get('/request_like', ApiController.requestLike);
+router.post("/update_profile", upload.fields([{ name: "coverImg", maxCount: 1 }, { name: "avatarImg", maxCount: 1 },]), isAuthorized, ApiController.updateProfile);
+// deprecated ppv_stream api
+// router.post('/request_ppv_stream', isAuthorized, ApiController.requestPPVStream);
+// router.get('/request_ppv_stream', isAuthorized, ApiController.requestPPVStream);
+router.get('/request_like', isAuthorized, ApiController.requestLike);
 router.get('/request_tip', isAuthorized, ApiController.requestTip);
 router.get('/request_comment', isAuthorized, ApiController.requestComment);
 router.get('/request_vote', isAuthorized, ApiController.requestVote);

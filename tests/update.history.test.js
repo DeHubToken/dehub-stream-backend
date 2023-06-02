@@ -1,9 +1,11 @@
 require('dotenv').config();
+const PubNub = require('pubnub');
 let mongoose = require('mongoose');
 let { config } = require('../config');
 const { PPVTransaction } = require('../models/PPVTransaction');
 const { WatchHistory } = require('../models/WatchHistory');
 const { sleep } = require('../utils/time');
+const { publicChatChannelId } = require('../config/constants');
 
 mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/' + config.mongo.dbName,
     { useNewUrlParser: true, useUnifiedTopology: true }, async function (err, db) {
@@ -20,9 +22,26 @@ mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/
     });
 
 async function cron_loop() {
+    const pubnub = new PubNub({
+        publishKey: process.env.PUBNUB_PUBKEY,
+        subscribeKey: process.env.PUBNUB_SUBKEY,
+        userId: "myUniqueUserId",
+    });
+
+    pubnub.deleteMessages(
+        {
+            channel: publicChatChannelId,
+            start: "16843258452905625",
+            end: `${Date.now()}9290`,
+        },
+        function (status, response) {
+            console.log(status, response);
+        }
+    );
+    return;
     const ppvTxs = await PPVTransaction.find({});
     console.log(ppvTxs[0].createdAt);
-    console.log(new Date(Date.now()-config.availableTimeForPPVStream));
+    console.log(new Date(Date.now() - config.availableTimeForPPVStream));
     console.log(new Date());
     process.exit(0);
     const tokenId = 2;

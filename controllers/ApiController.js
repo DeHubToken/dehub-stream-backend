@@ -52,97 +52,15 @@ const ApiController = {
         return res.json({ status: true, data: Math.floor(Date.now() / 1000), note: 's' });
     },
     signWithWallet: async function (req, res, next) {
-        const address = reqParam(req, paramNames.address);
-        const rawSig = reqParam(req, paramNames.sig);
-        const timestamp = reqParam(req, paramNames.timestamp);
-        if (!rawSig || !address || !timestamp)
-            return res.json({ error: true, msg: "sig or address not exist" });
-        const signedMsg = `${address.toLowerCase()}-${timestamp}`;
-        console.log("---signed msg", signedMsg, rawSig);
-        // const toSign = ethers.utils
-        //     .keccak256(
-        //         ethers.utils.defaultAbiCoder.encode(["string"], [signedMsg])
-        //     )
-        //     .slice(2);
+        let address = reqParam(req, paramNames.address);
+        address = address.toLowerCase();
         try {
-            const signedAddress = ethers.utils
-                .verifyMessage(signedMsg, rawSig)
-                .toLowerCase();
-            console.log("---user sign", signedAddress);
-            if (signedAddress != address) return res.json({ status: false, error: true, error_msg: "sign error" });
-            const account = await Account.findOneAndUpdate({ address: signedAddress }, { loginDate: new Date() }, { upsert: true, new: true, setDefaultsOnInsert: true }).lean();
+            const account = await Account.findOneAndUpdate({ address }, { lastLoginTimestamp: Date.now() }, { upsert: true, new: true, setDefaultsOnInsert: true }).lean();
             if (!account) return res.json({ status: false, error: true, error_msg: "not found account" });
-            console.log(account);
-            return res.json({ status: true, result: { address: signedAddress, loginDate: account.loginDate } });
+            return res.json({ status: true, result: { address: signedAddress, lastLoginTimestamp: account.lastLoginTimestamp } });
         } catch (e) {
-            console.log("signature error", e);
             return res.json({ error: true, msg: "sign error" });
         }
-    },
-    registerUserInfo: async function (req, res, next) {
-        const address = req.query.address || req.body.address || req.params.address;
-        const rawSig = req.query.sig || req.body.sig || req.params.sig;
-        const timestamp = req.query.timestamp || req.body.timestamp || req.params.timestamp;
-        const data = reqParam(req, "data");
-        const encryptedUsername = reqParam(req, "data1");
-        const encryptedEmail = reqParam(req, "data2");
-        // const username = req.query.username || req.body.username || req.params.username;        
-        if (!rawSig || !address || !timestamp || !encryptedUsername || !encryptedEmail)
-            return res.json({ error: true, msg: "sig or address not exist" });
-        if (Number(timestamp) < Date.now() - expireTime)
-            return res.json({ error: true, msg: "expired!" });
-        let signedMsg = `${address.toLowerCase()}-${timestamp}`;
-        console.log("---signed msg", signedMsg, rawSig);
-        try {
-            // signedMsg = ethers.utils
-            // .keccak256(
-            //   ethers.utils.defaultAbiCoder.encode(["string"], [signedMsg])
-            // )
-            // .slice(2);
-            const signedAddress = ethers.utils
-                .verifyMessage(signedMsg, rawSig)
-                .toLowerCase();
-            console.log("---user sign", signedAddress);
-            if (signedAddress.toLowerCase() != address.toLowerCase()) return res.json({ status: false, error: true, error_msg: "sign error" });
-            const username = decryptWithSourceKey(encryptedUsername, rawSig);
-            const email = decryptWithSourceKey(encryptedEmail, rawSig);
-
-            // let decryptedData;
-            if (!username || !email)
-                return res.json({ error: true, msg: "username or email not exist" });
-            // try {
-            //     decryptedData = JSON.parse(decrypted);
-            // }
-            // catch
-            // {
-            //     return res.json({ error: true, msg: "sig or address not exist" });
-            // }
-
-            const account = await Account.findOneAndUpdate({ address: signedAddress }, { username, email, loginDate: new Date() }, { upsert: true, new: true, setDefaultsOnInsert: true }).lean();
-            if (!account) return res.json({ status: false, error: true, error_msg: "not found account" });
-            console.log(account);
-            return res.json({ status: true, result: { address: signedAddress, loginDate: account.loginDate } });
-        } catch (e) {
-            console.log("signature error", e);
-            return res.json({ error: true, msg: "sign error" });
-        }
-    },
-    getUserInfo: async function (req, res, next) {
-        const address = reqParam(req, "address");
-        const rawSig = reqParam(req, "sig");
-        const timestamp = reqParam(req, "timestamp");
-
-        if (!rawSig || !address || !timestamp)
-            return res.json({ error: true, msg: "sig or parameters not exist" });
-        if (Number(timestamp) < Date.now() - expireTime)
-            return res.json({ error: true, msg: "expired!" });
-        const result = await isValidAccount(address, timestamp, rawSig);
-        if (!result) return res.json({ status: false, error: true, error_msg: "should login first" });
-        const data = { u: result.username, e: result.email };
-        // const encrypted = encryptWithSourceKey(JSON.stringify(data), rawSig);
-        const data1 = encryptWithSourceKey(result.username, rawSig);
-        const data2 = encryptWithSourceKey(result.email, rawSig);
-        return res.json({ status: true, result: { data1, data2 } });
     },
     getSignedDataForUserMint: async function (req, res, next) {
         const { address, name, description, streamInfo, chainId, category } = req.body;
@@ -263,16 +181,18 @@ const ApiController = {
         return res.json({ result: nftInfo });
     },
     getAccountInfo: async function (req, res, next) {
+        /// walletAddress param can be username or address
         let walletAddress = req.query.id || req.query.id || req.params?.id;
         if (!walletAddress) return res.json({ error: 'not define wallet' });
         let accountInfo = await Account.findOne({ $or: [{ address: normalizeAddress(walletAddress) }, { username: walletAddress }] }, accountTemplate).lean();
-        walletAddress = normalizeAddress(walletAddress);
-        if (accountInfo) {
-            if (accountInfo.avatarImageUrl) accountInfo.avatarImageUrl = `${process.env.DEFAULT_DOMAIN}/${accountInfo.avatarImageUrl}`;
-            if (accountInfo.coverImageUrl) accountInfo.coverImageUrl = `${process.env.DEFAULT_DOMAIN}/${accountInfo.coverImageUrl}`;
+        const balanceData = await Balance.find({ address: walletAddress.toLowerCase() }, { chainId: 1, tokenAddress: 1, walletBalance: 1, staked: 1, _id: 0 });
+        if (!balanceData?.length && !accountInfo && !isAddress(walletAddress)) {
+            return res.json({ error: 'no account', result: false });
+        } else if (accountInfo) {
+            walletAddress = accountInfo?.address;
+        } else {
+            accountInfo = {};
         }
-        else accountInfo = {};
-        balanceData = await Balance.find({ address: walletAddress.toLowerCase() }, { chainId: 1, tokenAddress: 1, walletBalance: 1, staked: 1, _id: 0 });
         const unlockedPPVStreams = await PPVTransaction.find({ address: walletAddress, createdAt: { $gt: new Date(Date.now() - config.availableTimeForPPVStream) } }, { streamTokenId: 1 }).distinct('streamTokenId');
         accountInfo.balanceData = balanceData.filter(e => e.walletBalance > 0 || e.staked > 0);
         accountInfo.unlocked = unlockedPPVStreams;
@@ -302,8 +222,6 @@ const ApiController = {
     updateProfile: async function (req, res, next) {
         let address = reqParam(req, paramNames.address);
         address = normalizeAddress(address);
-        const authResult = isValidAccount(address, reqParam(req, paramNames.timestamp), reqParam(req, paramNames.sig));
-        if (!authResult) return res.json({ error: true });
         const updateAccountOptions = {};
         let username = reqParam(req, userProfileKeys.username);
         if (username) {
@@ -370,14 +288,12 @@ const ApiController = {
     },
     requestLike: async function (req, res, next) {
         const address = reqParam(req, paramNames.address);
-        const rawSig = reqParam(req, paramNames.sig);
-        const timestamp = reqParam(req, paramNames.timestamp);
         let streamTokenId = reqParam(req, paramNames.streamTokenId);
-        if (!rawSig || !address || !timestamp || !streamTokenId)
-            return res.json({ error: true, msg: "sig or address not exist" });
+        if (!streamTokenId)
+            return res.json({ error: true, msg: "tokenId does not exist" });
         try {
             streamTokenId = parseInt(streamTokenId, 10);
-            const result = await requestLike(address, rawSig, timestamp, streamTokenId);
+            const result = await requestLike(address, streamTokenId);
             return res.json(result);
         }
         catch (err) {

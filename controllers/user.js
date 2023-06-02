@@ -50,7 +50,7 @@ const signatureForClaim = async (address, sig, timestamp, amount, chainId, token
     });
     const toSignForClaim = ethers.utils.solidityKeccak256(["address", "uint256", "address", "address", "uint256", "uint256", "uint256"],
         [vaultContractAddresses[chainId], claimTx.id, address, tokenAddress, chainId, bigAmount, curTimestamp]);
-    let signer = new ethers.Wallet(process.env.SIGNER_KEY);    
+    let signer = new ethers.Wallet(process.env.SIGNER_KEY);
     const { r, s, v } = splitSignature(await signer.signMessage(ethers.utils.arrayify(toSignForClaim)));
     await Balance.updateOne(filterBalanceOption, { $inc: { balance: -Number(amount), pending: Number(amount) } });
     return { status: true, result: { amount: bigAmount.toString(), timestamp: curTimestamp, id: claimTx.id, v, r, s } };
@@ -113,9 +113,7 @@ const requestPPVStream = async (account, sig, timestamp, chainId, tokenId) => {
     return { result: true };
 }
 
-const requestLike = async (account, sig, timestamp, tokenId) => {
-    if (!account || !sig || !timestamp) return { result: false, error: 'Please connect with your wallet' };
-    if (!isValidAccount(account, timestamp, sig)) return { result: false, error: 'Please sign with your wallet' };
+const requestLike = async (account, tokenId) => {
     const nftStreamItem = await Token.findOne({ tokenId }, {}).lean();
     if (!nftStreamItem) return { result: false, error: 'This stream no exist' };
     const likeItem = await Feature.findOne({ tokenId, address: normalizeAddress(account) });
@@ -141,7 +139,7 @@ const requestTip = async (account, tokenId, tipAmount, chainId) => {
     const sender = normalizeAddress(account);
     const balanceItem = await Balance.findOne({ address: sender, tokenAddress, chainId, }, { balance: 1 });
     if (!balanceItem?.balance || balanceItem.balance < tipAmount) return { result: false, error: 'Deposit or buy more tokens in the profile section' };
-    if(nftStreamItem.owner === sender)  return { result: false, error: `Can't tip for stream owned by yourself` };
+    if (nftStreamItem.owner === sender) return { result: false, error: `Can't tip for stream owned by yourself` };
     if (nftStreamItem.owner) {
         await Balance.updateOne({ address: sender, tokenAddress, chainId },
             { $inc: { balance: -tipAmount, sentTips: tipAmount } });

@@ -47,6 +47,8 @@ async function updateWalletBalanceFromTransfer(transfer) {
     // update wallet balance directly
     await Balance.updateOne({ address: from, chainId, tokenAddress }, { walletBalance: fromBalance }, overrideOptions);
     await Balance.updateOne({ address: to, chainId, tokenAddress }, { walletBalance: toBalance }, overrideOptions);
+    await Account.updateOne({}, { address: from }, overrideOptions);
+    await Account.updateOne({}, { address: to }, overrideOptions);
 }
 
 async function registerProtocolTx(protocolTx) {
@@ -98,7 +100,7 @@ async function updateStreamCollection(nftTransfer) {
     if (from === ethers.constants.AddressZero) {
         updateData = { ...updateData, minter: toAddress, status: 'minted' };
         console.log('--minted', streamCollectionAddress, tokenIdInt, toAddress);
-        await Account.updateOne({ address: toAddress }, { $inc: { uploads: 1 } });
+        await Account.updateOne({ address: toAddress }, { $inc: { uploads: 1 } }, overrideOptions);
     }
     let updatedTokenItem;
     try {
