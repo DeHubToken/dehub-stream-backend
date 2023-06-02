@@ -52,9 +52,14 @@ const getLeaderboard = async (sort = null) => {
                     receivedTips: { $first: '$account.receivedTips' },
                 }
             },
+            {
+                $match: {
+                    $or: [{ sentTips: { $gt: 0 } }, { receivedTips: { $gt: 0 } }, { total: { $gt: 0 } }]
+                }
+            },
             sortOption,
             {
-                $limit: 20
+                $limit: 500
             }
         ];
         let result = await Balance.aggregate(query);
