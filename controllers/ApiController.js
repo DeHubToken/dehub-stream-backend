@@ -184,7 +184,8 @@ const ApiController = {
         /// walletAddress param can be username or address
         let walletAddress = req.query.id || req.query.id || req.params?.id;
         if (!walletAddress) return res.json({ error: 'not define wallet' });
-        let accountInfo = await Account.findOne({ $or: [{ address: normalizeAddress(walletAddress) }, { username: walletAddress }] }, accountTemplate).lean();
+        walletAddress = normalizeAddress(walletAddress);
+        let accountInfo = await Account.findOne({ $or: [{ address: walletAddress }, { username: walletAddress}] }, accountTemplate).lean();
         const balanceData = await Balance.find({ address: walletAddress.toLowerCase() }, { chainId: 1, tokenAddress: 1, walletBalance: 1, staked: 1, _id: 0 });
         if (!balanceData?.length && !accountInfo && !isAddress(walletAddress)) {
             return res.json({ error: 'no account', result: false });
@@ -223,15 +224,17 @@ const ApiController = {
         let address = reqParam(req, paramNames.address);
         address = normalizeAddress(address);
         const updateAccountOptions = {};
-        let username = reqParam(req, userProfileKeys.username);
-        if (username) {
-            const validation = await isValidUsername(address, username);
-            if (validation.error) return res.json(validation);
-        }
+        let username = reqParam(req, userProfileKeys.username);        
         Object.keys(userProfileKeys).map(key => {
             const reqVal = reqParam(req, userProfileKeys[key]);
-            if (reqVal && reqVal !== 'undefined' && reqVal !== 'null') updateAccountOptions[key] = reqVal;
+            if (reqVal && reqVal !== 'undefined' && reqVal !== 'null') updateAccountOptions[key] = reqVal;            
         });
+        if (username) {
+            username  = username.toLowerCase();
+            const validation = await isValidUsername(address, username);
+            if (validation.error) return res.json(validation);
+            updateAccountOptions[userProfileKeys.username] = username;
+        }
         const coverImgFile = req.files?.coverImg?.[0];
         const avatarImgFile = req.files?.avatarImg?.[0];
         if (coverImgFile) {
@@ -249,7 +252,7 @@ const ApiController = {
         const updatedAccount = await Account.findOneAndUpdate({ address: address.toLowerCase() }, updateAccountOptions, overrideOptions);
         if (updatedAccount.displayName && !updatedAccount.username) {
             // set default username
-            username = updatedAccount.displayName.replace(' ', '_');
+            username = updatedAccount.displayName.toLowerCase().replace(' ', '_');
             let tailNumber = 0;
             for (let i = 0; i < 10000; i++) {
                 const updatedUsername = tailNumber === 0 ? username : `${username}_${tailNumber}`;
@@ -437,7 +440,7 @@ const ApiController = {
         const username = reqParam(req, userProfileKeys.username);
         const address = reqParam(req, 'address');
         try {
-            return res.json(await isValidUsername(normalizeAddress(address), username));
+            return res.json(await isValidUsername(normalizeAddress(address), normalizeAddress(username)));
         }
         catch (err) {
             console.log('-----request follow error', err);
