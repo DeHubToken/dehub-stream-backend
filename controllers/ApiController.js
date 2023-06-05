@@ -4,7 +4,7 @@ require("dotenv").config();
 const { ethers } = require('ethers');
 const { isValidAccount, reqParam } = require('../utils/auth');
 const { decryptWithSourceKey, encryptWithSourceKey } = require('../utils/encrypt');
-const { paramNames, errorMsgs, userProfileKeys, overrideOptions, tokenTemplate } = require('../config/constants');
+const { paramNames, errorMsgs, userProfileKeys, overrideOptions, tokenTemplate, editableProfileKeys } = require('../config/constants');
 const { Token } = require('../models/Token');
 const { checkFileType, normalizeAddress } = require('../utils/format');
 const { signatureForMintingNFT } = require('./mintNft');
@@ -185,7 +185,7 @@ const ApiController = {
         let walletAddress = req.query.id || req.query.id || req.params?.id;
         if (!walletAddress) return res.json({ error: 'not define wallet' });
         walletAddress = normalizeAddress(walletAddress);
-        let accountInfo = await Account.findOne({ $or: [{ address: walletAddress }, { username: walletAddress}] }, accountTemplate).lean();
+        let accountInfo = await Account.findOne({ $or: [{ address: walletAddress }, { username: walletAddress }] }, accountTemplate).lean();
         const balanceData = await Balance.find({ address: walletAddress.toLowerCase() }, { chainId: 1, tokenAddress: 1, walletBalance: 1, staked: 1, _id: 0 });
         if (!balanceData?.length && !accountInfo && !isAddress(walletAddress)) {
             return res.json({ error: 'no account', result: false });
@@ -224,13 +224,13 @@ const ApiController = {
         let address = reqParam(req, paramNames.address);
         address = normalizeAddress(address);
         const updateAccountOptions = {};
-        let username = reqParam(req, userProfileKeys.username);        
-        Object.keys(userProfileKeys).map(key => {
-            const reqVal = reqParam(req, userProfileKeys[key]);
-            if (reqVal && reqVal !== 'undefined' && reqVal !== 'null') updateAccountOptions[key] = reqVal;            
+        let username = reqParam(req, userProfileKeys.username);
+        Object.entries(editableProfileKeys).forEach(([, profileKey]) => {
+            const reqVal = reqParam(req, profileKey);
+            if (reqVal && reqVal !== 'undefined' && reqVal !== 'null') updateAccountOptions[profileKey] = reqVal;
         });
         if (username) {
-            username  = username.toLowerCase();
+            username = username.toLowerCase();
             const validation = await isValidUsername(address, username);
             if (validation.error) return res.json(validation);
             updateAccountOptions[userProfileKeys.username] = username;
@@ -441,6 +441,24 @@ const ApiController = {
         const address = reqParam(req, 'address');
         try {
             return res.json(await isValidUsername(normalizeAddress(address), normalizeAddress(username)));
+        }
+        catch (err) {
+            console.log('-----request follow error', err);
+            return res.json({ result: false, error: 'following was failed' });
+        }
+    },
+    publicAccountData: async function (req, res, next) {
+        const addressList = reqParam(req, 'addressList');
+        if (!addressList || addressList.length < 1) return res.json({ result: false, error: 'no addressList' });
+        try {
+            const accountTemplate = {
+                _id: 0,
+                address: 1,
+                username: 1,
+                displayName: 1,
+                avatarImageUrl: 1,
+            }
+            return res.json({ result: await Account.find({ address: { $in: addressList } }, accountTemplate) });
         }
         catch (err) {
             console.log('-----request follow error', err);

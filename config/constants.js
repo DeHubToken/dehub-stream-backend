@@ -61,6 +61,17 @@ const userProfileKeys = {
     instagramLink: 'instagramLink',
 }
 
+const editableProfileKeys = {
+    username: 'username',
+    displayName: 'displayName',
+    email: 'email',
+    aboutMe: 'aboutMe',
+    facebookLink: 'facebookLink',
+    twitterLink: 'twitterLink',
+    discordLink: 'discordLink',
+    instagramLink: 'instagramLink',
+}
+
 const ChainId = {
     MAINNET: 1,
     GORLI: 5,
@@ -431,5 +442,6 @@ module.exports = {
     streamControllerContractAddresses,
     tokenTemplate,
     blacklistOnLeaderboard,
-    publicChatChannelId
+    publicChatChannelId,
+    editableProfileKeys,
 }

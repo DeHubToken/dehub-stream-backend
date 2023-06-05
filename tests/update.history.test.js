@@ -15,7 +15,7 @@ mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/
         if (err) {
             console.log('[' + d.toLocaleString() + '] ' + 'DB error');
         } else {
-            console.log('[' + d.toLocaleString() + '] ' + ' check games ...');
+            console.log('[' + d.toLocaleString() + '] ' + 'updating ...');
             cron_loop();
         }
 

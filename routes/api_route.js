@@ -46,4 +46,6 @@ router.get('/get_categories', ApiController.getCategories);
 router.get('/usernames', ApiController.getUsernames);
 router.get('/is_valid_username', ApiController.isValidUsername);
 
+router.post('/public_accounts', ApiController.publicAccountData);
+
 module.exports = router;

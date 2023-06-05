@@ -16,8 +16,8 @@ const isValidAccount = (address, timestamp, sig) => {
     if (!sig || !address || !timestamp)
         return false;
     // const signedMsg = `${address.toLowerCase()}-${timestamp}`;
-    const displayedDate = new Date(timestamp * 1000);    
-    const signedMsg = `Welcome to DeHub.io!\n\nClick to sign in for authentication.\nSignatures are valid for ${expireSecond / 3600} hours.\nYour wallet address is ${address.toLowerCase()}.\nIt is ${displayedDate.toUTCString()}.`;    
+    const displayedDate = new Date(timestamp * 1000);
+    const signedMsg = `Welcome to DeHub.io!\n\nClick to sign in for authentication.\nSignatures are valid for ${expireSecond / 3600} hours.\nYour wallet address is ${address.toLowerCase()}.\nIt is ${displayedDate.toUTCString()}.`;
     try {
         const signedAddress = ethers.utils
             .verifyMessage(signedMsg, sig)
@@ -39,8 +39,8 @@ const isValidAccount = (address, timestamp, sig) => {
 
 const reqParam = (req, paramName) => {
     if (!req) return null;
-    const result = req.query?.[paramName]?.trim() || req.body?.[paramName]?.trim() || req.params?.[paramName]?.trim();
-    return result?.trim();
+    const result = req.query?.[paramName] || req.body?.[paramName] || req.params?.[paramName];
+    return typeof result === 'string' ? result?.trim() : result;
 }
 
 /**
