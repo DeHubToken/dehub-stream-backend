@@ -405,6 +405,7 @@ const tokenTemplate = {
     totalVotes: 1,
     status: 1,
     transcodingStatus: 1,
+    createdAt: 1,
     _id: 0,
 };
 
