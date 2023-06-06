@@ -81,54 +81,52 @@ async function deleteExpiredTokenItems() {
         // console.log(aa.filter((c, index) => aa.findIndex(e=>e.address === c.address) === index));
         const creators = await getCreatorsForTokenIds(chainId, aa);
         for (const nftItem of nftItems.nfts) {
-            if (creators[nftItem.tokenId] && creators[nftItem.tokenId] !== ethers.constants.AddressZero) {                
+            if (creators[nftItem.tokenId] && creators[nftItem.tokenId] !== ethers.constants.AddressZero) {
                 mintedTokenIds.push(nftItem.tokenId);
             }
             else {
                 tokenItemsToDelete.push(expiredTokenItems.find(e => e.tokenId === nftItem.tokenId));
             }
         }
-        continue;
-    }    
+    }
     // const tokenIds = expiredTokenItems.map(e => e.tokenId);
     // console.log(tokenIds);
     // return;
     // for (const tokenItem of expiredTokenItems) {
-        // not delete video files and image files
-        // let filePath = defaultVideoFilePath(tokenItem.tokenId, tokenItem.videoExt);
-        // fs.unlink(filePath, error => { if (error) console.log('delete file error!') });
-        // filePath = defaultImageFilePath(tokenItem.tokenId, tokenItem.imageExt);
-        // fs.unlink(filePath, error => { if (error) console.log('delete file error!') });
-        // processing unlock of bounty amount
-        // const streamInfo = tokenItem.streamInfo;
-        // const addBountyTotalAmount = getTotalBountyAmount(streamInfo);
-        // if (addBountyTotalAmount) {
-        //     const bountyAmountWithFee = getTotalBountyAmount(streamInfo, true);
-        //     const bountyToken = supportedTokens.find(e => e.symbol === streamInfo[streamInfoKeys.addBountyTokenSymbol] && e.chainId === Number(streamInfo[streamInfoKeys.addBountyChainId]));
-        //     const balanceFilter = { address: tokenItem.minter, tokenAddress: bountyToken?.address?.toLowerCase(), chainId: Number(streamInfo[streamInfoKeys.addBountyChainId]) };
-        //     let balanceItem = await Balance.findOne(balanceFilter).lean();
-        //     if (balanceItem.lockForBounty < addBountyTotalAmount) {
-        //         console.log(`insufficient locked to add bounty`, tokenItem.tokenId, tokenItem.minter, balanceItem.lockForBounty);
-        //     }
-        //     balanceItem = await Balance.findOneAndUpdate(balanceFilter, { $inc: { balance: bountyAmountWithFee, lockForBounty: -addBountyTotalAmount } }, overrideOptions);
-        //     console.log('unlocked bounty stream', tokenItem.tokenId, balanceFilter, 'total bounty:', bountyAmountWithFee);
-        //     await Balance.updateOne({ ...balanceFilter, address: config.devWalletAddress }, { $inc: { balance: -(bountyAmountWithFee - addBountyTotalAmount) } }, overrideOptions);
-        // }
+    // not delete video files and image files
+    // let filePath = defaultVideoFilePath(tokenItem.tokenId, tokenItem.videoExt);
+    // fs.unlink(filePath, error => { if (error) console.log('delete file error!') });
+    // filePath = defaultImageFilePath(tokenItem.tokenId, tokenItem.imageExt);
+    // fs.unlink(filePath, error => { if (error) console.log('delete file error!') });
+    // processing unlock of bounty amount
+    // const streamInfo = tokenItem.streamInfo;
+    // const addBountyTotalAmount = getTotalBountyAmount(streamInfo);
+    // if (addBountyTotalAmount) {
+    //     const bountyAmountWithFee = getTotalBountyAmount(streamInfo, true);
+    //     const bountyToken = supportedTokens.find(e => e.symbol === streamInfo[streamInfoKeys.addBountyTokenSymbol] && e.chainId === Number(streamInfo[streamInfoKeys.addBountyChainId]));
+    //     const balanceFilter = { address: tokenItem.minter, tokenAddress: bountyToken?.address?.toLowerCase(), chainId: Number(streamInfo[streamInfoKeys.addBountyChainId]) };
+    //     let balanceItem = await Balance.findOne(balanceFilter).lean();
+    //     if (balanceItem.lockForBounty < addBountyTotalAmount) {
+    //         console.log(`insufficient locked to add bounty`, tokenItem.tokenId, tokenItem.minter, balanceItem.lockForBounty);
+    //     }
+    //     balanceItem = await Balance.findOneAndUpdate(balanceFilter, { $inc: { balance: bountyAmountWithFee, lockForBounty: -addBountyTotalAmount } }, overrideOptions);
+    //     console.log('unlocked bounty stream', tokenItem.tokenId, balanceFilter, 'total bounty:', bountyAmountWithFee);
+    //     await Balance.updateOne({ ...balanceFilter, address: config.devWalletAddress }, { $inc: { balance: -(bountyAmountWithFee - addBountyTotalAmount) } }, overrideOptions);
+    // }
     // }
     const deletedTokenIds = tokenItemsToDelete.map(e => e.tokenId);
-    if(deletedTokenIds.length>0){
+    if (deletedTokenIds.length > 0) {
         console.log('---deleted tokens:', deletedTokenIds);
         await IDCounter.updateOne({ id: 'tokenId' }, { $push: { expiredIds: deletedTokenIds } });
-        const result = await Token.updateMany({ tokenId: { $in: deletedTokenIds } }, { status: 'failed' });        
+        const result = await Token.updateMany({ tokenId: { $in: deletedTokenIds } }, { status: 'failed' });
         console.log('--deleted expired tokens', deletedTokenIds.length, result);
-    } 
+    }
 
-    if(mintedTokenIds.length>0)
-    {
-        console.log('---minted:', mintedTokenIds );
+    if (mintedTokenIds.length > 0) {
+        console.log('---minted:', mintedTokenIds);
         const result2 = await Token.updateMany({ tokenId: { $in: mintedTokenIds } }, { status: 'checking' });
-        console.log('--checking tokens',  result2);
-    } 
+        console.log('--checking tokens', result2);
+    }
 }
 
 async function transcodeVideos() {
@@ -137,14 +135,14 @@ async function transcodeVideos() {
         console.log('---transcoding: ', transcodingCount);
         return;
     }
-    const tokenItems = await Token.find({ transcodingStatus: null, videoInfo: { $ne: null } }, { tokenId: 1, videoExt: 1 }).limit(1).lean();
+    const tokenItems = await Token.find({ transcodingStatus: null, videoInfo: { $ne: null }, status: { $ne: 'failed' } }, { tokenId: 1, videoExt: 1 }).limit(1).lean();
     for (const tokenItem of tokenItems) {
         await transcodeVideo(tokenItem.tokenId, tokenItem.videoExt);
     }
 }
 
 async function fullVideoInfo() {
-    const tokenItems = await Token.find({ videoInfo: null }, { tokenId: 1, videoExt: 1, }).lean();
+    const tokenItems = await Token.find({ videoInfo: null, transcodingStatus: { $ne: 'failed' } }, { tokenId: 1, videoExt: 1, }).lean();
     for (const tokenItem of tokenItems) {
         await updateVideoInfo(tokenItem.tokenId, tokenItem.videoExt);
     }

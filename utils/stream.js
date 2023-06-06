@@ -8,7 +8,16 @@ const { defaultVideoFilePath, getTempVideoFilePath, moveFile } = require('./file
 
 const updateVideoInfo = async (tokenId, videoExt) => {
     const videoFilePath = defaultVideoFilePath(tokenId, videoExt);
-    const videoInfo = await ffprobe(videoFilePath, { path: ffprobeStatic.path });
+    let videoInfo = undefined;
+    try {
+        videoInfo = await ffprobe(videoFilePath, { path: ffprobeStatic.path });
+    }
+    catch (e) {
+        console.log('---ffprobe error', e);
+        await Token.updateOne({ tokenId: tokenId }, { transcodingStatus: 'failed' });
+        return;
+    }
+
     const videoStream = videoInfo?.streams?.find(e => e.codec_type === 'video');
     if (!videoStream) {
         console.log('not find video stream', tokenId);

@@ -47,8 +47,8 @@ async function updateWalletBalanceFromTransfer(transfer) {
     // update wallet balance directly
     await Balance.updateOne({ address: from, chainId, tokenAddress }, { walletBalance: fromBalance }, overrideOptions);
     await Balance.updateOne({ address: to, chainId, tokenAddress }, { walletBalance: toBalance }, overrideOptions);
-    await Account.updateOne({}, { address: from }, overrideOptions);
-    await Account.updateOne({}, { address: to }, overrideOptions);
+    // await Account.updateOne({}, { address: from }, overrideOptions);
+    // await Account.updateOne({}, { address: to }, overrideOptions);
 }
 
 async function registerProtocolTx(protocolTx) {

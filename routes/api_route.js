@@ -38,7 +38,7 @@ router.get('/request_comment', isAuthorized, ApiController.requestComment);
 router.get('/request_vote', isAuthorized, ApiController.requestVote);
 router.get('/request_follow', isAuthorized, ApiController.requestFollow);
 router.get('/claim_bounty', isAuthorized, ApiController.getSignForClaimBounty);
-router.get('/add_category', /* isAuthorized, */ ApiController.addCategory);
+router.get('/add_category', isAuthorized, ApiController.addCategory);
 
 // get apis
 router.get('/leaderboard', ApiController.leaderboard);
