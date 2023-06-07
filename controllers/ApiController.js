@@ -8,7 +8,7 @@ const { paramNames, errorMsgs, userProfileKeys, overrideOptions, tokenTemplate, 
 const { Token } = require('../models/Token');
 const { checkFileType, normalizeAddress } = require('../utils/format');
 const { signatureForMintingNFT } = require('./mintNft');
-const { removeDuplicatedObject, isValidTipAmount, eligibleBountyForAccount, isValidUsername } = require('../utils/validation');
+const { removeDuplicatedObject, isValidTipAmount, eligibleBountyForAccount, isValidUsername, isValidSearch } = require('../utils/validation');
 const { WatchHistory } = require('../models/WatchHistory');
 const { config } = require('../config');
 const { signatureForClaim, requestPPVStream, requestLike, requestTip, requestComment } = require('./user');
@@ -131,6 +131,7 @@ const ApiController = {
                 searchQuery['$match']['category'] = { $elemMatch: { $eq: category } }
             }
             if (search) {
+                if (!isValidSearch(search)) return res.json({ result: [] });
                 var re = new RegExp(search, "gi")
                 searchQuery['$match'] = { ...searchQuery['$match'], $or: [{ name: re }, { description: re }, { minter: re }, { owner: re }] }
             }

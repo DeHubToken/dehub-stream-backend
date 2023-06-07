@@ -148,14 +148,14 @@ async function fullVideoInfo() {
     }
 }
 
-async function processingFundsForPlayingStreams() {
+async function processWatchHistory() {
     let pendingStreamsForProcessing = await WatchHistory.find({ $or: [{ status: null }, { status: 'created' }] }).lean();
     console.log('--processing watch streams', pendingStreamsForProcessing.length, new Date());
     for (const watchStream of pendingStreamsForProcessing) {
         const _id = watchStream._id;
         const watchedTime = watchStream.exitedAt.getTime() - watchStream.createdAt.getTime();
         const tokenItem = await Token.findOne({ tokenId: watchStream.tokenId }, { videoDuration: 1, _id: 0 }).lean();
-        if (tokenItem && watchedTime >= (Math.min(config.watchTimeForConfirming, tokenItem.videoDuration * 0.5))) {
+        if (tokenItem && watchedTime >= (Math.min(config.watchTimeForConfirming, tokenItem.videoDuration * 500))) {
             const tokenFilter = { tokenId: watchStream.tokenId };
             // await payBounty(watchStream.watcherAddress, watchStream.tokenId, RewardType.BountyForViewer);
             await WatchHistory.updateOne({ _id }, { status: 'confirmed' });
@@ -176,10 +176,10 @@ async function deleteVotedStreams() {
 let autoDeleteCronCounter = 0;
 async function cronLoop() {
     // await deleteExpiredClaimTx();
-    await fullVideoInfo();
-    await transcodeVideos();
-    await deleteExpiredTokenItems();
-    await processingFundsForPlayingStreams();
+    // await fullVideoInfo();
+    // await transcodeVideos();
+    // await deleteExpiredTokenItems();
+    await processWatchHistory();
     if (autoDeleteCronCounter++ % (config.periodOfDeleleCron / 10) == 0) await deleteVotedStreams();
     setTimeout(cronLoop, 10 * 1000);
 }

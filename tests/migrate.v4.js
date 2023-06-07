@@ -22,12 +22,20 @@ async function cron_loop() {
     /**
      * update displayName and username of accounts
      */
-    const accounts = await Account.find({ username: { $ne: null } });
-    console.log('update accounts:', accounts.length);
+    const accounts = await Account.find({ username: { $ne: null } }).lean();
+    // const checkLength = 'statics/avatars/0x5f79aa988d1c7347ae446c6208b0339bb7c2fae9'.length;
     for (const account of accounts) {
         // account.displayName = account.username.trim();
-        account.username = account.username.toLowerCase();
-        await account.save();
+        // account.username = account.username.toLowerCase();
+        // if(account.avatarImageUrl.substr(0, checkLength) !== `statics/avatars/${account.address}`)
+        // {
+        //     console.log('---', account.address, account.avatarImageUrl.substr(0, checkLength));
+        // }
+        if(accounts.filter(e=>e.username === account.username).length > 1)
+        {
+            console.log('---', account.address);
+        }
+        // await account.save();
     }
     process.exit(0);
 }

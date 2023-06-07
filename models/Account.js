@@ -24,5 +24,5 @@ let AccountSchema = new Schema({
     
 }, { timestamps: true });
 
-AccountSchema.index({ address: 1 });
+AccountSchema.index({ address: 1 }, { unique: true });
 module.exports.Account = mongoose.model('accounts', AccountSchema);

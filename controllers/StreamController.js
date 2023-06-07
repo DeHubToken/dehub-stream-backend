@@ -12,7 +12,7 @@ const { config } = require('../config');
 const { isAddress } = require('ethers/lib/utils');
 const { Balance } = require('../models/Balance');
 const { normalizeAddress } = require('../utils/format');
-const { isUnlockedPPVStream } = require('../utils/validation');
+const { isUnlockedPPVStream, isUnlockedLockedContent } = require('../utils/validation');
 const defaultLimitBuffer = 1 * 1024 * 1024; // 2M
 const defaultInitialBuffer = 160 * 1024; // first 160k is free
 const tokenTemplateForStream = {
@@ -54,8 +54,8 @@ const StreamController = {
         const userAddress = signParams?.account?.toLowerCase();
         const limitBuffer = tokenItem.videoInfo?.bitrate ? Math.floor(tokenItem.videoInfo?.bitrate / 8 * 3) : defaultLimitBuffer;
         const initialBuffer = tokenItem.videoInfo?.bitrate ? Math.floor(tokenItem.videoInfo?.bitrate / 8) : defaultInitialBuffer;
-        let chainId = signParams?.chainId;
-        if (chainId) chainId = parseInt(chainId);
+        // let chainId = signParams?.chainId;
+        // if (chainId) chainId = parseInt(chainId);
         if (videoRange) {
             const parts = videoRange.replace(/bytes=/, "").split("-");
             let start = parseInt(parts[0], 10);
@@ -83,20 +83,9 @@ const StreamController = {
                         // chunksize = 100;
                         // end = start + chunksize - 1;              
                     }
-                    // const accountItem = await Account.findOne({ address: userAddress }, { balance: 1, dhbBalance: 1 });
                     if (tokenItem?.streamInfo?.[streamInfoKeys.isLockContent]) {
-
-                        const symbol = tokenItem?.streamInfo?.[streamInfoKeys.lockContentTokenSymbol] || config.defaultTokenSymbol;
-                        const chainIds = tokenItem?.streamInfo?.[streamInfoKeys.lockContentChainIds] || [config.defaultChainId];
-                        if (!chainIds.includes(chainId)) return res.status(500).send('error!');
-                        const tokenAddress = supportedTokens.find(e => e.symbol === symbol || e.chainId === chainId)?.address;
-                        const lockContentAmount = Number(tokenItem?.streamInfo?.[streamInfoKeys.lockContentAmount]);
-                        const balanceItem = await Balance.findOne({
-                            address: userAddress,
-                            chainId, chainId,
-                            tokenAddress: normalizeAddress(tokenAddress),
-                        }, { walletBalance: 1 }).lean();
-                        if (!balanceItem || balanceItem.walletBalance < lockContentAmount) {
+                        const isUnlocked = await isUnlockedLockedContent(tokenItem?.streamInfo, userAddress);
+                        if (!isUnlocked) {
                             return res.status(500).send('error!');
                         }
                     }
@@ -107,7 +96,7 @@ const StreamController = {
                     }
                 }
             }
-            console.log('---call stream', nowTimestamp, signParams?.account, signParams?.chainId, tokenId, req.headers.range, end, fileSize);
+            console.log('---call stream', nowTimestamp, signParams?.account, tokenId, req.headers.range, end, fileSize);
             const file = fs.createReadStream(videoPath, { start, end });
             const header = {
                 "Content-Range": `bytes ${start}-${end}/${fileSize}`,
@@ -121,7 +110,6 @@ const StreamController = {
             let filter = { tokenId, exitedAt: { $gt: new Date(nowTimestamp - config.extraPeriodForHistory) } };
             if (userAddress && isAddress(userAddress)) {
                 filter = { ...filter, watcherAddress: userAddress };
-                if (chainId) filter = { ...filter, chainId };
                 await WatchHistory.updateOne(filter, { exitedAt: new Date(nowTimestamp), lastWatchedFrame: end }, overrideOptions);
             }
         }

@@ -131,3 +131,5 @@ dist
 /assets/avatars/*
 !/assets/avatars/holder.md
 !/uploads/holder.md
+temp.text
+fast.test.js

@@ -4,7 +4,6 @@ const { overrideOptions, supportedNetworks, ChainId, RewardType } = require("../
 const { config } = require('../config');
 
 const { Transaction } = require("../models/Transaction");
-const { ClaimTransaction } = require("../models/ClaimTransaction");
 const { Balance } = require("../models/Balance");
 const { Setting } = require("../models/Setting");
 
@@ -20,7 +19,7 @@ const networkName = (process?.argv?.[2] || "bsc");
 const curNetwork = supportedNetworks.find(e => e.shortName === networkName);
 if (!curNetwork) process.exit('no supported network!');
 const chainId = curNetwork.chainId;
-console.log("---deposit cron for:", networkName, 'chainId:', chainId);
+console.log("---stream cron for:", networkName, 'chainId:', chainId);
 const graphUrl = curNetwork.graphUrl;
 
 /**

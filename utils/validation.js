@@ -1,5 +1,5 @@
 const { config } = require("../config");
-const { supportedChainIds, streamInfoKeys } = require("../config/constants");
+const { supportedChainIds, streamInfoKeys, supportedTokens } = require("../config/constants");
 const Comment = require("../models/Comment");
 const { PPVTransaction } = require("../models/PPVTransaction");
 const { Transaction } = require("../models/Transaction");
@@ -7,6 +7,7 @@ const { Token } = require("../models/Token");
 const { WatchHistory } = require("../models/WatchHistory");
 const { normalizeAddress } = require("./format");
 const { Account } = require("../models/Account");
+const { Balance } = require("../models/Balance");
 
 function removeDuplicatedObject(arr, subKey,) {
     var m = {};
@@ -26,9 +27,26 @@ function removeDuplicatedObject(arr, subKey,) {
     }
     return newarr;
 }
+
 const isUnlockedPPVStream = async (streamTokenId, account) => {
     const ppvTxItem = await PPVTransaction.findOne({ address: normalizeAddress(account), streamTokenId, createdAt: { $gt: new Date(Date.now() - config.availableTimeForPPVStream) } }, { createdAt: 1 }).lean();
     if (ppvTxItem && ppvTxItem.createdAt) return true;
+    return false;
+}
+
+const isUnlockedLockedContent = async (streamInfo, account) => {
+    const symbol = streamInfo?.[streamInfoKeys.lockContentTokenSymbol] || config.defaultTokenSymbol;
+    const chainIds = streamInfo?.[streamInfoKeys.lockContentChainIds] || [config.defaultChainId];
+    const tokenAddresses = supportedTokens.filter(e => e.symbol === symbol && chainIds?.includes(e.chainId))?.map(e => e.address);
+    const lockContentAmount = Number(streamInfo?.[streamInfoKeys.lockContentAmount] || 0);
+    const balanceItems = await Balance.find({
+        address: account,
+        tokenAddress: { $in: tokenAddresses.map(e => normalizeAddress(e)) },
+    }, { walletBalance: 1 }).lean();
+    if (!balanceItems?.length) return false;
+    for (const item of balanceItems) {
+        if (item.walletBalance >= lockContentAmount) { return true; }
+    }
     return false;
 }
 
@@ -72,11 +90,18 @@ const isValidUsername = async (address, username) => {
     return { result: true };
 }
 
+const isValidSearch = (searchStr) => {
+    var format = /[`#@$%^&*()_+\-=\[\]{};':"\\|,.<>\/~]/;
+    return !format.test(searchStr);
+}
+
 module.exports = {
     removeDuplicatedObject,
     isUnlockedPPVStream,
+    isUnlockedLockedContent,
     isValidTipAmount,
     isSupportedChain,
     eligibleBountyForAccount,
     isValidUsername,
+    isValidSearch,
 }
