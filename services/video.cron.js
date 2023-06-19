@@ -176,9 +176,9 @@ async function deleteVotedStreams() {
 let autoDeleteCronCounter = 0;
 async function cronLoop() {
     // await deleteExpiredClaimTx();
-    // await fullVideoInfo();
-    // await transcodeVideos();
-    // await deleteExpiredTokenItems();
+    await fullVideoInfo();
+    await transcodeVideos();
+    await deleteExpiredTokenItems();
     await processWatchHistory();
     if (autoDeleteCronCounter++ % (config.periodOfDeleleCron / 10) == 0) await deleteVotedStreams();
     setTimeout(cronLoop, 10 * 1000);
