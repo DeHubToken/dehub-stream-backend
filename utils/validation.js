@@ -95,8 +95,21 @@ const isValidSearch = (searchStr) => {
     return !format.test(searchStr);
 }
 
+const removeDuplicatedElementsFromArray = (arr) => {
+    if (arr?.length > 0)
+        return arr.filter((item,
+            index) => arr.indexOf(item) === index);
+    return undefined;
+}
+
+const isUserCanAddNewCategory = async (address) => {    
+    const stakedBalance = await Balance.findOne({ address, chainId: 56, staked: { $gte: 10_000 } }, { staked: 1 });
+    return !!stakedBalance;
+}
+
 module.exports = {
     removeDuplicatedObject,
+    removeDuplicatedElementsFromArray,
     isUnlockedPPVStream,
     isUnlockedLockedContent,
     isValidTipAmount,
@@ -104,4 +117,5 @@ module.exports = {
     eligibleBountyForAccount,
     isValidUsername,
     isValidSearch,
+    isUserCanAddNewCategory,
 }
