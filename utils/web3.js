@@ -349,6 +349,44 @@ const getCollectionHistories = async (fromBlock, toBlock, collectionAddress, cha
 * @param {string} collectionAddress 
 * @returns {transfers, toBlock}
 */
+const getERC721Histories = async (fromBlock, toBlock, collectionAddress, chainId) => {
+    if (toBlock <= fromBlock) return { transfers: [] };
+    const network = supportedNetworks.find(e => e.chainId === chainId);
+    if (!network) return { tranfers: [] };
+    const provider = new ethers.providers.JsonRpcProvider(network.rpcUrls[0]);
+    const collectionContract = new ethers.Contract(collectionAddress, erc721ContractAbi, provider);
+    let result = [];
+    try {
+        let eventResults = [];
+        const filter = collectionContract.filters.Transfer();
+        eventResults = await collectionContract.queryFilter(filter, fromBlock, toBlock);
+        result = eventResults.map(e => {
+            return {
+                from: e.args.from,
+                to: e.args.to,
+                tokenId: Number(e.args.tokenId),
+                amount: 1,
+                logInfo: { transactionHash: e.transactionHash, logIndex: e.logIndex, blockNumber: e.blockNumber, address: e.address },
+                event: e.event,
+            }
+        });
+    }
+    catch (e) {
+        console.log(e);
+        return { result: [] };
+    }
+    return { result, toBlock };
+
+}
+
+/**
+* 
+* @param {int} fromBlock 
+* @param {int} latestBlock 
+* @param {object} evmWeb3 
+* @param {string} collectionAddress 
+* @returns {transfers, toBlock}
+*/
 const getControllerHistories = async (fromBlock, toBlock, collectionAddress, chainId) => {
     if (toBlock <= fromBlock) return { transfers: [] };
     const network = supportedNetworks.find(e => e.chainId === chainId);
@@ -389,5 +427,6 @@ module.exports = {
     getCollectionContract,
     getCreatorsOfCollection,
     getCollectionHistories,
-    getCreatorsForTokenIds
+    getCreatorsForTokenIds,
+    getERC721Histories,
 }

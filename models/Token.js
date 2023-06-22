@@ -42,6 +42,7 @@ let TokenSchema = new Schema({
     },
     transcodingStatus: String,
     category: [String],
+    mintTxHash: String,
 }, { timestamps: true });
 
 

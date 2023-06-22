@@ -30,7 +30,7 @@ const config = {
     votesForDeleting: 1000,
     totalStakedForDeleting: 50_000_0000,
     periodOfDeleleCron: 600, // per 10 min, check and delete voted streams
-    blockLimitsForFetching: 5000, // fetch blockchain data in a range of this block using graphql 
+    blockLimitsForFetching: 1000, // fetch blockchain data in a range of this block using graphql 
     itemLimitsForFetching: 500, // count of max items that are fetched
 };
 module.exports = {

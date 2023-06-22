@@ -82,7 +82,6 @@ const getHistoryFromGraphGL = async (minBlockNumber, maxBlockNumber, url) => {
         logIndex    
         }
         nftTransfers(first: ${config.itemLimitsForFetching},where:{ blockNumber_gte: ${minBlockNumber}, blockNumber_lte: ${maxBlockNumber} }, orderBy: blockNumber, orderDirection:asc){
-            id
             tokenId
             from {
                 id
@@ -91,6 +90,45 @@ const getHistoryFromGraphGL = async (minBlockNumber, maxBlockNumber, url) => {
                 id
             }
             collection
+            transaction {
+                id
+            }
+        }  
+    }`;
+    let retData = undefined;
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                query
+            }) // Get some from re-orgs
+        });
+        const result = await res.json();
+        const { data } = result
+        retData = data;
+    }
+    catch (err) {
+        console.log("--fetch graphql error-", err)
+    }
+    return retData;
+}
+
+/**
+ * @notice Fetches transaction from graphql
+ *  
+ * @param
+ */
+const getMintTxesFromGraphGL = async (url) => {
+    const query = `
+     {        
+        nftTransfers(where:{from: "0x0000000000000000000000000000000000000000"}, orderBy: tokenId, orderDirection:asc){
+            id
+            tokenId            
+            collection
+            transaction {
+                id
+            }
         }  
     }`;
     let retData = undefined;
@@ -113,5 +151,6 @@ const getHistoryFromGraphGL = async (minBlockNumber, maxBlockNumber, url) => {
 }
 
 module.exports = {
-    getHistoryFromGraphGL
+    getHistoryFromGraphGL,
+    getMintTxesFromGraphGL,
 }

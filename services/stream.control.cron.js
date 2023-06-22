@@ -97,13 +97,13 @@ async function updateStreamCollection(nftTransfer) {
     const streamCollectionAddress = nftTransfer.collection.toLowerCase();
     let updateData = { owner: toAddress };
     if (from === ethers.constants.AddressZero) {
-        updateData = { ...updateData, minter: toAddress, status: 'minted' };
+        updateData = { ...updateData, minter: toAddress, status: 'minted', mintTxHash: nftTransfer.transaction.id };
         console.log('--minted', streamCollectionAddress, tokenIdInt, toAddress);
         await Account.updateOne({ address: toAddress }, { $inc: { uploads: 1 } }, overrideOptions);
     }
     let updatedTokenItem;
     try {
-        updatedTokenItem = await Token.findOneAndUpdate({ contractAddress: streamCollectionAddress, tokenId: tokenIdInt, chainId }, updateData, { new: true, upsert: true });
+        updatedTokenItem = await Token.findOneAndUpdate({ contractAddress: streamCollectionAddress, tokenId: tokenIdInt, chainId }, updateData, overrideOptions);
     } catch (error) {
         console.log("--- token find error");
     }
