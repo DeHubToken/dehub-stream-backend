@@ -4,7 +4,7 @@ require("dotenv").config();
 const { ethers } = require('ethers');
 const { isValidAccount, reqParam } = require('../utils/auth');
 const { decryptWithSourceKey, encryptWithSourceKey } = require('../utils/encrypt');
-const { paramNames, errorMsgs, userProfileKeys, overrideOptions, tokenTemplate, editableProfileKeys } = require('../config/constants');
+const { paramNames, errorMsgs, userProfileKeys, overrideOptions, tokenTemplate, editableProfileKeys, streamInfoKeys } = require('../config/constants');
 const { Token } = require('../models/Token');
 const { checkFileType, normalizeAddress } = require('../utils/format');
 const { signatureForMintingNFT } = require('./mintNft');
@@ -121,6 +121,15 @@ const ApiController = {
                     break;
                 case 'mostLiked':
                     sortRule = { likes: -1 };
+                    break;
+                case 'ppv':
+                    searchQuery['$match'][`streamInfo.${streamInfoKeys.isPayPerView}`] = true;
+                    break;
+                case 'bounty':
+                    searchQuery['$match'][`streamInfo.${streamInfoKeys.isAddBounty}`] = true;
+                    break;
+                case 'locked':
+                    searchQuery['$match'][`streamInfo.${streamInfoKeys.isLockContent}`] = true;
                     break;
             }
 

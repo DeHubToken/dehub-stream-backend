@@ -407,6 +407,7 @@ const tokenTemplate = {
     transcodingStatus: 1,
     createdAt: 1,
     mintTxHash: 1,
+    chainId: 1,
     _id: 0,
 };
 
