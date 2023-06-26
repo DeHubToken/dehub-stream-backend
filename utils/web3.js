@@ -372,7 +372,7 @@ const getERC721Histories = async (fromBlock, toBlock, collectionAddress, chainId
         });
     }
     catch (e) {
-        console.log(e);
+        console.log('--error for erc721 history--');
         return { result: [] };
     }
     return { result, toBlock };

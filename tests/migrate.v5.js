@@ -1,4 +1,4 @@
-// migrated at 2023/05/24
+// migrated at 2023/06/25
 require('dotenv').config();
 let mongoose = require('mongoose');
 let { config } = require('../config');
@@ -8,6 +8,7 @@ const { Transaction } = require('../models/Transaction');
 const { getMintTxesFromGraphGL } = require('../utils/graphql');
 const { supportedNetworks } = require('../config/constants');
 const { getCollectionHistories, getERC721Histories } = require('../utils/web3');
+const { sleep } = require("../utils/time");
 const networkName = (process?.argv?.[2] || "bsc");
 const curNetwork = supportedNetworks.find(e => e.shortName === networkName);
 if (!curNetwork) process.exit('no supported network!');
@@ -54,6 +55,11 @@ async function cron_loop() {
     do {
         const transctions = await getERC721Histories(startBlockNumber, endBlockNumber, contractAddress, chainId);
         console.log('--transfer transactions', transctions?.result?.length, endBlockNumber);
+        if (!transctions?.toBlock) {
+            console.log('----error!!!')
+            await sleep(1000);
+            continue;
+        }
         if (transctions?.result?.length > 0) {
             for (let nftTransfer of transctions?.result) {
                 console.log(nftTransfer.tokenId, nftTransfer.logInfo.transactionHash);
