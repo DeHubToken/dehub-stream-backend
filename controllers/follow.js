@@ -4,8 +4,8 @@ const { normalizeAddress } = require("../utils/format");
 
 const requestFollow = async (address, following) => {
     following = normalizeAddress(following);
-    if(address === following) return {result: false, error: 'Not follow for you'}
-    const updatedResult = await Follow.updateOne({ address }, { following }, overrideOptions);
+    if (address === following) return { result: false, error: 'Not follow for you' }
+    const updatedResult = await Follow.updateOne({ address, following }, {}, overrideOptions);
     if (updatedResult?.nModified > 0) return { result: false, error: 'already following' };
     return { result: true };
 }

@@ -46,7 +46,8 @@ const StreamController = {
                 videoStat = fs.statSync(videoPath);
                 fileSize = videoStat.size;
             } catch {
-
+                console.log('----not video', tokenId);
+                return res.json({ error: 'error!' });
             }
         }
         const videoRange = req.headers.range;
