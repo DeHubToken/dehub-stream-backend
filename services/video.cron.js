@@ -80,12 +80,14 @@ async function deleteExpiredTokenItems() {
         });
         // console.log(aa.filter((c, index) => aa.findIndex(e=>e.address === c.address) === index));
         const creators = await getCreatorsForTokenIds(chainId, aa);
-        for (const nftItem of nftItems.nfts) {
-            if (creators[nftItem.tokenId] && creators[nftItem.tokenId] !== ethers.constants.AddressZero) {
-                mintedTokenIds.push(nftItem.tokenId);
-            }
-            else {
-                tokenItemsToDelete.push(expiredTokenItems.find(e => e.tokenId === nftItem.tokenId));
+        if (creators) {
+            for (const nftItem of nftItems.nfts) {
+                if (creators[nftItem.tokenId] && creators[nftItem.tokenId] !== ethers.constants.AddressZero) {
+                    mintedTokenIds.push(nftItem.tokenId);
+                }
+                else {
+                    tokenItemsToDelete.push(expiredTokenItems.find(e => e.tokenId === nftItem.tokenId));
+                }
             }
         }
     }
