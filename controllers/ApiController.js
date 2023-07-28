@@ -212,6 +212,17 @@ const ApiController = {
         accountInfo.followers = await getFollowers(walletAddress);
         return res.json({ result: accountInfo, });
     },
+    getUnlockedNfts: async function (req, res, next) {
+        /// walletAddress param can be username or address
+        let walletAddress = req.query.id || req.query.id || req.params?.id;
+        if (!walletAddress) return res.json({ error: 'not define wallet' });
+        walletAddress = normalizeAddress(walletAddress);
+        let accountInfo = {};
+        const unlockedPPVStreams = await PPVTransaction.find({ address: walletAddress, createdAt: { $gt: new Date(Date.now() - config.availableTimeForPPVStream) } }, { streamTokenId: 1 }).distinct('streamTokenId');
+        accountInfo.unlocked = unlockedPPVStreams;
+        return res.json({ result: accountInfo, });
+    },
+    
     getSignDataForClaim: async function (req, res, next) {
         const address = reqParam(req, paramNames.address);
         const rawSig = reqParam(req, paramNames.sig);
