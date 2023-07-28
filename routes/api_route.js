@@ -20,6 +20,7 @@ router.get("/search_nfts", ApiController.getFilteredNfts);
 router.get("/my_watched_nfts", ApiController.getMyWatchedNfts);
 router.get("/nft_info/:id", ApiController.getNftInfo);
 router.get("/account_info/:id", ApiController.getAccountInfo);
+router.get("/unlocked_nfts/:id", ApiController.getUnlockedNfts);
 // deprecated claim transaction
 // router.get('/claim', async function (req, res, next) {
 //     return ApiController.getSignDataForClaim(req, res, next);
@@ -40,7 +41,7 @@ router.get('/request_follow', isAuthorized, ApiController.requestFollow);
 router.get('/claim_bounty', isAuthorized, ApiController.getSignForClaimBounty);
 router.get('/add_category', isAuthorized, ApiController.addCategory);
 
-// get apis
+// apis to get public data
 router.get('/leaderboard', ApiController.leaderboard);
 router.get('/get_categories', ApiController.getCategories);
 router.get('/usernames', ApiController.getUsernames);
