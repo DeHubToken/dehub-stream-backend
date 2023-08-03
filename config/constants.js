@@ -59,6 +59,7 @@ const userProfileKeys = {
     twitterLink: 'twitterLink',
     discordLink: 'discordLink',
     instagramLink: 'instagramLink',
+    tiktokLink: 'tiktokLink',
 }
 
 const editableProfileKeys = {
@@ -70,6 +71,7 @@ const editableProfileKeys = {
     twitterLink: 'twitterLink',
     discordLink: 'discordLink',
     instagramLink: 'instagramLink',
+    tiktokLink: 'tiktokLink',
 }
 
 const ChainId = {

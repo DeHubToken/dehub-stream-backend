@@ -15,6 +15,7 @@ let AccountSchema = new Schema({
     twitterLink: String,
     discordLink: String,
     instagramLink: String,
+    tiktokLink: String,
     sentTips: Number,
     receivedTips: Number,
     // count of streams uploaded by the account

@@ -41,6 +41,7 @@ const accountTemplate = {
     [userProfileKeys.twitterLink]: 1,
     [userProfileKeys.discordLink]: 1,
     [userProfileKeys.instagramLink]: 1,
+    [userProfileKeys.tiktokLink]: 1,
     createdAt: 1,
     sentTips: 1,
     receivedTips: 1,
@@ -222,7 +223,7 @@ const ApiController = {
         accountInfo.unlocked = unlockedPPVStreams;
         return res.json({ result: accountInfo, });
     },
-    
+
     getSignDataForClaim: async function (req, res, next) {
         const address = reqParam(req, paramNames.address);
         const rawSig = reqParam(req, paramNames.sig);
