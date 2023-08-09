@@ -76,11 +76,14 @@ async function registerProtocolTx(protocolTx) {
         }
     }
     else if (type === 'TIP') {
-        const updateResult = await Token.updateOne({ tokenId, minter: protocolTx.to.id }, { $inc: { totalTips: amount } }, overrideOptions);
+        if (Number(tokenId) > 0) {
+            const updateResult = await Token.updateOne({ tokenId, minter: protocolTx.to.id }, { $inc: { totalTips: amount } }, overrideOptions);
+            console.log('---tip for token', updateResult);
+        }
         await Account.updateOne({ address }, { $inc: { sentTips: amount } }, overrideOptions);
         await Account.updateOne({ address: protocolTx.to.id }, { $inc: { receivedTips: amount }, overrideOptions });
         await Reward.create({ address: protocolTx.to.id, from: address, rewardAmount: amount, chainId, tokenId, type: RewardType.Tip })
-        console.log('-----tip', updateResult);
+        console.log('-----tip done:', tokenId, protocolTx?.to?.id);
     }
     else if (type === 'PPV') {
         await PPVTransaction.create({ address, amount, streamTokenId: tokenId, tokenAddress, chainId });
