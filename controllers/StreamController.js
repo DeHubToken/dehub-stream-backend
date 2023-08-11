@@ -53,8 +53,8 @@ const StreamController = {
         const videoRange = req.headers.range;
         const nowTimestamp = Date.now();
         const userAddress = signParams?.account?.toLowerCase();
-        const limitBuffer = tokenItem.videoInfo?.bitrate ? Math.floor(tokenItem.videoInfo?.bitrate / 8 * 3) : defaultLimitBuffer;
-        const initialBuffer = tokenItem.videoInfo?.bitrate ? Math.floor(tokenItem.videoInfo?.bitrate / 8) : defaultInitialBuffer;
+        const limitBuffer = tokenItem.videoInfo?.bitrate ? Math.floor(tokenItem.videoInfo?.bitrate / 8 * 6) : defaultLimitBuffer;
+        const initialBuffer = tokenItem.videoInfo?.bitrate ? Math.floor(tokenItem.videoInfo?.bitrate / 8 * 2) : defaultInitialBuffer;
         // let chainId = signParams?.chainId;
         // if (chainId) chainId = parseInt(chainId);
         if (videoRange) {
@@ -66,7 +66,7 @@ const StreamController = {
             // watching video at start position is always available.
             if (videoRange === 'bytes=0-') {
                 start = 0;
-                chunksize = initialBuffer + 1;
+                chunksize = (chunksize > initialBuffer + 1) ? (initialBuffer + 1) : chunksize;
                 end = chunksize - 1;
             }
             else {
@@ -97,7 +97,7 @@ const StreamController = {
                     }
                 }
             }
-            console.log('---call stream', nowTimestamp, signParams?.account, tokenId, req.headers.range, end, fileSize);
+            console.log('---call stream', nowTimestamp, signParams?.account, tokenId, req.headers.range, start, end, fileSize);
             const file = fs.createReadStream(videoPath, { start, end });
             const header = {
                 "Content-Range": `bytes ${start}-${end}/${fileSize}`,
