@@ -21,7 +21,9 @@ const signatureForMintingNFT = async (videoFile, imageFile, name, description, s
   address = normalizeAddress(address);
   let videoExt = videoFile.mimetype.toString().substr(videoFile.mimetype.toString().indexOf("/") + 1);
   if (videoExt === 'quicktime') videoExt = 'mov';
-  const imageExt = imageFile.mimetype.toString().substr(imageFile.mimetype.toString().indexOf("/") + 1);
+  const imageExt = imageFile.originalname.substr(imageFile.originalname.toString().indexOf(".") + 1);
+  // imageFile.mimetype.toString().substr(imageFile.mimetype.toString().indexOf("/") + 1);
+  
   // checking category
   if (category?.length > 0) {
     category = removeDuplicatedElementsFromArray(category);

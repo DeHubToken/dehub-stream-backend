@@ -14,7 +14,7 @@ const paramNames = {
 }
 
 const supportedVideoTypes = ["/mp4", "/quicktime"];
-const supportedImageTypes = ["/png", "/jpeg", "/jpg", "/gif"];
+const supportedImageTypes = ["/png", "/jpeg", "/jpg", "/gif", "/octet-stream"];
 const errorMsgs = {
     not_supported_video: 'Not supported video',
     not_supported_image: 'Not supported Image',
