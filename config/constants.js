@@ -411,6 +411,7 @@ const tokenTemplate = {
     createdAt: 1,
     mintTxHash: 1,
     chainId: 1,
+    category: 1,
     _id: 0,
 };
 
