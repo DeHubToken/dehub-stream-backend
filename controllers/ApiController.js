@@ -46,6 +46,7 @@ const accountTemplate = {
     sentTips: 1,
     receivedTips: 1,
     uploads: 1,
+    customs: 1,
     _id: 0,
 };
 const ApiController = {
@@ -142,8 +143,10 @@ const ApiController = {
             }
             if (search) {
                 if (!isValidSearch(search)) return res.json({ result: [] });
-                var re = new RegExp(search, "gi")
-                searchQuery['$match'] = { ...searchQuery['$match'], $or: [{ name: re }, { description: re }, { minter: re }, { owner: re }] }
+                var re = new RegExp(search, "gi");
+                let orOptions = [{ name: re }, { description: re }, { owner: normalizeAddress(re) }];
+                if (Number(search) > 0) orOptions.push({ tokenId: Number(search) });
+                searchQuery['$match'] = { ...searchQuery['$match'], $or: orOptions }
             }
             if (bulkIdList) {
                 let idList = bulkIdList.split("-");
@@ -248,8 +251,23 @@ const ApiController = {
         const updateAccountOptions = {};
         let username = reqParam(req, userProfileKeys.username);
         Object.entries(editableProfileKeys).forEach(([, profileKey]) => {
-            const reqVal = reqParam(req, profileKey);
-            if (reqVal && reqVal !== 'undefined' && reqVal !== 'null') updateAccountOptions[profileKey] = reqVal;
+            let reqVal = reqParam(req, profileKey);
+            if (profileKey === 'customs') {
+                try {
+                    reqVal = JSON.parse(reqVal);
+                    Object.keys(reqVal).map(key => {
+                        if (!(Number(key) >= 1 && Number(key) <= 5)) delete reqVal[key];
+                    })
+                }
+                catch {
+                    console.log('---error updating custom links');
+                    reqVal = undefined;
+                }
+            }
+            if (reqVal === 'undefined' || reqVal === 'null' || reqVal === '' || !reqVal) reqVal = null;
+            // username is not null
+            if (!reqVal && profileKey == 'username') return;
+            updateAccountOptions[profileKey] = reqVal;
         });
         if (username) {
             username = username.toLowerCase();

@@ -22,7 +22,7 @@ let AccountSchema = new Schema({
     uploads: Number,
     followers: Number,
     likes: Number,
-    
+    customs: Object
 }, { timestamps: true });
 
 AccountSchema.index({ address: 1 }, { unique: true });

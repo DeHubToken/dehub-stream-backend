@@ -58,6 +58,7 @@ const transcodeVideo = async (tokenId, videoExt) => {
     const videoFilePath = defaultVideoFilePath(tokenId, videoExt);
     const tempFilePath = getTempVideoFilePath(tokenId, destVideoExt);
     await Token.updateOne({ tokenId }, { transcodingStatus: 'on' });
+    console.log('--started transcoding', tokenId);
     ffmpeg(videoFilePath)
         .withOutputFormat('mp4')
         .on('end', async () => {

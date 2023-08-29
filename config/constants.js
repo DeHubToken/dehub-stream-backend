@@ -72,6 +72,7 @@ const editableProfileKeys = {
     discordLink: 'discordLink',
     instagramLink: 'instagramLink',
     tiktokLink: 'tiktokLink',
+    customs: 'customs'
 }
 
 const ChainId = {

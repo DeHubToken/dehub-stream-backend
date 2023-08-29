@@ -67,9 +67,9 @@ const signatureForMintingNFT = async (videoFile, imageFile, name, description, s
     ...addedOptions
   });
   // 3. move file to main assets directory  
-  const videoPath = `${path.dirname(__dirname)}/assets/videos/${tokenItem.tokenId}.${videoExt}`;  
+  const videoPath = `${path.dirname(__dirname)}/assets/videos/${tokenItem.tokenId}.${videoExt}`;
   moveFile(`${path.dirname(__dirname)}/${videoFile.path}`, videoPath);
-  const imagePath = `${path.dirname(__dirname)}/assets/images/${tokenItem.tokenId}.${imageExt}`;  
+  const imagePath = `${path.dirname(__dirname)}/assets/images/${tokenItem.tokenId}.${imageExt}`;
   moveFile(`${path.dirname(__dirname)}/${imageFile.path}`, imagePath);
 
   // 4. signature for minting token
