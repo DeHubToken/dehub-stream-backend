@@ -278,13 +278,13 @@ const ApiController = {
         const coverImgFile = req.files?.coverImg?.[0];
         const avatarImgFile = req.files?.avatarImg?.[0];
         if (coverImgFile) {
-            const imageExt = coverImgFile.mimetype.toString().substr(coverImgFile.mimetype.toString().indexOf("/") + 1);
+            const imageExt = coverImgFile.originalname.substr(coverImgFile.originalname.toString().indexOf(".") + 1);
             const coverImagePath = `${path.dirname(__dirname)}/assets/covers/${address.toLowerCase()}.${imageExt}`;
             moveFile(coverImgFile.path, coverImagePath);
             updateAccountOptions[userProfileKeys.coverImageUrl] = `statics/covers/${address.toLowerCase()}.${imageExt}`;
         }
         if (avatarImgFile) {
-            const avatarImageExt = avatarImgFile.mimetype.toString().substr(avatarImgFile.mimetype.toString().indexOf("/") + 1);
+            const avatarImageExt = avatarImgFile.originalname.substr(avatarImgFile.originalname.toString().indexOf(".") + 1);
             const avatarImagePath = `${path.dirname(__dirname)}/assets/avatars/${address.toLowerCase()}.${avatarImageExt}`;
             moveFile(avatarImgFile.path, avatarImagePath);
             updateAccountOptions[userProfileKeys.avatarImageUrl] = `statics/avatars/${address.toLowerCase()}.${avatarImageExt}`;
