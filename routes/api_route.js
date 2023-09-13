@@ -40,6 +40,7 @@ router.get('/request_vote', isAuthorized, ApiController.requestVote);
 router.get('/request_follow', isAuthorized, ApiController.requestFollow);
 router.get('/claim_bounty', isAuthorized, ApiController.getSignForClaimBounty);
 router.get('/add_category', isAuthorized, ApiController.addCategory);
+router.get('/request_reaction', isAuthorized, ApiController.requestReaction);
 
 // apis to get public data
 router.get('/leaderboard', ApiController.leaderboard);
@@ -48,5 +49,6 @@ router.get('/usernames', ApiController.getUsernames);
 router.get('/is_valid_username', ApiController.isValidUsername);
 
 router.post('/public_accounts', ApiController.publicAccountData);
+router.get('/get_reactions', ApiController.getReactions);
 
 module.exports = router;

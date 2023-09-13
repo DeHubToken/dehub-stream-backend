@@ -10,7 +10,7 @@
     "deposit_serve": "node ./services/deposit.indexer.js",
     "video_serve": "node ./services/video.cron.js",
     "stream_serve": "node services/stream.control.cron.js",
-    "dev": "nodemon server"  
+    "dev": "nodemon server"
   },
   "author": "",
   "license": "ISC",

@@ -23,8 +23,8 @@ const { isAddress } = require('ethers/lib/utils');
 const { requestFollow, unFollow, getFollowing, getFollowers } = require('./follow');
 const { signatureForClaimBounty } = require('./bounty');
 const { Category } = require('../models/Category');
-
-const expireTime = 86400000;
+const { Reaction } = require('../models/Reaction');
+const { requestReaction } = require('./chat/reaction');
 
 const accountTemplate = {
     username: 1,
@@ -505,5 +505,31 @@ const ApiController = {
             return res.json({ result: false, error: 'following was failed' });
         }
     },
+    requestReaction: async function (req, res, next) {
+        const address = reqParam(req, paramNames.address);
+        const reactionType = reqParam(req, 'reactionType');
+        const subjectType = reqParam(req, 'subjectType');
+        const subjectId = reqParam(req, 'subjectId');
+        if (!subjectId || !reactionType || !subjectType)
+            return res.json({ error: true, msg: "params not exist" });
+        try {
+            const result = await requestReaction({ address, subjectId, reactionType, subjectType });
+            return res.json(result);
+        }
+        catch (err) {
+            console.log('-----request reaction error', err);
+            return res.json({ result: false, error: 'reaction was failed' });
+        }
+    },
+    getReactions: async function (req, res, next) {
+        const subjectType = reqParam(req, 'subjectType');
+        const skip = req.body.skip || req.query.skip || 0;
+        const limit = req.body.limit || req.query.limit || 200;
+        const result = await Reaction.find({ subjectType }, { subjectId: 1, value: 1, type: 1, _id: 0 })
+            .sort({ updatedAt: -1 })
+            .skip(skip)
+            .limit(limit).lean();
+        return res.json({ result });
+    }
 }
 module.exports = { ApiController };

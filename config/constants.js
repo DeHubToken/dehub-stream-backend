@@ -48,6 +48,16 @@ const RewardType = {
     BountyForCommentor: 'BountyForCommentor',
 }
 
+const ReactionType = {
+    Like: 'LIKE',
+    UnLike: 'UNLIKE',
+}
+
+const ReactionSubjectType = {
+    Message: 'MSG',
+    Comment: 'COMMENT'
+}
+
 const userProfileKeys = {
     username: 'username',
     displayName: 'displayName',
@@ -451,4 +461,6 @@ module.exports = {
     blacklistOnLeaderboard,
     publicChatChannelId,
     editableProfileKeys,
+    ReactionType,
+    ReactionSubjectType
 }
