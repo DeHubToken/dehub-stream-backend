@@ -157,7 +157,9 @@ async function processWatchHistory() {
         const _id = watchStream._id;
         const watchedTime = watchStream.exitedAt.getTime() - watchStream.createdAt.getTime();
         const tokenItem = await Token.findOne({ tokenId: watchStream.tokenId }, { videoDuration: 1, _id: 0 }).lean();
-        if (tokenItem && watchedTime >= (Math.min(config.watchTimeForConfirming, tokenItem.videoDuration * 300))) {
+        let minimumWatchTime = tokenItem.videoDuration * 300;
+        if (minimumWatchTime < 6000) minimumWatchTime = 100; // shorter than 20s
+        if (tokenItem && watchedTime >= (Math.min(config.watchTimeForConfirming, minimumWatchTime))) {
             const tokenFilter = { tokenId: watchStream.tokenId };
             // await payBounty(watchStream.watcherAddress, watchStream.tokenId, RewardType.BountyForViewer);
             await WatchHistory.updateOne({ _id }, { status: 'confirmed' });
