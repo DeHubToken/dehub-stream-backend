@@ -20,12 +20,14 @@ app.set('view engine', 'ejs');
 
 app.use(cookieParser());
 app.use(cors());
-app.use(session({
-    secret: "1234567890",
+app.use(
+  session({
+    secret: '1234567890',
     cookie: { secure: false },
     resave: true,
-    saveUninitialized: true
-}));
+    saveUninitialized: true,
+  }),
+);
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true, parameterLimit: 1000000 }));
 app.use(bodyParser.json({ limit: '50mb', extended: true }));
 app.use(bodyParser.json({ type: 'application/vnd.api+json' }));
@@ -34,50 +36,54 @@ app.use(flash());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(function (req, res, next) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,Content-type,Accept');
-    res.setHeader('Access-Control-Allow-Credentials', true);
-    next();
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,Content-type,Accept');
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  next();
 });
 mongoose.set('useFindAndModify', false);
 mongoose.set('useCreateIndex', true);
-mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/' + config.mongo.dbName,
-    { useNewUrlParser: true, useUnifiedTopology: true }, async function (err, db) {
-        if (err) {
-            console.log('[' + new Date().toLocaleString() + '] ' + 'Sorry, there is no mongo db server running.');
-        } else {
-            let attachDB = function (req, res, next) {
-                req.db = db;
-                next();
-            };
+mongoose.connect(
+  'mongodb://' + config.mongo.host + ':' + config.mongo.port + '/' + config.mongo.dbName,
+  { useNewUrlParser: true, useUnifiedTopology: true },
+  async function (err, db) {
+    if (err) {
+      console.log('[' + new Date().toLocaleString() + '] ' + 'Sorry, there is no mongo db server running.');
+    } else {
+      let attachDB = function (req, res, next) {
+        req.db = db;
+        next();
+      };
 
-            app.use('/', attachDB, home_route);
+      app.use('/', attachDB, home_route);
 
-            app.use('/api', attachDB, api_route);
+      app.use('/api', attachDB, api_route);
 
-            app.use('/streams', attachDB, stream_route);
+      app.use('/streams', attachDB, stream_route);
 
-            app.use('/nfts', attachDB, nft_data_route);
+      app.use('/nfts', attachDB, nft_data_route);
 
-            app.use('/statics', attachDB, static_media_route);
+      app.use('/statics', attachDB, static_media_route);
 
-            /**
-             * Error Routes
-             * */
-            app.get('*', function (req, res, next) {
-                res.send("All Error");
-            });
-            app.get('/404', function (req, res, next) {
-                res.send("404 Error");
-            }); 1
-            app.use((err, req, res, next) => {
-                // console.log('------error', err);
-                res.status(err.status || 500);
-                res.send('500 Error');
-            });
-            app.listen(config.port, function () {
-                console.log('[' + new Date().toLocaleString() + '] ' + 'Server listening ' + config.baseUrl);
-            });
-        }
-    });
+      /**
+       * Error Routes
+       * */
+      app.get('*', function (req, res, next) {
+        res.send('Method Not Supported');
+      });
+      app.get('/404', function (req, res, next) {
+        res.send('404 Error');
+      });
+      1;
+      app.use((err, req, res, next) => {
+        // console.log('------error', err);
+        res.status(err.status || 500);
+        res.send('500 Error');
+      });
+      app.listen(config.port, function () {
+        console.log('[' + new Date().toLocaleString() + '] ' + 'Server listening ' + config.baseUrl);
+      });
+    }
+  },
+);

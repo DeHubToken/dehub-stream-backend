@@ -1,11 +1,12 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
-let AccountSchema = new Schema({
+let AccountSchema = new Schema(
+  {
     // "Account address"
     address: String,
     lastLoginTimestamp: Number,
-    username: String,  // user profile
+    username: String, // user profile
     displayName: String, // this can be overrided.
     email: String,
     avatarImageUrl: String,
@@ -16,14 +17,18 @@ let AccountSchema = new Schema({
     discordLink: String,
     instagramLink: String,
     tiktokLink: String,
+    youtubeLink: String,
+    telegramLink: String,
     sentTips: Number,
     receivedTips: Number,
     // count of streams uploaded by the account
     uploads: Number,
     followers: Number,
     likes: Number,
-    customs: Object
-}, { timestamps: true });
+    customs: Object,
+  },
+  { timestamps: true },
+);
 
 AccountSchema.index({ address: 1 }, { unique: true });
 module.exports.Account = mongoose.model('accounts', AccountSchema);
