@@ -70,7 +70,7 @@ mongoose.connect(
        * Error Routes
        * */
       app.get('*', function (req, res, next) {
-        res.send('Method Not Supported');
+        res.status(405).json({ message: 'Method Not Supported' });
       });
       app.get('/404', function (req, res, next) {
         res.send('404 Error');
