@@ -39,6 +39,7 @@ const { signatureForClaimBounty } = require('./bounty');
 const { Category } = require('../models/Category');
 const { Reaction } = require('../models/Reaction');
 const { requestReaction } = require('./chat/reaction');
+const notificationService = require('../services/NotificationService');
 
 const accountTemplate = {
   username: 1,
@@ -414,7 +415,12 @@ const ApiController = {
       chainId = parseInt(chainId, 10);
       if (!isValidTipAmount(amount)) return res.json({ error: true, msg: 'Invalid tip amount!' });
       streamTokenId = parseInt(streamTokenId, 10);
+      const owner = await Token.findOne({ tokenId: streamTokenId }, {}).lean();
       const result = await requestTip(address, streamTokenId, amount, chainId);
+      await notificationService.createNotification(normalizeAddress(owner.owner), 'tip', {
+        senderAddress: normalizeAddress(address),
+        tipAmount: amount,
+      });
       return res.json(result);
     } catch (err) {
       console.log('-----request like error', err);
@@ -446,7 +452,17 @@ const ApiController = {
     try {
       if (!vote) return res.json({ error: true, msg: 'no vote!' });
       streamTokenId = parseInt(streamTokenId, 10);
+      const owner = await Token.findOne({ tokenId: streamTokenId }, {}).lean();
       const result = await requestVote(address, streamTokenId, vote.toString());
+      // notify owner
+      await notificationService.createNotification(
+        normalizeAddress(owner.owner),
+        vote === 'true' ? 'like' : 'dislike',
+        {
+          tokenId: streamTokenId,
+          senderAddress: normalizeAddress(address),
+        },
+      );
       return res.json(result);
     } catch (err) {
       console.log('-----request vote error', err);
@@ -460,8 +476,12 @@ const ApiController = {
     if (!following && !isAddress(following)) return res.json({ error: true, msg: 'following param is missing' });
     try {
       let result = undefined;
-      if (unFollowing != 'true') result = await requestFollow(address, following);
-      else result = await unFollow(address, following);
+      if (unFollowing != 'true') {
+        result = await requestFollow(address, following);
+        await notificationService.createNotification(normalizeAddress(following), 'following', {
+          senderAddress: normalizeAddress(address),
+        });
+      } else result = await unFollow(address, following);
       return res.json(result);
     } catch (err) {
       console.log('-----request follow error', err);
