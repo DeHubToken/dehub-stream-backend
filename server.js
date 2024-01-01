@@ -2,6 +2,8 @@ let express = require('express');
 let flash = require('connect-flash');
 let path = require('path');
 let session = require('express-session');
+const http = require('http');
+const socketIO = require('socket.io');
 let mongoose = require('mongoose');
 let cors = require('cors');
 let cookieParser = require('cookie-parser');
@@ -15,6 +17,16 @@ let api_route = require('./routes/api_route');
 let stream_route = require('./routes/stream_route');
 let nft_data_route = require('./routes/nft_metadata_route');
 let static_media_route = require('./routes/static_media_route');
+const webSockets = require('./controllers/SocketsController');
+
+const socketServer = http.createServer(app);
+const io = socketIO(socketServer, {
+  cors: {
+    origin: '*',
+  },
+  reconnection: true,
+  // reconnectionAttempts: 3,
+});
 
 app.set('view engine', 'ejs');
 
@@ -66,6 +78,9 @@ mongoose.connect(
 
       app.use('/statics', attachDB, static_media_route);
 
+      io.on('connection', socket => {
+        webSockets(socket, io);
+      });
       /**
        * Error Routes
        * */
@@ -81,7 +96,11 @@ mongoose.connect(
         res.status(err.status || 500);
         res.send('500 Error');
       });
-      app.listen(config.port, function () {
+
+      // app.listen(config.port, function () {
+      //   console.log('[' + new Date().toLocaleString() + '] ' + 'Server listening ' + config.baseUrl);
+      // });
+      socketServer.listen(config.port, function () {
         console.log('[' + new Date().toLocaleString() + '] ' + 'Server listening ' + config.baseUrl);
       });
     }

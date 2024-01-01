@@ -26,6 +26,10 @@ let AccountSchema = new Schema(
     followers: Number,
     likes: Number,
     customs: Object,
+    online: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true },
 );

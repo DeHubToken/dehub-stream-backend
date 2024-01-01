@@ -550,6 +550,15 @@ const ApiController = {
       return res.json({ result: false, error: 'following was failed' });
     }
   },
+  getNumberOfUsers: async function (req, res, next) {
+    try {
+      const userCount = await Account.countDocuments({});
+      return res.json({ result: userCount });
+    } catch (error) {
+      console.error('Error getting user count:', error.message);
+      return res.status(500).json({ error: error.message || 'Internal Server Error' });
+    }
+  },
   publicAccountData: async function (req, res, next) {
     const addressList = reqParam(req, 'addressList');
     if (!addressList || addressList.length < 1) return res.json({ result: false, error: 'no addressList' });
