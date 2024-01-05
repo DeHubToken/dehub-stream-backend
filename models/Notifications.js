@@ -5,7 +5,7 @@ const NotificationSchema = new Schema(
   {
     address: String,
     tokenId: String | undefined | null | Number,
-    type: String, // like, dislike, tip, following, videoRemoval
+    type: String, // like, dislike, tip, comment, following, videoRemoval
     content: String,
     createdAt: { type: Date, default: Date.now },
     read: { type: Boolean, default: false },

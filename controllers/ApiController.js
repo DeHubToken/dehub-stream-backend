@@ -40,6 +40,7 @@ const { Category } = require('../models/Category');
 const { Reaction } = require('../models/Reaction');
 const { requestReaction } = require('./chat/reaction');
 const notificationService = require('../services/NotificationService');
+const likedVideoService = require('../services/LikedVideosService');
 
 const accountTemplate = {
   username: 1,
@@ -437,7 +438,13 @@ const ApiController = {
       if (!content) return res.json({ error: true, msg: 'no comment!' });
       streamTokenId = parseInt(streamTokenId, 10);
       commentId = commentId ? parseInt(commentId, 10) : undefined;
+      const owner = await Token.findOne({ tokenId: streamTokenId }, {}).lean();
       const result = await requestComment(address, streamTokenId, content, commentId);
+      // notify owner
+      await notificationService.createNotification(normalizeAddress(owner.owner), 'comment', {
+        tokenId: streamTokenId,
+        senderAddress: normalizeAddress(address),
+      });
       return res.json(result);
     } catch (err) {
       console.log('-----request comment error', err);
@@ -463,6 +470,10 @@ const ApiController = {
           senderAddress: normalizeAddress(address),
         },
       );
+      // Add to liked videos
+      if (vote === 'true') {
+        await likedVideoService.createLikedVideo(normalizeAddress(address), owner._id);
+      }
       return res.json(result);
     } catch (err) {
       console.log('-----request vote error', err);

@@ -8,6 +8,7 @@ async function createNotification(recipentAddress, type, additionalData) {
     switch (type) {
       case 'like':
       case 'dislike':
+      case 'comment':
         verifyFields(['senderAddress', 'tokenId'], additionalData);
         break;
       case 'tip':
@@ -36,7 +37,7 @@ async function createNotification(recipentAddress, type, additionalData) {
     }
 
     let content, payload, id;
-    if (type === 'like' || type === 'dislike') {
+    if (type === 'like' || type === 'dislike' || type === 'comment') {
       payload = {
         address: recipentAddress,
         type: { $in: [type] },
@@ -61,6 +62,10 @@ async function createNotification(recipentAddress, type, additionalData) {
       case 'dislike':
         const numExistingDisLikes = existingNotifications.filter(e => e.type === 'dislike')?.length;
         content = await generateDislikeContent(recipentAddress, numExistingDisLikes, additionalData.username);
+        break;
+      case 'comment':
+        const numExistingComment = existingNotifications.filter(e => e.type === 'comment')?.length;
+        content = await generateCommentContent(recipentAddress, numExistingComment, additionalData.username);
         break;
       case 'tip':
         content = `${additionalData.username} just tipped you ${additionalData.tipAmount} DHB.`;
@@ -141,7 +146,6 @@ async function generateLikeContent(address, numExistingLikes, username) {
 
     const existingContent = existingLikeNotification.content;
     const match = existingContent.match(/(\w+) liked your video/);
-    console.log(existingContent);
     if (match && match[1] !== username) {
       return `${username} and ${match[1]} liked your video.`;
     } else if (existingContent.match(/(\w+) and \w+ liked your video./)) {
@@ -209,6 +213,35 @@ async function generateDislikeContent(address, numExistingDislikes, username) {
       return `${username} and ${numOthers + 1} others disliked your video.`;
     } else {
       return `${username} disliked your video.`;
+    }
+  }
+}
+
+async function generateCommentContent(address, numExistingFollows, username) {
+  if (numExistingFollows === 0) {
+    return `${username} commented on your video.`;
+  } else {
+    const existingCommentNotification = await Notification.findOne({
+      address,
+      type: 'comment',
+      read: false,
+    });
+
+    if (!existingFollowNotification) {
+      return `${username} commented on your video.`;
+    }
+
+    const existingContent = existingCommentNotification.content;
+    const match = existingContent.match(/(\w+) commented on your video/);
+    if (match && match[1] !== username) {
+      return `${username} and ${match[1]} commented on your video.`;
+    } else if (existingContent.match(/(\w+) and \w+ commented on your video./)) {
+      return `${username} and ${2} others commented on your video.`;
+    } else if (existingContent.match(/(\w+) and \d+ commented on your video/)) {
+      const numOthers = parseInt(existingContent.match(/(\w+) and (\d+) others commented on your video/)[2], 10);
+      return `${username} and ${numOthers + 1} others commented on your video.`;
+    } else {
+      return `${username} commented on your video.`;
     }
   }
 }

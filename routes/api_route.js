@@ -7,6 +7,7 @@ let router = express.Router();
 var multer = require('multer');
 const { isAuthorized } = require('../utils/auth');
 const NotificationController = require('../controllers/NotificationController');
+const LikedVideosController = require('../controllers/LikedVideoController');
 const upload = multer({ dest: 'uploads/' });
 
 /**
@@ -70,5 +71,9 @@ router.get('/get_reactions', ApiController.getReactions);
 // router.post('/notification', isAuthorized, NotificationController.createNotification);
 router.get('/notification', isAuthorized, NotificationController.getUnreadNotifications);
 router.patch('/notification/:notificationId', isAuthorized, NotificationController.markNotificationAsRead);
+
+// Liked Videos ------------- Can't be created by endpoints. Created internally
+router.get('/liked-videos', isAuthorized, LikedVideosController.get);
+// router.delete('/liked-videos/:id', isAuthorized, LikedVideosController.remove);
 
 module.exports = router;
