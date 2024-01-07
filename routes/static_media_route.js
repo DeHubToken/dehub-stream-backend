@@ -17,8 +17,8 @@ router.get('/covers/:id', async (req, res, next) => {
   res.set('Content-Type', 'image/png');
   res.set('Content-Length', compressedImage.length);
 
-  const sizeInMegabytes = compressedImage.length / (1024 * 1024);
-  console.log(`${sizeInMegabytes.toFixed(2)} MB`);
+  //   const sizeInMegabytes = compressedImage.length / (1024 * 1024);
+  //   console.log(`${sizeInMegabytes.toFixed(2)} MB`);
 
   return res.send(compressedImage);
   //   return res.sendFile(coverImagePath);
@@ -36,8 +36,8 @@ router.get('/avatars/:id', async (req, res, next) => {
   res.set('Content-Type', 'image/png');
   res.set('Content-Length', compressedImage.length);
 
-  const sizeInMegabytes = compressedImage.length / (1024 * 1024);
-  console.log(`${sizeInMegabytes.toFixed(2)} MB`);
+  //   const sizeInMegabytes = compressedImage.length / (1024 * 1024);
+  //   console.log(`${sizeInMegabytes.toFixed(2)} MB`);
 
   return res.send(compressedImage);
   // return res.sendFile(avatarImagePath);
