@@ -1,17 +1,18 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
-const IDCounter = require("./IDCounter");
-const { NFT_NAME_PREFIX } = require("../shared/contants");
+const IDCounter = require('./IDCounter');
+const { NFT_NAME_PREFIX } = require('../shared/contants');
 
-let TokenSchema = new Schema({
+let TokenSchema = new Schema(
+  {
     symbol: String,
-    address: String,  // collection address
+    address: String, // collection address
     name: { type: String, index: true },
     decimals: Number, // 1
-    chainId: Number,  // 56
+    chainId: Number, // 56
     logoURI: String,
-    totalSupply: Number,    // total supply
+    totalSupply: Number, // total supply
     tokenId: { type: Number, unique: true },
     price: Number,
     metaDataUrl: String,
@@ -36,33 +37,34 @@ let TokenSchema = new Schema({
     totalTips: { type: Number, index: true }, // total tips received from any users
     totalFunds: { type: Number, index: true }, // total funds received from pay per view
     status: {
-        type: String,
-        default: "signed",
-        enum: ["signed", "pending", "minted", "deleted", "failed", "burned", "checking"],
+      type: String,
+      default: 'signed',
+      enum: ['signed', 'pending', 'minted', 'deleted', 'failed', 'burned', 'checking'],
     },
     transcodingStatus: String,
     category: [String],
     mintTxHash: String,
-}, { timestamps: true });
+  },
+  { timestamps: true },
+);
 
-
-TokenSchema.pre("save", function (next) {
-    let doc = this;
-    if (!doc.tokenId)
-        IDCounter.findOneAndUpdate(
-            { id: "tokenId" },
-            { $inc: { seq: 1 } },
-            { new: true, upsert: true, setDefaultsOnInsert: true },
-            function (error, counter) {
-                if (error) return next(error);
-                doc.tokenId = counter.seq;
-                if (!doc.name) doc.name = `${NFT_NAME_PREFIX} #${doc.tokenId}`;
-                if (!doc.imageUrl) doc.imageUrl = `nfts/images/${doc.tokenId}.${doc.imageExt ? doc.imageExt : 'png'}`;
-                if (!doc.videoUrl) doc.videoUrl = `streams/video/${doc.tokenId}`;
-                next();
-            }
-        );
-    else next();
+TokenSchema.pre('save', function (next) {
+  let doc = this;
+  if (!doc.tokenId)
+    IDCounter.findOneAndUpdate(
+      { id: 'tokenId' },
+      { $inc: { seq: 1 } },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+      function (error, counter) {
+        if (error) return next(error);
+        doc.tokenId = counter.seq;
+        if (!doc.name) doc.name = `${NFT_NAME_PREFIX} #${doc.tokenId}`;
+        if (!doc.imageUrl) doc.imageUrl = `nfts/images/${doc.tokenId}.${doc.imageExt ? doc.imageExt : 'png'}`;
+        if (!doc.videoUrl) doc.videoUrl = `streams/video/${doc.tokenId}`;
+        next();
+      },
+    );
+  else next();
 });
 
 TokenSchema.index({ minter: 1 });
