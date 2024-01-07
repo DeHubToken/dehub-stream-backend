@@ -141,6 +141,7 @@ const StreamController = {
       const imageLocalFilePath = defaultImageFilePath(parseInt(id), tokenItem.imageExt);
       console.log(imageLocalFilePath);
 
+      // Will have to compress all the images on server later and make sure it gets compressed before it gets stored
       const compressedImage = await sharp(imageLocalFilePath).resize({ width: 800 }).toBuffer();
 
       res.set('Content-Type', 'image/png');
