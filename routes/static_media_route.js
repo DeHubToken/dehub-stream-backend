@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 let router = express.Router();
 const sharp = require('sharp');
+const { reqParam } = require('../utils/auth');
 
 // cover images for address
 router.get('/covers/:id', async (req, res, next) => {
@@ -27,12 +28,13 @@ router.get('/covers/:id', async (req, res, next) => {
 // avatar images for address
 router.get('/avatars/:id', async (req, res, next) => {
   const addressWithExt = req.params?.id;
+  const width = Number(reqParam(req, 'w') || 50);
   if (!addressWithExt || addressWithExt.split('.')?.length < 1) return res.json({ error: true });
   const imageExt = addressWithExt.split('.').pop();
   const address = addressWithExt.substring(0, addressWithExt.length - imageExt.length - 1);
   if (!isAddress(address)) return res.json({ error: true });
   const avatarImagePath = `${path.dirname(__dirname)}/assets/avatars/${address.toLowerCase()}.${imageExt}`;
-  const compressedImage = await sharp(avatarImagePath).resize({ width: 35, fit: 'cover' }).toBuffer();
+  const compressedImage = await sharp(avatarImagePath).resize({ width: width, fit: 'cover' }).toBuffer();
   res.set('Content-Type', 'image/png');
   res.set('Content-Length', compressedImage.length);
 
