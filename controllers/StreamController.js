@@ -13,6 +13,7 @@ const { isAddress } = require('ethers/lib/utils');
 const { Balance } = require('../models/Balance');
 const { normalizeAddress } = require('../utils/format');
 const { isUnlockedPPVStream, isUnlockedLockedContent } = require('../utils/validation');
+const sharp = require('sharp');
 const defaultLimitBuffer = 1 * 1024 * 1024; // 2M
 const defaultInitialBuffer = 160 * 1024; // first 160k is free
 const tokenTemplateForStream = {
@@ -138,8 +139,17 @@ const StreamController = {
     const tokenItem = await Token.findOne({ tokenId: parseInt(id) }, { tokenId: 1, imageExt: 1 }).lean();
     if (tokenItem) {
       const imageLocalFilePath = defaultImageFilePath(parseInt(id), tokenItem.imageExt);
-      // console.log(imageLocalFilePath);
-      return res.sendFile(imageLocalFilePath);
+      console.log(imageLocalFilePath);
+
+      const compressedImage = await sharp(imageLocalFilePath).resize({ width: 800 }).toBuffer();
+
+      res.set('Content-Type', 'image/png');
+      res.set('Content-Length', compressedImage.length);
+      // const sizeInMegabytes = compressedImage.length / (1024 * 1024);
+      // console.log(`${sizeInMegabytes.toFixed(2)} MB`);
+
+      return res.send(compressedImage);
+      // return res.sendFile(imageLocalFilePath);
     }
     return res.json({ error: 'no token' });
   },
