@@ -9,12 +9,13 @@ const { reqParam } = require('../utils/auth');
 // cover images for address
 router.get('/covers/:id', async (req, res, next) => {
   const addressWithExt = req.params?.id;
+  const width = Number(reqParam(req, 'w') || 1200);
   if (!addressWithExt || addressWithExt.split('.')?.length < 1) return res.json({ error: true });
   const imageExt = addressWithExt.split('.').pop();
   const address = addressWithExt.substring(0, addressWithExt.length - imageExt.length - 1);
   if (!isAddress(address)) return res.json({ error: true });
   const coverImagePath = `${path.dirname(__dirname)}/assets/covers/${address.toLowerCase()}.${imageExt}`;
-  const compressedImage = await sharp(coverImagePath).resize({ width: 1200, height: 300, fit: 'cover' }).toBuffer();
+  const compressedImage = await sharp(coverImagePath).resize({ width, height: 300, fit: 'cover' }).toBuffer();
   res.set('Content-Type', 'image/png');
   res.set('Content-Length', compressedImage.length);
 
