@@ -14,7 +14,6 @@ const { Balance } = require('../models/Balance');
 const { normalizeAddress } = require('../utils/format');
 const { isUnlockedPPVStream, isUnlockedLockedContent } = require('../utils/validation');
 const sharp = require('sharp');
-const { reqParam } = require('../utils/auth');
 const defaultLimitBuffer = 1 * 1024 * 1024; // 2M
 const defaultInitialBuffer = 160 * 1024; // first 160k is free
 const tokenTemplateForStream = {
@@ -141,7 +140,6 @@ const StreamController = {
     const tokenItem = await Token.findOne({ tokenId: parseInt(id) }, { tokenId: 1, imageExt: 1 }).lean();
     if (tokenItem) {
       const imageLocalFilePath = defaultImageFilePath(parseInt(id), tokenItem.imageExt);
-      console.log(imageLocalFilePath);
 
       // Will have to compress all the images on server later and make sure it gets compressed before it gets stored
       const compressedImage = await sharp(imageLocalFilePath).resize({ width }).toBuffer();
