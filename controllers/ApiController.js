@@ -477,7 +477,7 @@ const ApiController = {
       return res.json(result);
     } catch (err) {
       console.log('-----request vote error', err);
-      return res.json({ result: false, error: 'voting was failed' });
+      return res.json({ result: false, error: 'Voting failed' });
     }
   },
   requestFollow: async function (req, res, next) {
