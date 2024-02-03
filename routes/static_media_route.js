@@ -6,7 +6,27 @@ let router = express.Router();
 const sharp = require('sharp');
 const { reqParam } = require('../utils/auth');
 
-// cover images for address
+/**
+ * @openapi
+ * /statics/covers/{addressWithExt}:
+ *   get:
+ *     summary: Fetches a cover image
+ *     tags: [Images]
+ *     description: Cover images for profile accounts, width can be changed by adding 'w' in the parameters. It maintains it's aspect ratio
+ *     parameters:
+ *        - name: addressWithExt
+ *          in: path
+ *          required: true
+ *          description: User address with extenstion
+ *          schema:
+ *            type: string
+ *          example: "0x.....jpeg"
+ *        - $ref: '#/parameters/imageWidthQueryParam'
+ *     responses:
+ *       200:
+ *         description: OK
+ */
+
 router.get('/covers/:id', async (req, res, next) => {
   const addressWithExt = req.params?.id;
   const width = Number(reqParam(req, 'w') || 1200);
@@ -26,7 +46,27 @@ router.get('/covers/:id', async (req, res, next) => {
   //   return res.sendFile(coverImagePath);
 });
 
-// avatar images for address
+/**
+ * @openapi
+ * /statics/avatars/{addressWithExt}:
+ *   get:
+ *     summary: Fetches an avatar
+ *     tags: [Images]
+ *     description: Avatar images for profile accounts, width can be changed by adding 'w' in the parameters. It maintains it's aspect ratio
+ *     parameters:
+ *        - name: addressWithExt
+ *          in: path
+ *          required: true
+ *          description: User address with extenstion
+ *          schema:
+ *            type: string
+ *          example: "0x.....jpeg"
+ *        - $ref: '#/parameters/imageWidthQueryParam'
+ *     responses:
+ *       200:
+ *         description: OK
+ */
+
 router.get('/avatars/:id', async (req, res, next) => {
   const addressWithExt = req.params?.id;
   const width = Number(reqParam(req, 'w') || 50);

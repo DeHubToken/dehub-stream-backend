@@ -9,6 +9,8 @@ let cors = require('cors');
 let cookieParser = require('cookie-parser');
 let bodyParser = require('body-parser');
 let methodOverride = require('method-override');
+const swaggerUi = require('swagger-ui-express');
+const OpenApiValidator = require('express-openapi-validator');
 
 let app = express();
 let { config } = require('./config');
@@ -17,6 +19,7 @@ let api_route = require('./routes/api_route');
 let stream_route = require('./routes/stream_route');
 let nft_data_route = require('./routes/nft_metadata_route');
 let static_media_route = require('./routes/static_media_route');
+const docs_route = require('./routes/swagger_route');
 const webSockets = require('./controllers/SocketsController');
 
 const socketServer = http.createServer(app);
@@ -78,21 +81,44 @@ mongoose.connect(
 
       app.use('/statics', attachDB, static_media_route);
 
+      app.use('/documentation', swaggerUi.serve, swaggerUi.setup(docs_route));
+
+      // app.use(
+      //   OpenApiValidator.middleware({
+      //     apiSpec: docs_route,
+      //     validateRequests: true,
+      //     validateResponses: true,
+      //   }),
+      // );
+
       io.on('connection', socket => {
         webSockets(socket, io);
       });
+
       /**
-       * Error Routes
-       * */
-      app.get('*', function (req, res, next) {
-        res.status(405).json({ message: 'Method Not Supported' });
-      });
+       * @openapi
+       * /404:
+       *   get:
+       *     summary: 404 response
+       *     tags: [Misc]
+       *     description: 404 response
+       *     responses:
+       *       404:
+       *         description: Page not found
+       */
       app.get('/404', function (req, res, next) {
-        res.send('404 Error');
+        res.status(404).send('404 Error');
       });
+      app.get('*', function (req, res, next) {
+        res
+          .status(405)
+          .json({ message: `http method '${req.method}' for API endpoint (${req.originalUrl}) is not allowed` });
+        // throw new Error(`http method '${req.method}' for API endpoint (${req.originalUrl}) is not allowed`)
+      });
+
       1;
       app.use((err, req, res, next) => {
-        // console.log('------error', err);
+        console.log(err);
         res.status(err.status || 500);
         res.send('500 Error');
       });

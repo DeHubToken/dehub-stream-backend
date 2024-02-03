@@ -15,12 +15,10 @@ const initializeOnlineUsers = async () => {
 };
 
 const addUserToOnlineList = async userAddress => {
-  // await Account.updateOne({ address: userAddress }, { online: true });
   onlineUsers.add(userAddress);
 };
 
 const removeUserFromOnlineList = async userAddress => {
-  // await Account.updateOne({ address: userAddress }, { online: false });
   onlineUsers.delete(userAddress);
 };
 

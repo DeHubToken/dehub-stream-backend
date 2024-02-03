@@ -1,7 +1,5 @@
-// const { ethers } = require("ethers");
 let express = require('express');
 const fs = require('fs');
-// const path = require("path");
 const { ApiController } = require('../controllers/ApiController');
 let router = express.Router();
 var multer = require('multer');
@@ -11,10 +9,71 @@ const LikedVideosController = require('../controllers/LikedVideoController');
 const upload = multer({ dest: 'uploads/' });
 
 /**
- * return server time as second unit
+ * @openapi
+ * /api/getServerTime:
+ *   get:
+ *     summary: Server time
+ *     tags: [Misc]
+ *     description: Returns server time in second
+ *     responses:
+ *       200:
+ *         description: OK
  */
+
 router.get('/getServerTime', ApiController.getServerTime);
+
+/**
+ * @openapi
+ * /api/signinWithWallet:
+ *   post:
+ *     summary: Sign in with wallet
+ *     tags: [Auth]
+ *     description: Signs in an authorized user and update their lastLoginTimestamp
+ *     parameters:
+ *        - $ref: '#/parameters/addressQueryParam'
+ *        - $ref: '#/parameters/sigQueryParam'
+ *        - $ref: '#/parameters/timestampQueryParam'
+ *     responses:
+ *       200:
+ *         description: OK
+ */
+
 router.post('/signinWithWallet', isAuthorized, ApiController.signWithWallet);
+
+/**
+ * @openapi
+ * /api/user_mint:
+ *   post:
+ *     summary: Video and Image Upload for NFT Minting
+ *     tags: [Users, Videos]
+ *     description: |
+ *       Mint a token/Video by uploading video and image files.
+ *     parameters:
+ *       - $ref: '#/parameters/addressQueryParam'
+ *       - $ref: '#/parameters/sigQueryParam'
+ *       - $ref: '#/parameters/timestampQueryParam'
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *            schema:
+ *     responses:
+ *       '200':
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               message: NFT minted successfully
+ *       '400':
+ *         description: Bad Request
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: false
+ *               message: Invalid request payload or files
+ */
+// continue later
 router.post(
   '/user_mint',
   upload.fields([{ name: 'files', maxCount: 2 }]),
