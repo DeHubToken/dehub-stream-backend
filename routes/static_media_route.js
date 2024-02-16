@@ -5,6 +5,8 @@ const path = require('path');
 let router = express.Router();
 const sharp = require('sharp');
 const { reqParam } = require('../utils/auth');
+const uniqid = require('uniqid');
+const { moveFile } = require('../utils/file');
 
 /**
  * @openapi
@@ -84,6 +86,49 @@ router.get('/avatars/:id', async (req, res, next) => {
 
   return res.send(compressedImage);
   // return res.sendFile(avatarImagePath);
+});
+
+router.post('/chat-image', async (req, res, next) => {
+  const multiple = req?.body?.multiple;
+  console.log(req.body, req.files);
+  try {
+    if (!multiple) {
+      const image = req.files?.image?.[0];
+      if (!image) return res.status(400).json({ message: 'No file uploaded.' });
+      const imageExt = image.originalname.substr(image.originalname.toString().indexOf('.') + 1);
+      const imagePath = `${path.dirname(__dirname)}/chat/images/${uniqid()}.${imageExt}`;
+      moveFile(image.path, imagePath);
+      return res.json({ message: 'Image created', url: imagePath });
+    } else {
+      const images = req.files?.images;
+      if (!images || images.length === 0) {
+        return res.status(400).json({ message: 'No images provided' });
+      }
+
+      const imageLinks = [];
+      for (const image of images) {
+        const imageExt = path.extname(image.originalname);
+        const fileName = `${uuidv4()}${imageExt}`;
+        const imagePath = path.join(__dirname, `/chat/images/${fileName}`);
+        await image.mv(imagePath);
+        imageLinks.push(imagePath);
+      }
+      return res.json({ message: 'Image created', urls: imageLinks });
+    }
+  } catch (error) {
+    console.error('Error uploading images:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+router.get('/chat/images/:fileName', (req, res) => {
+  const { fileName } = req.params;
+  const filePath = path.join(__dirname, `/chat/images/${fileName}`);
+  if (fs.existsSync(filePath)) {
+    res.sendFile(filePath);
+  } else {
+    res.status(404).json({ message: 'Image not found' });
+  }
 });
 
 module.exports = router;
