@@ -131,5 +131,10 @@ dist
 /assets/avatars/*
 !/assets/avatars/holder.md
 !/uploads/holder.md
+
+# uploaded chat  images
+/assets/chat/images/*
+!/assets/chat/images/holder.md
+
 temp.text
 fast.test.js
