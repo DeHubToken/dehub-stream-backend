@@ -93,16 +93,16 @@ router.get('/avatars/:id', async (req, res, next) => {
 router.post('/chat-image', upload.fields([{ name: 'images', maxCount: 5 }]), async (req, res, next) => {
   try {
     const images = req.files?.images;
-    console.log(req.files);
     if (!images || images.length === 0) {
       return res.status(400).json({ message: 'No images provided' });
     }
     const imageLinks = [];
     for (const image of images) {
       const imageExt = image.originalname.substr(image.originalname.toString().indexOf('.') + 1);
-      const imagePath = `${path.dirname(__dirname)}/assets/chat/images/${uniqid()}.${imageExt}`;
+      const id = uniqid();
+      const imagePath = `${path.dirname(__dirname)}/assets/chat/images/${id}.${imageExt}`;
       moveFile(image.path, imagePath);
-      imageLinks.push(imagePath);
+      imageLinks.push(`statics/chat-images/${id}.${imageExt}`);
     }
     return res.json({ message: 'Image created', urls: imageLinks });
   } catch (error) {
@@ -111,9 +111,9 @@ router.post('/chat-image', upload.fields([{ name: 'images', maxCount: 5 }]), asy
   }
 });
 
-router.get('/chat/images/:fileName', (req, res) => {
+router.get('/chat-images/:fileName', (req, res) => {
   const { fileName } = req.params;
-  const filePath = path.join(__dirname, `/chat/images/${fileName}`);
+  const filePath = path.join(path.dirname(__dirname), `/assets/chat/images/${fileName}`);
   if (fs.existsSync(filePath)) {
     res.sendFile(filePath);
   } else {
