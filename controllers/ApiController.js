@@ -136,7 +136,8 @@ const ApiController = {
   },
   getFilteredNfts: async function (req, res, next) {
     try {
-      let { search, page, unit, sortMode, bulkIdList, verifiedOnly, isSales, minter, owner, category } = req.query;
+      let { search, page, unit, sortMode, bulkIdList, verifiedOnly, isSales, minter, owner, category, range } =
+        req.query;
       const searchQuery = {};
       if (!unit) unit = 20;
       if (unit > 100) unit = 100;
@@ -145,10 +146,47 @@ const ApiController = {
       searchQuery['$match'] = { status: 'minted' };
       switch (sortMode) {
         case 'trends':
+          if (range) {
+            let fromDate = new Date();
+            switch (range) {
+              case 'day':
+                fromDate.setDate(fromDate.getDate() - 1);
+                break;
+              case 'week':
+                fromDate.setDate(fromDate.getDate() - 7);
+                break;
+              case 'month':
+                fromDate.setMonth(fromDate.getMonth() - 1);
+                break;
+              case 'year':
+                fromDate.setFullYear(fromDate.getFullYear() - 1);
+                break;
+            }
+            searchQuery['$match']['createdAt'] = { $gt: fromDate };
+          }
           sortRule = { views: -1 };
           break;
         case 'new':
-          searchQuery['$match']['createdAt'] = { $gt: new Date(new Date() - config.recentTimeDiff) };
+          if (range) {
+            let fromDate = new Date();
+            switch (range) {
+              case 'day':
+                fromDate.setDate(fromDate.getDate() - 1);
+                break;
+              case 'week':
+                fromDate.setDate(fromDate.getDate() - 7);
+                break;
+              case 'month':
+                fromDate.setMonth(fromDate.getMonth() - 1);
+                break;
+              case 'year':
+                fromDate.setFullYear(fromDate.getFullYear() - 1);
+                break;
+            }
+            searchQuery['$match']['createdAt'] = { $gt: fromDate };
+          } else {
+            searchQuery['$match']['createdAt'] = { $gt: new Date(new Date() - config.recentTimeDiff) };
+          }
           break;
         case 'mostLiked':
           sortRule = { likes: -1 };
