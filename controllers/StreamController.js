@@ -26,15 +26,15 @@ const StreamController = {
     let tokenId = req.params.id;
     const signParams = req.query;
     // { sig: '', timestamp: '0', account: 'undefined' } when not connecting with wallet
-    if (!tokenId) return res.json({ error: 'error!' });
+    if (!tokenId) return res.status(400).json({ error: 'Bad Request: Token Id is required' });
     try {
       tokenId = parseInt(tokenId);
     } catch (e) {
-      return res.json({ error: 'error!' });
+      return res.status(400).json({ error: 'Bad Request: Token Id is required' });
     }
     console.log('----start stream:', tokenId);
     const tokenItem = await Token.findOne({ tokenId, status: 'minted' }, tokenTemplateForStream).lean();
-    if (!tokenItem) return res.json({ error: 'no stream!' });
+    if (!tokenItem) return res.status(404).json({ error: 'Not Found: Token not found' });
     const videoPath = `${path.dirname(__dirname)}/assets/videos/${tokenId}.mp4`;
     let fileSize;
     if (tokenItem.videoInfo?.size) {
@@ -44,9 +44,9 @@ const StreamController = {
         let videoStat;
         videoStat = fs.statSync(videoPath);
         fileSize = videoStat.size;
-      } catch {
+      } catch (e) {
         console.log('----not video', tokenId);
-        return res.json({ error: 'error!' });
+        return res.status(500).json({ error: e.message || 'Internal Server Error' });
       }
     }
     const videoRange = req.headers.range;
@@ -136,7 +136,7 @@ const StreamController = {
   getImage: async function (req, res, next) {
     const id = req.params.id;
     const width = Number(reqParam(req, 'w') || 450);
-    if (!id) return res.json({ error: 'not image' });
+    if (!id) return res.status(400).json({ error: 'Bad Request: Id is required' });
     const tokenItem = await Token.findOne({ tokenId: parseInt(id) }, { tokenId: 1, imageExt: 1 }).lean();
     if (tokenItem) {
       const imageLocalFilePath = defaultImageFilePath(parseInt(id), tokenItem.imageExt);
@@ -152,11 +152,11 @@ const StreamController = {
       return res.send(compressedImage);
       // return res.sendFile(imageLocalFilePath);
     }
-    return res.json({ error: 'no token' });
+    return res.status(404).json({ error: 'Token not found' });
   },
   getMetaData: async function (req, res, next) {
     const tokenId = req.params.id;
-    if (!tokenId) return json({});
+    if (!tokenId) return res.status(400).json({ error: 'Bad Request: tokenId is required' });
     const tokenTemplate = {
       name: 1,
       description: 1,

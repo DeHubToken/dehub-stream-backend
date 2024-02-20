@@ -80,24 +80,27 @@ const ApiController = {
         { lastLoginTimestamp: Date.now() },
         { upsert: true, new: true, setDefaultsOnInsert: true },
       ).lean();
-      if (!account) return res.json({ status: false, error: true, error_msg: 'not found account' });
+      if (!account)
+        return res.status(404).json({ status: false, error: true, error_message: 'Not Found: Account not found' });
       return res.json({
         status: true,
         result: { address: signedAddress, lastLoginTimestamp: account.lastLoginTimestamp },
       });
     } catch (e) {
-      return res.json({ error: true, msg: 'sign error' });
+      return res.status(500).json({ error: true, message: 'Sign Error' });
     }
   },
   getSignedDataForUserMint: async function (req, res, next) {
     const { address, name, description, streamInfo, chainId, category } = req.body;
     console.log('upload:', name, description, streamInfo, chainId, JSON.parse(category));
     const uploadedFiles = req.files.files;
-    if (uploadedFiles?.length < 2) return res.json({ error: true, msg: 'upload image and video file' });
+    if (uploadedFiles?.length < 2)
+      return res.status(400).json({ error: true, message: 'Both Image and Video files are needed' });
     const videoFile = uploadedFiles[0];
-    if (!checkFileType(videoFile)) return res.json({ error: true, msg: errorMsgs.not_supported_video });
+    if (!checkFileType(videoFile)) return res.status(400).json({ error: true, message: errorMsgs.not_supported_video });
     const imageFile = uploadedFiles[1];
-    if (!checkFileType(imageFile, 'image')) return res.json({ error: true, msg: errorMsgs.not_supported_image });
+    if (!checkFileType(imageFile, 'image'))
+      return res.status(400).json({ error: true, message: errorMsgs.not_supported_image });
     try {
       const result = await signatureForMintingNFT(
         videoFile,
@@ -112,7 +115,7 @@ const ApiController = {
       return res.json(result);
     } catch (err) {
       console.log('-----getSignedDataForUserMint error', err);
-      return res.json({ result: false, error: 'Uploading was failed' });
+      return res.status(500).json({ result: false, error: 'Uploading failed' });
     }
   },
   getAllNfts: async function (req, res, next) {
@@ -127,7 +130,7 @@ const ApiController = {
     const skip = req.body.skip || req.query.skip || 0;
     const limit = req.body.limit || req.query.limit || 1000;
     const owner = req.body.owner || req.query.owner;
-    if (!owner) return res.json({ error: 'no owner field!' });
+    if (!owner) return res.status(400).json({ error: 'Owner field is required' });
     // const filter = { status: 'minted', $or: [{ owner: owner.toLowerCase() }, { minter: owner.toLowerCase() }] };
     const filter = { status: 'minted', minter: owner.toLowerCase() };
     const totalCount = await Token.find(filter, tokenTemplate).count();
@@ -244,7 +247,7 @@ const ApiController = {
   getMyWatchedNfts: async function (req, res, next) {
     let watcherAddress = req.query.watcherAddress || req.query.watcherAddress;
     const category = reqParam(req, 'category');
-    if (!watcherAddress) return res.json({ error: 'not define watcherAddress' });
+    if (!watcherAddress) return res.status(400).json({ error: 'Watcher address is required' });
     watcherAddress = watcherAddress.toLowerCase();
     const watchedTokenIds = await WatchHistory.find({ watcherAddress }).limit(20).distinct('tokenId');
     if (!watchedTokenIds || watchedTokenIds.length < 1) return res.json({ result: [] });
@@ -261,10 +264,10 @@ const ApiController = {
   },
   getNftInfo: async function (req, res, next) {
     let tokenId = req.query.id || req.query.id || req.params?.id;
-    if (!tokenId) return res.json({ error: 'not define tokenId' });
+    if (!tokenId) return res.status(400).json({ error: 'Bad request: No token id' });
     // const nftInfo = await Token.findOne({ tokenId }, tokenTemplate).lean();
     const nftInfo = (await getStreamNfts({ tokenId: Number(tokenId) }, 0, 1))?.[0];
-    if (!nftInfo) return res.json({ error: 'no nft' });
+    if (!nftInfo) return res.status(404).json({ error: 'Not Found: NFT does not exist' });
     nftInfo.imageUrl = process.env.DEFAULT_DOMAIN + '/' + nftInfo.imageUrl;
     nftInfo.videoUrl = process.env.DEFAULT_DOMAIN + '/' + nftInfo.videoUrl;
     const comments = await commentsForTokenId(tokenId);
@@ -274,7 +277,7 @@ const ApiController = {
   getAccountInfo: async function (req, res, next) {
     /// walletAddress param can be username or address
     let walletAddress = req.query.id || req.query.id || req.params?.id;
-    if (!walletAddress) return res.json({ error: 'not define wallet' });
+    if (!walletAddress) return res.status(400).json({ error: 'Bad request: No wallet sent' });
     walletAddress = normalizeAddress(walletAddress);
     let accountInfo = await Account.findOne(
       { $or: [{ address: walletAddress }, { username: walletAddress }] },
@@ -285,7 +288,7 @@ const ApiController = {
       { chainId: 1, tokenAddress: 1, walletBalance: 1, staked: 1, _id: 0 },
     );
     if (!balanceData?.length && !accountInfo && !isAddress(walletAddress)) {
-      return res.json({ error: 'no account', result: false });
+      return res.status(404).json({ error: 'Not Found: Account not found', result: false });
     } else if (accountInfo) {
       walletAddress = accountInfo?.address;
     } else {
@@ -305,7 +308,7 @@ const ApiController = {
   getUnlockedNfts: async function (req, res, next) {
     /// walletAddress param can be username or address
     let walletAddress = req.query.id || req.query.id || req.params?.id;
-    if (!walletAddress) return res.json({ error: 'not define wallet' });
+    if (!walletAddress) return res.status(400).json({ error: 'Bad request: No wallet sent' });
     walletAddress = normalizeAddress(walletAddress);
     let accountInfo = {};
     const unlockedPPVStreams = await PPVTransaction.find(
@@ -323,7 +326,7 @@ const ApiController = {
     let chainId = reqParam(req, paramNames.chainId);
     const tokenAddress = reqParam(req, paramNames.tokenAddress);
     if (!rawSig || !address || !timestamp || !chainId)
-      return res.json({ error: true, msg: 'sig or address not exist' });
+      return res.status(400).json({ error: true, message: 'Signature, Address, Timestamp and chain ID are required' });
     try {
       chainId = parseInt(chainId, 10);
       const result = await signatureForClaim(
@@ -337,7 +340,7 @@ const ApiController = {
       return res.json(result);
     } catch (err) {
       console.log('-----getSignedDataForClaim error', err);
-      return res.json({ result: false, error: 'claim was failed' });
+      return res.status(500).json({ result: false, error: 'Claim Failed' });
     }
   },
   updateProfile: async function (req, res, next) {
@@ -415,7 +418,7 @@ const ApiController = {
     let chainId = reqParam(req, paramNames.chainId);
     let streamTokenId = reqParam(req, paramNames.streamTokenId);
     if (!rawSig || !address || !timestamp || !chainId)
-      return res.json({ error: true, msg: 'sig or address not exist' });
+      return res.status(400).json({ error: true, message: 'Signature, Address, Timestamp and chain ID are required' });
     try {
       chainId = parseInt(chainId, 10);
       streamTokenId = parseInt(streamTokenId, 10);
@@ -423,20 +426,20 @@ const ApiController = {
       return res.json(result);
     } catch (err) {
       console.log('-----request ppv error', err);
-      return res.json({ result: false, error: 'request ppv stream was failed' });
+      return res.status(500).json({ result: false, error: 'Request for PPV stream failed' });
     }
   },
   requestLike: async function (req, res, next) {
     const address = reqParam(req, paramNames.address);
     let streamTokenId = reqParam(req, paramNames.streamTokenId);
-    if (!streamTokenId) return res.json({ error: true, msg: 'tokenId does not exist' });
+    if (!streamTokenId) return res.status(404).json({ error: true, message: 'Not Found: Token does not exist' });
     try {
       streamTokenId = parseInt(streamTokenId, 10);
       const result = await requestLike(address, streamTokenId);
       return res.json(result);
     } catch (err) {
       console.log('-----request like error', err);
-      return res.json({ result: false, error: 'request ppv stream was failed' });
+      return res.status(500).json({ result: false, error: 'Like request failed' });
     }
   },
   leaderboard: async function (req, res, next) {
@@ -448,11 +451,12 @@ const ApiController = {
     let amount = reqParam(req, 'amount');
     let chainId = reqParam(req, 'chainId');
     let streamTokenId = reqParam(req, paramNames.streamTokenId);
-    if (!streamTokenId) return res.json({ error: true, msg: 'streamTokenId not exist' });
+    if (!streamTokenId) return res.status(404).json({ error: true, message: 'Not Found: Token does not exist' });
     try {
       amount = Number(amount);
       chainId = parseInt(chainId, 10);
-      if (!isValidTipAmount(amount)) return res.json({ error: true, msg: 'Invalid tip amount!' });
+      if (!isValidTipAmount(amount))
+        return res.status(400).json({ error: true, message: 'Bad request: Invalid tip amount!' });
       streamTokenId = parseInt(streamTokenId, 10);
       const owner = await Token.findOne({ tokenId: streamTokenId }, {}).lean();
       const result = await requestTip(address, streamTokenId, amount, chainId);
@@ -462,8 +466,8 @@ const ApiController = {
       });
       return res.json(result);
     } catch (err) {
-      console.log('-----request like error', err);
-      return res.json({ result: false, error: 'request ppv stream was failed' });
+      console.log('-----request tip error', err);
+      return res.status(500).json({ result: false, error: 'Tip failed' });
     }
   },
   requestComment: async function (req, res, next) {
@@ -471,9 +475,9 @@ const ApiController = {
     let content = reqParam(req, 'content');
     let commentId = reqParam(req, 'commentId');
     let streamTokenId = reqParam(req, paramNames.streamTokenId);
-    if (!streamTokenId) return res.json({ error: true, msg: 'streamTokenId not exist' });
+    if (!streamTokenId) return res.status(404).json({ error: true, message: 'Not Found: Token does not exist' });
     try {
-      if (!content) return res.json({ error: true, msg: 'no comment!' });
+      if (!content) return res.status(400).json({ error: true, message: 'Comment content is required' });
       streamTokenId = parseInt(streamTokenId, 10);
       commentId = commentId ? parseInt(commentId, 10) : undefined;
       const owner = await Token.findOne({ tokenId: streamTokenId }, {}).lean();
@@ -486,16 +490,16 @@ const ApiController = {
       return res.json(result);
     } catch (err) {
       console.log('-----request comment error', err);
-      return res.json({ result: false, error: 'comment was failed' });
+      return res.status(500).json({ result: false, error: 'Comment failed' });
     }
   },
   requestVote: async function (req, res, next) {
     const address = reqParam(req, paramNames.address);
     const vote = reqParam(req, 'vote'); // 'true' => yes or 'false' => no
     let streamTokenId = reqParam(req, paramNames.streamTokenId);
-    if (!streamTokenId) return res.json({ error: true, msg: 'streamTokenId not exist' });
+    if (!streamTokenId) return res.status(404).json({ error: true, message: 'Not Found: Token does not exist' });
     try {
-      if (!vote) return res.json({ error: true, msg: 'no vote!' });
+      if (!vote) return res.status(400).json({ error: true, message: 'Vote params is required' });
       streamTokenId = parseInt(streamTokenId, 10);
       const owner = await Token.findOne({ tokenId: streamTokenId }, {}).lean();
       const result = await requestVote(address, streamTokenId, vote.toString());
@@ -515,14 +519,15 @@ const ApiController = {
       return res.json(result);
     } catch (err) {
       console.log('-----request vote error', err);
-      return res.json({ result: false, error: 'Voting failed' });
+      return res.status(500).json({ result: false, error: 'Voting failed' });
     }
   },
   requestFollow: async function (req, res, next) {
     const address = reqParam(req, paramNames.address);
     const following = reqParam(req, 'following');
     const unFollowing = reqParam(req, 'unFollowing');
-    if (!following && !isAddress(following)) return res.json({ error: true, msg: 'following param is missing' });
+    if (!following && !isAddress(following))
+      return res.status(400).json({ error: true, message: 'Following params is required' });
     try {
       let result = undefined;
       if (unFollowing != 'true') {
@@ -534,13 +539,14 @@ const ApiController = {
       return res.json(result);
     } catch (err) {
       console.log('-----request follow error', err);
-      return res.json({ result: false, error: 'following was failed' });
+      return res.status(500).json({ result: false, error: 'Following failed' });
     }
   },
   getSignForClaimBounty: async function (req, res, next) {
     const address = reqParam(req, paramNames.address);
     const tokenId = reqParam(req, 'tokenId');
-    if (!address || !tokenId) return res.json({ result: false, error: 'not params' });
+    if (!address || !tokenId)
+      return res.status(400).json({ result: false, error: 'Address and token ID are required' });
     const eligibleResult = await eligibleBountyForAccount(address, tokenId);
     const result = { error: false, result: {}, claimed: {} };
     if (eligibleResult?.viewer_claimed) result.result.viewer_claimed = true;
@@ -556,7 +562,7 @@ const ApiController = {
     }
     if (result.result.viewer || result.result.commentor) return res.json(result);
     else {
-      result.error = 'not eligible';
+      result.error = 'Not Eligible';
       return res.json(result);
     }
   },
@@ -565,10 +571,10 @@ const ApiController = {
     try {
       const result = await Category.updateOne({ name }, { name }, overrideOptions);
       if (result.upserted) return res.json({ result: true });
-      else return res.json({ result: false, error: 'Already exists the category' });
+      else return res.status(409).json({ result: false, error: 'Already exists' });
     } catch (err) {
       console.log('-----add category error', err);
-      return res.json({ result: false, error: 'adding category was failed' });
+      return res.status(500).json({ result: false, error: 'Could not add Category' });
     }
   },
   getCategories: async function (req, res, next) {
@@ -577,7 +583,7 @@ const ApiController = {
       return res.json(result);
     } catch (err) {
       console.log('-----request follow error', err);
-      return res.json({ result: false, error: 'following was failed' });
+      return res.status(500).json({ result: false, error: 'Could not fetch catergories' });
     }
   },
   getUsernames: async function (req, res, next) {
@@ -585,8 +591,8 @@ const ApiController = {
       let result = await Account.find({}, { username: 1 }).distinct('username');
       return res.json(result);
     } catch (err) {
-      console.log('-----request follow error', err);
-      return res.json({ result: false, error: 'following was failed' });
+      console.log('-----request getUsernames error', err);
+      return res.status(500).json({ result: false, error: 'Failed to fetch username' });
     }
   },
   isValidUsername: async function (req, res, next) {
@@ -595,8 +601,8 @@ const ApiController = {
     try {
       return res.json(await isValidUsername(normalizeAddress(address), normalizeAddress(username)));
     } catch (err) {
-      console.log('-----request follow error', err);
-      return res.json({ result: false, error: 'following was failed' });
+      console.log('-----validate username error', err);
+      return res.status(500).json({ result: false, error: 'Could not validate username' });
     }
   },
   getNumberOfUsers: async function (req, res, next) {
@@ -610,7 +616,8 @@ const ApiController = {
   },
   publicAccountData: async function (req, res, next) {
     const addressList = reqParam(req, 'addressList');
-    if (!addressList || addressList.length < 1) return res.json({ result: false, error: 'no addressList' });
+    if (!addressList || addressList.length < 1)
+      return res.status(400).json({ result: false, error: 'Bad Request: Address List is required' });
     try {
       const accountTemplate = {
         _id: 0,
@@ -621,8 +628,8 @@ const ApiController = {
       };
       return res.json({ result: await Account.find({ address: { $in: addressList } }, accountTemplate) });
     } catch (err) {
-      console.log('-----request follow error', err);
-      return res.json({ result: false, error: 'following was failed' });
+      console.log('-----public account data', err);
+      return res.status(500).json({ result: false, error: error.message || 'Could not fetch account data' });
     }
   },
   requestReaction: async function (req, res, next) {
@@ -630,13 +637,16 @@ const ApiController = {
     const reactionType = reqParam(req, 'reactionType');
     const subjectType = reqParam(req, 'subjectType');
     const subjectId = reqParam(req, 'subjectId');
-    if (!subjectId || !reactionType || !subjectType) return res.json({ error: true, msg: 'params not exist' });
+    if (!subjectId || !reactionType || !subjectType)
+      return res
+        .status(400)
+        .json({ error: true, message: 'address, reactionType, subjectType and subjectId are required' });
     try {
       const result = await requestReaction({ address, subjectId, reactionType, subjectType });
       return res.json(result);
     } catch (err) {
       console.log('-----request reaction error', err);
-      return res.json({ result: false, error: 'reaction was failed' });
+      return res.status(500).json({ result: false, error: error.message || 'Reaction failed' });
     }
   },
   getReactions: async function (req, res, next) {
