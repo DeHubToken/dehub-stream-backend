@@ -212,13 +212,7 @@ const ApiController = {
       if (category) {
         searchQuery['$match']['category'] = { $elemMatch: { $eq: category } };
       }
-      if (search) {
-        if (!isValidSearch(search)) return res.json({ result: [] });
-        var re = new RegExp(search, 'gi');
-        let orOptions = [{ name: re }, { description: re }, { owner: normalizeAddress(re) }];
-        if (Number(search) > 0) orOptions.push({ tokenId: Number(search) });
-        searchQuery['$match'] = { ...searchQuery['$match'], $or: orOptions };
-      }
+
       if (bulkIdList) {
         let idList = bulkIdList.split('-');
         if (idList.length > 0) {
@@ -231,6 +225,28 @@ const ApiController = {
         searchQuery['$match'] = { ...searchQuery['$match'], verified: true };
       }
 
+      if (search) {
+        if (!isValidSearch(search)) return res.json({ result: [] });
+        var re = new RegExp(search, 'gi');
+        let orOptions = [{ name: re }, { description: re }, { owner: normalizeAddress(re) }];
+        if (Number(search) > 0) orOptions.push({ tokenId: Number(search) });
+        searchQuery['$match'] = { ...searchQuery['$match'], $or: orOptions };
+
+        // Search through the accounts table
+        const accounts = await Account.find({ username: { $regex: new RegExp(search, 'i') } });
+        const videos = await getStreamNfts(
+          searchQuery['$match'],
+          parseInt(unit * page),
+          parseInt(unit * page + unit * 1),
+          sortRule,
+        );
+        return res.send({
+          result: {
+            accounts,
+            videos,
+          },
+        });
+      }
       const ret = await getStreamNfts(
         searchQuery['$match'],
         parseInt(unit * page),
