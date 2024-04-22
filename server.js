@@ -81,7 +81,7 @@ mongoose.connect(
 
       app.use('/statics', attachDB, static_media_route);
 
-      app.use('/documentation', swaggerUi.serve, swaggerUi.setup(docs_route));
+      app.use('/dehub-documentation', swaggerUi.serve, swaggerUi.setup(docs_route));
 
       // app.use(
       //   OpenApiValidator.middleware({

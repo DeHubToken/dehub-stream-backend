@@ -25,11 +25,11 @@ router.get('/getServerTime', ApiController.getServerTime);
 
 /**
  * @openapi
- * /api/signinWithWallet:
+ * /api/loginWithWallet:
  *   post:
  *     summary: Sign in with wallet
  *     tags: [Auth]
- *     description: Signs in an authorized user and update their lastLoginTimestamp
+ *     description: Signs in an authorized user, update their lastLoginTimestamp and returns jwt token
  *     parameters:
  *        - $ref: '#/parameters/addressQueryParam'
  *        - $ref: '#/parameters/sigQueryParam'
