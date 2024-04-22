@@ -6,6 +6,7 @@ var multer = require('multer');
 const { isAuthorized } = require('../utils/auth');
 const NotificationController = require('../controllers/NotificationController');
 const LikedVideosController = require('../controllers/LikedVideoController');
+const usernameRoutes = require('./username_route');
 const upload = multer({ dest: 'uploads/' });
 
 /**
@@ -39,6 +40,8 @@ router.get('/getServerTime', ApiController.getServerTime);
  */
 
 router.post('/signinWithWallet', isAuthorized, ApiController.signWithWallet);
+
+router.post('/loginWithWallet', isAuthorized, ApiController.login);
 
 /**
  * @openapi
@@ -134,5 +137,8 @@ router.patch('/notification/:notificationId', isAuthorized, NotificationControll
 // Liked Videos ------------- Can't be created by endpoints. Created internally
 router.get('/liked-videos', isAuthorized, LikedVideosController.get);
 // router.delete('/liked-videos/:id', isAuthorized, LikedVideosController.remove);
+
+// Usernames delegation and sales
+router.use('/username', usernameRoutes);
 
 module.exports = router;

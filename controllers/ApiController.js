@@ -90,6 +90,27 @@ const ApiController = {
       return res.status(500).json({ error: true, message: 'Sign Error' });
     }
   },
+  login: async function (req, res, next) {
+    let address = reqParam(req, paramNames.address);
+    address = address.toLowerCase();
+    try {
+      const account = await Account.findOneAndUpdate(
+        { address },
+        { lastLoginTimestamp: Date.now() },
+        { upsert: true, new: true, setDefaultsOnInsert: true },
+      ).lean();
+      if (!account)
+        return res.status(404).json({ status: false, error: true, error_message: 'Not Found: Account not found' });
+      return res.json({
+        token: req.generatedToken,
+        status: true,
+        result: { address: address, lastLoginTimestamp: account.lastLoginTimestamp },
+      });
+    } catch (e) {
+      console.log(e);
+      return res.status(500).json({ error: true, message: 'Sign Error' });
+    }
+  },
   getSignedDataForUserMint: async function (req, res, next) {
     const { address, name, description, streamInfo, chainId, category } = req.body;
     console.log('upload:', name, description, streamInfo, chainId, JSON.parse(category));
