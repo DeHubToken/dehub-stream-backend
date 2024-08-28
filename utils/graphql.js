@@ -3,11 +3,11 @@ const { config } = require('../config');
 
 /**
  * @notice Fetches transaction from graphql
- *  
+ *
  * @param
  */
 const getHistoryFromGraphGL = async (minBlockNumber, maxBlockNumber, url) => {
-    const query = `
+  const query = `
      {
         _meta {
             block {
@@ -21,9 +21,6 @@ const getHistoryFromGraphGL = async (minBlockNumber, maxBlockNumber, url) => {
                 id
             }   
             tokenAddress
-            {
-              id
-            }
             to
             {
               id
@@ -95,32 +92,31 @@ const getHistoryFromGraphGL = async (minBlockNumber, maxBlockNumber, url) => {
             }
         }  
     }`;
-    let retData = undefined;
-    try {
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                query
-            }) // Get some from re-orgs
-        });
-        const result = await res.json();
-        const { data } = result
-        retData = data;
-    }
-    catch (err) {
-        console.log("--fetch graphql error-", err)
-    }
-    return retData;
-}
+  let retData = undefined;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query,
+      }), // Get some from re-orgs
+    });
+    const result = await res.json();
+    const { data } = result;
+    retData = data;
+  } catch (err) {
+    console.log('--fetch graphql error-', err);
+  }
+  return retData;
+};
 
 /**
  * @notice Fetches transaction from graphql
- *  
+ *
  * @param
  */
-const getMintTxesFromGraphGL = async (url) => {
-    const query = `
+const getMintTxesFromGraphGL = async url => {
+  const query = `
      {        
         nftTransfers(where:{from: "0x0000000000000000000000000000000000000000"}, orderBy: tokenId, orderDirection:asc){
             id
@@ -131,26 +127,25 @@ const getMintTxesFromGraphGL = async (url) => {
             }
         }  
     }`;
-    let retData = undefined;
-    try {
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                query
-            }) // Get some from re-orgs
-        });
-        const result = await res.json();
-        const { data } = result
-        retData = data;
-    }
-    catch (err) {
-        console.log("--fetch graphql error-", err)
-    }
-    return retData;
-}
+  let retData = undefined;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query,
+      }), // Get some from re-orgs
+    });
+    const result = await res.json();
+    const { data } = result;
+    retData = data;
+  } catch (err) {
+    console.log('--fetch graphql error-', err);
+  }
+  return retData;
+};
 
 module.exports = {
-    getHistoryFromGraphGL,
-    getMintTxesFromGraphGL,
-}
+  getHistoryFromGraphGL,
+  getMintTxesFromGraphGL,
+};

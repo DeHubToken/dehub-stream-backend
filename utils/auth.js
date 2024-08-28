@@ -66,7 +66,7 @@ const reqParam = (req, paramName) => {
  * @returns call next function if api call is authorized with signed params
  */
 const isAuthorized = async (req, res, next) => {
-  const token = req.headers.authorization.split(' ')[1];
+  const token = req.headers?.authorization?.split(' ')[1];
 
   if (token) {
     try {
