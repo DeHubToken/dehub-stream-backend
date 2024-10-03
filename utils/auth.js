@@ -21,11 +21,12 @@ const isValidAccount = (address, timestamp, sig) => {
   if (!sig || !address || !timestamp) return false;
   // const signedMsg = `${address.toLowerCase()}-${timestamp}`;
   const displayedDate = new Date(timestamp * 1000);
-  const signedMsg = `Welcome to DeHub.io!\n\nClick to sign in for authentication.\nSignatures are valid for ${
-    expireSecond / 3600
-  } hours.\nYour wallet address is ${address.toLowerCase()}.\nIt is ${displayedDate.toUTCString()}.`;
+  // const signedMsg = `Welcome to DeHub!\n\nClick to sign in for authentication.\nSignatures are valid for ${expireSecond / 3600} hours.\nYour wallet address is ${address.toLowerCase()}.\nIt is ${displayedDate.toUTCString()}.`;
+  const signedMsg = `Welcome to Blocjerk!\n\nClick to sign in for authentication.\nSignatures are valid for ${expireSecond / 3600} hours.\nYour wallet address is ${address.toLowerCase()}.\nIt is ${displayedDate.toUTCString()}.`;
+  
   try {
     const signedAddress = ethers.utils.verifyMessage(signedMsg, sig).toLowerCase();
+    console.log(address, signedAddress)
     /**
      * in case of development mode, we don't check signature and timestamp
      */
