@@ -59,17 +59,42 @@ const transcodeVideo = async (tokenId, videoExt) => {
     const tempFilePath = getTempVideoFilePath(tokenId, destVideoExt);
     await Token.updateOne({ tokenId }, { transcodingStatus: 'on' });
     console.log('--started transcoding', tokenId);
+    const clients = {};
+  
     ffmpeg(videoFilePath)
-        .withOutputFormat('mp4')
-        .on('end', async () => {
-            console.log('--finished transcoding', tokenId);
-            moveFile(tempFilePath, defaultVideoFilePath(tokenId, destVideoExt));
-            if (destVideoExt !== videoExt)
-                fs.unlink(videoFilePath, error => { if (error) console.error('delete source video error!', tokenId, videoExt) });
-            await updateVideoInfo(tokenId, destVideoExt);
-        })
-        .saveToFile(tempFilePath);
-}
+      .withOutputFormat('mp4')
+      .on('progress', progress => {
+        console.log(`Transcoding progress: ${progress.percent}%`);
+        // Send progress updates to the connected client
+        if (clients[tokenId]) {
+          clients[tokenId].write(`data: ${JSON.stringify({ progress: progress.percent })}\n\n`);
+        }
+      })
+      .on('end', async () => {
+        console.log('--finished transcoding', tokenId);
+        moveFile(tempFilePath, defaultVideoFilePath(tokenId, destVideoExt));
+        if (destVideoExt !== videoExt) {
+          fs.unlink(videoFilePath, error => {
+            if (error) console.error('delete source video error!', tokenId, videoExt);
+          });
+        }
+        await updateVideoInfo(tokenId, destVideoExt);
+        if (clients[tokenId]) {
+          clients[tokenId].write('data: { "progress": 100, "status": "completed" }\n\n');
+          clients[tokenId].end(); // Close the connection when transcoding is complete
+          delete clients[tokenId];
+        }
+      })
+      .on('error', error => {
+        console.error('Transcoding error:', error);
+        if (clients[tokenId]) {
+          clients[tokenId].write('data: { "status": "failed" }\n\n');
+          clients[tokenId].end();
+          delete clients[tokenId];
+        }
+      })
+      .saveToFile(tempFilePath);
+  };
 
 module.exports = {
     updateVideoInfo,
