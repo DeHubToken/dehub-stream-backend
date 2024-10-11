@@ -14,6 +14,7 @@ let TokenSchema = new Schema(
     logoURI: String,
     totalSupply: Number, // total supply
     tokenId: { type: Number, unique: true },
+    isHidden: Boolean,
     price: Number,
     metaDataUrl: String,
     imageUrl: String, //related path

@@ -6,7 +6,9 @@ var multer = require('multer');
 const { isAuthorized } = require('../utils/auth');
 const NotificationController = require('../controllers/NotificationController');
 const LikedVideosController = require('../controllers/LikedVideoController');
-const usernameRoutes = require('./username_route');
+
+// const usernameRoutes = require('./username_route');
+
 const upload = multer({ dest: 'uploads/' });
 
 /**
@@ -77,12 +79,28 @@ router.post('/loginWithWallet', isAuthorized, ApiController.login);
  *               message: Invalid request payload or files
  */
 // continue later
+let clients = {};
 router.post(
   '/user_mint',
   upload.fields([{ name: 'files', maxCount: 2 }]),
   isAuthorized,
   ApiController.getSignedDataForUserMint,
 );
+router.get('/transcode-progress/:tokenId', (req, res) => {
+  const tokenId = req.params.tokenId;
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  // Store the client's response object to send updates later
+  clients[tokenId] = res;
+
+  // Clean up when the connection closes
+  req.on('close', () => {
+    delete clients[tokenId];
+  });
+});
+router.post('/token_visibility', ApiController.updateTokenVisibility)
 router.get('/all_nfts', ApiController.getAllNfts);
 router.get('/my_nfts', ApiController.getMyNfts);
 router.get('/search_nfts', ApiController.getFilteredNfts);
@@ -139,6 +157,7 @@ router.get('/liked-videos', isAuthorized, LikedVideosController.get);
 // router.delete('/liked-videos/:id', isAuthorized, LikedVideosController.remove);
 
 // Usernames delegation and sales
-router.use('/username', usernameRoutes);
+
+// router.use('/username', usernameRoutes);
 
 module.exports = router;

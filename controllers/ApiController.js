@@ -1,9 +1,7 @@
 const { Account } = require('../models/Account');
 const path = require('path');
 require('dotenv').config();
-const { ethers } = require('ethers');
-const { isValidAccount, reqParam } = require('../utils/auth');
-const { decryptWithSourceKey, encryptWithSourceKey } = require('../utils/encrypt');
+const { reqParam } = require('../utils/auth');
 const {
   paramNames,
   errorMsgs,
@@ -17,7 +15,6 @@ const { Token } = require('../models/Token');
 const { checkFileType, normalizeAddress } = require('../utils/format');
 const { signatureForMintingNFT } = require('./mintNft');
 const {
-  removeDuplicatedObject,
   isValidTipAmount,
   eligibleBountyForAccount,
   isValidUsername,
@@ -41,6 +38,8 @@ const { Reaction } = require('../models/Reaction');
 const { requestReaction } = require('./chat/reaction');
 const notificationService = require('../services/NotificationService');
 const likedVideoService = require('../services/LikedVideosService');
+const { transcodeVideo } = require('../utils/stream');
+const Vote = require('../models/Vote');
 
 const accountTemplate = {
   username: 1,
@@ -117,11 +116,15 @@ const ApiController = {
     const uploadedFiles = req.files.files;
     if (uploadedFiles?.length < 2)
       return res.status(400).json({ error: true, message: 'Both Image and Video files are needed' });
+  
     const videoFile = uploadedFiles[0];
-    if (!checkFileType(videoFile)) return res.status(400).json({ error: true, message: errorMsgs.not_supported_video });
+    if (!checkFileType(videoFile))
+      return res.status(400).json({ error: true, message: errorMsgs.not_supported_video });
+  
     const imageFile = uploadedFiles[1];
     if (!checkFileType(imageFile, 'image'))
       return res.status(400).json({ error: true, message: errorMsgs.not_supported_image });
+  
     try {
       const result = await signatureForMintingNFT(
         videoFile,
@@ -133,16 +136,50 @@ const ApiController = {
         Number(chainId),
         JSON.parse(category),
       );
+
+      if (result && result.createdTokenId) {
+        transcodeVideo(result.createdTokenId, videoFile.mimetype.split('/')[1])
+          .catch((err) => console.error('Error during video transcoding:', err));
+      }
       return res.json(result);
+      
     } catch (err) {
       console.log('-----getSignedDataForUserMint error', err);
       return res.status(500).json({ result: false, error: 'Uploading failed' });
     }
-  },
+  },  
+  updateTokenVisibility: async function (req, res) {
+    try {
+      const { isHidden, id } = req.body;
+      
+      // Validate input data
+      if (!id || typeof isHidden === 'undefined') {
+        return res.status(400).json({ result: false, error: 'Invalid data provided' });
+      }
+  
+      // Find the token and update its visibility
+      const updatedToken = await Token.findOneAndUpdate(
+        {tokenId: id},
+        { isHidden },
+        { new: true } // Returns the updated document
+      );
+      
+      // Check if the token was successfully found and updated
+      if (!updatedToken) {
+        return res.status(404).json({ result: false, error: 'Token not found' });
+      }
+  
+      // Return the updated token
+      return res.status(200).json({ result: true, data: updatedToken });
+    } catch (e) {
+      console.error('-----updateVisibility error:', e);
+      return res.status(500).json({ result: false, error: 'Updating failed' });
+    }
+  },  
   getAllNfts: async function (req, res, next) {
     const skip = req.body.skip || req.query.skip || 0;
     const limit = req.body.limit || req.query.limit || 1000;
-    const filter = { status: 'minted' };
+    const filter = { status: 'minted', isHidden: false };
     const totalCount = await Token.find(filter, tokenTemplate).count();
     const all = await getStreamNfts(filter, skip, limit);
     return res.json({ result: { items: all, totalCount, skip, limit } });
@@ -153,7 +190,7 @@ const ApiController = {
     const owner = req.body.owner || req.query.owner;
     if (!owner) return res.status(400).json({ error: 'Owner field is required' });
     // const filter = { status: 'minted', $or: [{ owner: owner.toLowerCase() }, { minter: owner.toLowerCase() }] };
-    const filter = { status: 'minted', minter: owner.toLowerCase() };
+    const filter = {  minter: owner.toLowerCase() };
     const totalCount = await Token.find(filter, tokenTemplate).count();
     const all = await Token.find(filter, tokenTemplate).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean();
     return res.json({ result: { items: all, totalCount, skip, limit } });
@@ -167,7 +204,7 @@ const ApiController = {
       if (unit > 100) unit = 100;
 
       let sortRule = { createdAt: -1 };
-      searchQuery['$match'] = { status: 'minted' };
+      searchQuery['$match'] = { status: 'minted', isHidden: false };
       switch (sortMode) {
         case 'trends':
           if (range) {
@@ -228,7 +265,7 @@ const ApiController = {
 
       if (!page) page = 0;
       if (minter)
-        searchQuery['$match'] = { minter: minter.toLowerCase(), $or: [{ status: 'minted' }, { status: 'pending' }] };
+        searchQuery['$match'] = { minter: minter.toLowerCase() };
       if (owner) searchQuery['$match'] = { owner: owner.toLowerCase() };
       if (category) {
         searchQuery['$match']['category'] = { $elemMatch: { $eq: category } };
@@ -274,6 +311,7 @@ const ApiController = {
         parseInt(unit * page + unit * 1),
         sortRule,
       );
+      console.log(ret[0])
       res.send({ result: ret });
     } catch (e) {
       console.log('   ...', new Date(), ' -- index/tokens-search err: ', e);
@@ -301,15 +339,18 @@ const ApiController = {
   },
   getNftInfo: async function (req, res, next) {
     let tokenId = req.query.id || req.query.id || req.params?.id;
+    console.log(req.query)
     if (!tokenId) return res.status(400).json({ error: 'Bad request: No token id' });
     // const nftInfo = await Token.findOne({ tokenId }, tokenTemplate).lean();
     const nftInfo = (await getStreamNfts({ tokenId: Number(tokenId) }, 0, 1))?.[0];
+    const userLike = await Vote.findOne({tokenId, address: req.query?.address})
     if (!nftInfo) return res.status(404).json({ error: 'Not Found: NFT does not exist' });
     nftInfo.imageUrl = process.env.DEFAULT_DOMAIN + '/' + nftInfo.imageUrl;
     nftInfo.videoUrl = process.env.DEFAULT_DOMAIN + '/' + nftInfo.videoUrl;
     const comments = await commentsForTokenId(tokenId);
     nftInfo.comments = comments;
-    return res.json({ result: nftInfo });
+    console.log(userLike)
+    return res.json({ result: {...nftInfo, isLiked: Boolean(userLike)} });
   },
   getAccountInfo: async function (req, res, next) {
     /// walletAddress param can be username or address
