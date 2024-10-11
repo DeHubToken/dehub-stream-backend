@@ -136,5 +136,8 @@ dist
 /assets/chat/images/*
 !/assets/chat/images/holder.md
 
+/assets/livestream/*
+!/assets/livestream/holder.md
+
 temp.text
 fast.test.js

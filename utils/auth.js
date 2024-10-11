@@ -65,7 +65,7 @@ const reqParam = (req, paramName) => {
  */
 const isAuthorized = async (req, res, next) => {
   const token = req.headers?.authorization?.split(' ')[1];
- 
+
   if (token) {
     try {
       const decodedToken = jwt.verify(token, secretKey);
