@@ -12,7 +12,6 @@ const { getTotalBountyAmount } = require("../utils/calc");
 const { config } = require("../config");
 const { removeDuplicatedElementsFromArray, isUserCanAddNewCategory } = require("../utils/validation");
 const { Category } = require("../models/Category");
-const { transcodeVideo } = require("../utils/stream");
 
 const signer = new ethers.Wallet(process.env.SIGNER_KEY);
 
@@ -70,7 +69,6 @@ const signatureForMintingNFT = async (videoFile, imageFile, name, description, s
   // 3. move file to main assets directory  
   const videoPath = `${path.dirname(__dirname)}/assets/videos/${tokenItem.tokenId}.${videoExt}`;
   moveFile(`${path.dirname(__dirname)}/${videoFile.path}`, videoPath);
-  await transcodeVideo(tokenItem.tokenId, tokenItem.videoExt)
   const imagePath = `${path.dirname(__dirname)}/assets/images/${tokenItem.tokenId}.${imageExt}`;
   moveFile(`${path.dirname(__dirname)}/${imageFile.path}`, imagePath);
 

@@ -114,18 +114,34 @@ const ApiController = {
     const { address, name, description, streamInfo, chainId, category } = req.body;
     console.log('upload:', name, description, streamInfo, chainId, JSON.parse(category));
     const uploadedFiles = req.files.files;
-    if (uploadedFiles?.length < 2)
-      return res.status(400).json({ error: true, message: 'Both Image and Video files are needed' });
+  
+    // Set the response headers for Server-Sent Events (SSE)
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders(); // Flush headers to establish SSE connection
+  
+    if (uploadedFiles?.length < 2) {
+      res.write(`data: ${JSON.stringify({ progress: 0, error: true, message: 'Both Image and Video files are needed' })}\n\n`);
+      return res.end();
+    }
   
     const videoFile = uploadedFiles[0];
-    if (!checkFileType(videoFile))
-      return res.status(400).json({ error: true, message: errorMsgs.not_supported_video });
+    if (!checkFileType(videoFile)) {
+      res.write(`data: ${JSON.stringify({ progress: 0, error: true, message: errorMsgs.not_supported_video })}\n\n`);
+      return res.end();
+    }
   
     const imageFile = uploadedFiles[1];
-    if (!checkFileType(imageFile, 'image'))
-      return res.status(400).json({ error: true, message: errorMsgs.not_supported_image });
+    if (!checkFileType(imageFile, 'image')) {
+      res.write(`data: ${JSON.stringify({ progress: 0, error: true, message: errorMsgs.not_supported_image })}\n\n`);
+      return res.end();
+    }
   
     try {
+      // Step 1: Minting signature process starts
+      res.write(`data: ${JSON.stringify({ progress: 20, message: 'Minting signature process started...' })}\n\n`);
+  
       const result = await signatureForMintingNFT(
         videoFile,
         imageFile,
@@ -134,20 +150,35 @@ const ApiController = {
         JSON.parse(streamInfo),
         address,
         Number(chainId),
-        JSON.parse(category),
+        JSON.parse(category)
       );
-
-      if (result && result.createdTokenId) {
-        transcodeVideo(result.createdTokenId, videoFile.mimetype.split('/')[1])
-          .catch((err) => console.error('Error during video transcoding:', err));
-      }
-      return res.json(result);
+  
+      // Step 2: Signature creation completed
+      console.log(result)
       
+      if (result && result.createdTokenId) {
+        try {
+          res.write(`data: ${JSON.stringify({ progress: 50, message: 'Signature successfully created. Transcoding video...', result })}\n\n`);
+          await transcodeVideo(result.createdTokenId, videoFile.mimetype.split('/')[1]);
+          // Step 3: Transcoding completed successfully
+          res.write(`data: ${JSON.stringify({ progress: 80, message: 'Transcoding completed successfully.' })}\n\n`);
+
+        } catch (transcodeError) {
+          res.write(`data: ${JSON.stringify({ progress: 80, error: true, message: 'Error during video transcoding' })}\n\n`);
+        }
+      }
+  
+      // Step 4: Final result sent to the client
+      res.write(`data: ${JSON.stringify({ progress: 100, message: 'NFT minting process completed.', result })}\n\n`);
+      res.write('data: [DONE]\n\n'); // Signal the end of streaming
+      res.end();
     } catch (err) {
-      console.log('-----getSignedDataForUserMint error', err);
-      return res.status(500).json({ result: false, error: 'Uploading failed' });
+      console.error('-----getSignedDataForUserMint error', err);
+      res.write(`data: ${JSON.stringify({ progress: 0, result: false, error: 'Uploading failed' })}\n\n`);
+      res.end();
     }
-  },  
+  },
+   
   updateTokenVisibility: async function (req, res) {
     try {
       const { isHidden, id } = req.body;

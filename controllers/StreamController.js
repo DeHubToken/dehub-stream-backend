@@ -33,7 +33,7 @@ const StreamController = {
       return res.status(400).json({ error: 'Bad Request: Token Id is required' });
     }
     console.log('----start stream:', tokenId);
-    const tokenItem = await Token.findOne({ tokenId, status: 'minted' }, tokenTemplateForStream).lean();
+    const tokenItem = await Token.findOne({ tokenId, $or:[{status: "minted"},{status:"signed"},{status:"pending"}] }, tokenTemplateForStream).lean();
     if (!tokenItem) return res.status(404).json({ error: 'Not Found: Token not found' });
     const videoPath = `${path.dirname(__dirname)}/assets/videos/${tokenId}.mp4`;
     let fileSize;
