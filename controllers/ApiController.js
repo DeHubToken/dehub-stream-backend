@@ -140,7 +140,7 @@ const ApiController = {
   
     try {
       // Step 1: Minting signature process starts
-      res.write(`data: ${JSON.stringify({ progress: 20, message: 'Minting signature process started...' })}\n\n`);
+      res.write(`data: ${JSON.stringify({ progress: 20, message: 'Minting Started' })}\n\n`);
   
       const result = await signatureForMintingNFT(
         videoFile,
@@ -158,7 +158,7 @@ const ApiController = {
       
       if (result && result.createdTokenId) {
         try {
-          res.write(`data: ${JSON.stringify({ progress: 50, message: 'Signature successfully created. Transcoding video...', result })}\n\n`);
+          res.write(`data: ${JSON.stringify({ progress: 50, message: 'Transcoding video', result })}\n\n`);
           await transcodeVideo(result.createdTokenId, videoFile.mimetype.split('/')[1]);
           // Step 3: Transcoding completed successfully
           res.write(`data: ${JSON.stringify({ progress: 80, message: 'Transcoding completed successfully.' })}\n\n`);
