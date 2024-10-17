@@ -368,7 +368,7 @@ const ApiController = {
         const userLike = await Vote.findOne({ tokenId: nft.tokenId, address });
         nft.isLiked = Boolean(userLike);
       }
-      console.log(ret[0])
+      console.log(address)
       res.send({ result: ret });
     } catch (e) {
       console.log('   ...', new Date(), ' -- index/tokens-search err: ', e);
