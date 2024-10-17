@@ -101,7 +101,7 @@ async function createNotification(recipentAddress, type, additionalData) {
       await notification.save();
     }
   } catch (error) {
-    throw new Error(error.message);
+    throw new Error(error?.message);
   }
 }
 

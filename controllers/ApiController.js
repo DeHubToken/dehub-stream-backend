@@ -228,14 +228,27 @@ const ApiController = {
   },
   getFilteredNfts: async function (req, res, next) {
     try {
-      let { search, page, unit, sortMode, bulkIdList, verifiedOnly, isSales, minter, owner, category, range } =
-        req.query;
+      let {
+        search,
+        page,
+        unit,
+        sortMode,
+        bulkIdList,
+        verifiedOnly,
+        isSales,
+        minter,
+        owner,
+        category,
+        range,
+        address, // Add address to the destructured query parameters
+      } = req.query;
       const searchQuery = {};
       if (!unit) unit = 20;
       if (unit > 100) unit = 100;
-
+  
       let sortRule = { createdAt: -1 };
       searchQuery['$match'] = { status: 'minted', isHidden: false };
+  
       switch (sortMode) {
         case 'trends':
           if (range) {
@@ -293,15 +306,14 @@ const ApiController = {
           searchQuery['$match'][`streamInfo.${streamInfoKeys.isLockContent}`] = true;
           break;
       }
-
+  
       if (!page) page = 0;
-      if (minter)
-        searchQuery['$match'] = { minter: minter.toLowerCase() };
+      if (minter) searchQuery['$match'] = { minter: minter.toLowerCase() };
       if (owner) searchQuery['$match'] = { owner: owner.toLowerCase() };
       if (category) {
         searchQuery['$match']['category'] = { $elemMatch: { $eq: category } };
       }
-
+  
       if (bulkIdList) {
         let idList = bulkIdList.split('-');
         if (idList.length > 0) {
@@ -309,18 +321,18 @@ const ApiController = {
           searchQuery['$match'] = { id: { $in: idList } };
         }
       }
-
+  
       if ((verifiedOnly + '').toLowerCase() === 'true' || verifiedOnly === '1') {
         searchQuery['$match'] = { ...searchQuery['$match'], verified: true };
       }
-
+  
       if (search) {
         if (!isValidSearch(search)) return res.json({ result: [] });
         var re = new RegExp(search, 'gi');
         let orOptions = [{ name: re }, { description: re }, { owner: normalizeAddress(re) }];
         if (Number(search) > 0) orOptions.push({ tokenId: Number(search) });
         searchQuery['$match'] = { ...searchQuery['$match'], $or: orOptions };
-
+  
         // Search through the accounts table
         const accounts = await Account.find({ username: { $regex: new RegExp(search, 'i') } });
         const videos = await getStreamNfts(
@@ -329,6 +341,13 @@ const ApiController = {
           parseInt(unit * page + unit * 1),
           sortRule,
         );
+  
+        // Include userLike logic
+        for (let video of videos) {
+          const userLike = await Vote.findOne({ tokenId: video.tokenId, address });
+          video.isLiked = Boolean(userLike);
+        }
+  
         return res.send({
           result: {
             accounts,
@@ -336,12 +355,19 @@ const ApiController = {
           },
         });
       }
+  
       const ret = await getStreamNfts(
         searchQuery['$match'],
         parseInt(unit * page),
         parseInt(unit * page + unit * 1),
         sortRule,
       );
+  
+      // Include userLike logic
+      for (let nft of ret) {
+        const userLike = await Vote.findOne({ tokenId: nft.tokenId, address });
+        nft.isLiked = Boolean(userLike);
+      }
       console.log(ret[0])
       res.send({ result: ret });
     } catch (e) {
@@ -349,7 +375,7 @@ const ApiController = {
       res.status(500);
       res.send({ error: e.message });
     }
-  },
+  },  
   getMyWatchedNfts: async function (req, res, next) {
     let watcherAddress = req.query.watcherAddress || req.query.watcherAddress;
     const category = reqParam(req, 'category');
