@@ -413,6 +413,7 @@ const tokenTemplate = {
   tokenId: 1,
   imageUrl: 1,
   videoUrl: 1,
+  isHidden: 1,
   // owner: 1,
   minter: 1,
   streamInfo: 1,
