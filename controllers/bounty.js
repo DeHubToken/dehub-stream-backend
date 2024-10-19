@@ -25,7 +25,6 @@ const signatureForClaimBounty = async (address, tokenId, bountyType) => {
     return { v, r, s }
 };
 
-
 module.exports = {
     signatureForClaimBounty,
 }
