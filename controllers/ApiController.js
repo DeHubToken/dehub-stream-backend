@@ -210,7 +210,10 @@ const ApiController = {
   getAllNfts: async function (req, res, next) {
     const skip = req.body.skip || req.query.skip || 0;
     const limit = req.body.limit || req.query.limit || 1000;
-    const filter = { status: 'minted', isHidden: false };
+    const filter = { status: 'minted', $or: [
+      { isHidden: false }, 
+      { isHidden: { $exists: false } }
+    ] };
     const totalCount = await Token.find(filter, tokenTemplate).count();
     const all = await getStreamNfts(filter, skip, limit);
     return res.json({ result: { items: all, totalCount, skip, limit } });
@@ -247,7 +250,10 @@ const ApiController = {
       if (unit > 100) unit = 100;
   
       let sortRule = { createdAt: -1 };
-      searchQuery['$match'] = { status: 'minted', isHidden: false };
+      searchQuery['$match'] = { status: 'minted', $or: [
+        { isHidden: false }, 
+        { isHidden: { $exists: false } }
+      ] }
   
       switch (sortMode) {
         case 'trends':
