@@ -749,6 +749,23 @@ const ApiController = {
       return res.status(500).json({ error: error.message || 'Internal Server Error' });
     }
   },
+  searchUsers: async function (req, res) {
+    try {
+        // Extract searchParam from the query
+        const { searchParam } = req.query;
+
+        // Create a filter for searching usernames
+        const filter = {};
+        if (searchParam) {
+            filter.username = { $regex: searchParam, $options: "i" }; 
+        }
+        const users = await Account.find(filter).limit(10).exec();
+        return res.json({ result: users });
+    } catch (error) {
+        console.error('Error searching for users:', error.message);
+        return res.status(500).json({ error: error.message || 'Internal Server Error' });
+    }
+},
   publicAccountData: async function (req, res, next) {
     const addressList = reqParam(req, 'addressList');
     if (!addressList || addressList.length < 1)

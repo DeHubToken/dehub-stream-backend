@@ -129,6 +129,7 @@ router.get('/leaderboard', ApiController.leaderboard);
 router.get('/get_categories', ApiController.getCategories);
 router.get('/usernames', ApiController.getUsernames);
 router.get('/users_count', ApiController.getNumberOfUsers);
+router.get('/users_search', ApiController.searchUsers);
 router.get('/is_valid_username', ApiController.isValidUsername);
 
 router.post('/public_accounts', ApiController.publicAccountData);
