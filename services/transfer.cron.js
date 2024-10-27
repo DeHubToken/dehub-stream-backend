@@ -7,7 +7,7 @@ const { Token } = require("../models/Token");
 const { Transaction } = require("../models/Transaction");
 const { isInserted } = require("../utils/db");
 const { normalizeAddress } = require("../utils/format");
-const { getCollectionContract, getCollectionHistories, getCreatorsOfCollection, getYunistakingHistories, getStakedTimes } = require("../utils/web3");
+const { getCollectionContract, getCollectionHistories} = require("../utils/web3");
 const { Balance } = require("../models/Balance");
 
 const networkName = (process?.argv?.[2] || (config.isDevMode ? "goerli" : "mainnet"));

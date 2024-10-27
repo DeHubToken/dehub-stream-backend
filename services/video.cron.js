@@ -7,7 +7,6 @@ const fs = require('fs');
 const { config } = require("../config");
 const { Token } = require("../models/Token");
 const { EXPIRED_TIME_FOR_MINTING } = require("../shared/contants");
-const IDCounter = require("../models/IDCounter");
 const { defaultVideoFilePath, defaultImageFilePath } = require("../utils/file");
 const { WatchHistory } = require("../models/WatchHistory");
 const { streamInfoKeys, supportedTokens, overrideOptions, RewardType, supportedNetworks, ChainId } = require("../config/constants");
@@ -131,18 +130,6 @@ async function deleteExpiredTokenItems() {
     }
 }
 
-async function transcodeVideos() {
-    const transcodingCount = await Token.countDocuments({ transcodingStatus: 'on' });
-    if (transcodingCount > 1) {
-        console.log('---transcoding: ', transcodingCount);
-        return;
-    }
-    const tokenItems = await Token.find({ transcodingStatus: null, videoInfo: { $ne: null }, status: { $ne: 'failed' } }, { tokenId: 1, videoExt: 1 }).limit(1).lean();
-    for (const tokenItem of tokenItems) {
-        await transcodeVideo(tokenItem.tokenId, tokenItem.videoExt);
-    }
-}
-
 async function fullVideoInfo() {
     const tokenItems = await Token.find({ videoInfo: null, transcodingStatus: { $ne: 'failed' } }, { tokenId: 1, videoExt: 1, }).lean();
     for (const tokenItem of tokenItems) {
@@ -181,7 +168,6 @@ let autoDeleteCronCounter = 0;
 async function cronLoop() {
     // await deleteExpiredClaimTx();
     await fullVideoInfo();
-    await transcodeVideos();
     await deleteExpiredTokenItems();
     await processWatchHistory();
     if (autoDeleteCronCounter++ % (config.periodOfDeleleCron / 10) == 0) await deleteVotedStreams();
@@ -193,4 +179,3 @@ mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/
         console.log(' -- processing video files and watched streams...');
         cronLoop();
     });
-``

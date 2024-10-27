@@ -1,0 +1,257 @@
+import { Injectable } from '@nestjs/common';
+import { reqParam } from 'common/util/auth';
+import { normalizeAddress } from 'common/util/format';
+import { eligibleBountyForAccount, isValidUsername } from 'common/util/validation';
+import { editableProfileKeys, overrideOptions, paramNames, userProfileKeys } from 'config/constants';
+import { isAddress } from 'ethers';
+import { Request, Response } from 'express';
+import { AccountModel } from 'models/Account';
+import { Balance } from 'models/Balance';
+import { Feature } from 'models/Feature';
+import { Follow } from 'models/Follow';
+import { PPVTransactionModel } from 'models/PPVTransaction';
+import sharp from 'sharp';
+import { CdnService } from 'src/cdn/cdn.service';
+
+const accountTemplate = {
+  username: 1,
+  displayName: 1,
+  balance: 1,
+  address: 1,
+  // deposited: 1,
+  [userProfileKeys.avatarImageUrl]: 1,
+  [userProfileKeys.coverImageUrl]: 1,
+  [userProfileKeys.username]: 1,
+  [userProfileKeys.aboutMe]: 1,
+  [userProfileKeys.email]: 1,
+  [userProfileKeys.facebookLink]: 1,
+  [userProfileKeys.twitterLink]: 1,
+  [userProfileKeys.discordLink]: 1,
+  [userProfileKeys.instagramLink]: 1,
+  [userProfileKeys.tiktokLink]: 1,
+  [userProfileKeys.telegramLink]: 1,
+  [userProfileKeys.youtubeLink]: 1,
+  createdAt: 1,
+  sentTips: 1,
+  receivedTips: 1,
+  uploads: 1,
+  customs: 1,
+  _id: 0,
+};
+
+@Injectable()
+export class UserService {
+  constructor(private readonly cdnService:CdnService){}
+  
+  async getAccountInfo (req:Request, res:Response) {
+    /// walletAddress param can be username or address
+    let walletAddress:any = req.query.id || req.query.id || req.params?.id;
+    if (!walletAddress) return res.status(400).json({ error: 'Bad request: No wallet sent' });
+    walletAddress = normalizeAddress(walletAddress);
+    let accountInfo:any = await AccountModel.findOne(
+      { $or: [{ address: walletAddress }, { username: walletAddress }] },
+      accountTemplate,
+    ).lean();
+    const balanceData = await Balance.find(
+      { address: walletAddress.toLowerCase() },
+      { chainId: 1, tokenAddress: 1, walletBalance: 1, staked: 1, _id: 0 },
+    );
+    if (!balanceData?.length && !accountInfo && !isAddress(walletAddress)) {
+      return res.status(404).json({ error: 'Not Found: Account not found', result: false });
+    } else if (accountInfo) {
+      walletAddress = accountInfo?.address;
+    } else {
+      accountInfo = {};
+    }
+    const unlockedPPVStreams = await PPVTransactionModel.find(
+      { address: walletAddress }, // No expiry
+      // { address: walletAddress, createdAt: { $gt: new Date(Date.now() - config.availableTimeForPPVStream) } },
+      { streamTokenId: 1 },
+    ).distinct('streamTokenId');
+    accountInfo.balanceData = balanceData.filter(e => e.walletBalance > 0 || e.staked > 0);
+    accountInfo.unlocked = unlockedPPVStreams;
+    accountInfo.likes = await Feature.find({ address: walletAddress }, {}).distinct('tokenId');
+    accountInfo.followings = await this.getFollowing(walletAddress);
+    accountInfo.followers = await this.getFollowers(walletAddress);
+    return res.json({ result: accountInfo });
+  }
+
+  async updateProfile(req: Request, res: Response, coverImage, avatarImage) {
+    try {
+      let address = reqParam(req, paramNames.address);
+      address = normalizeAddress(address);
+      const updateAccountOptions = {};
+      let username = reqParam(req, userProfileKeys.username);
+  
+      // Process editable profile keys
+      Object.entries(editableProfileKeys).forEach(([, profileKey]) => {
+        let reqVal = reqParam(req, profileKey);
+        if (profileKey === 'customs') {
+          try {
+            if (!reqVal) return;
+            reqVal = JSON.parse(reqVal);
+            Object.keys(reqVal).forEach((key) => {
+              if (!(Number(key) >= 1 && Number(key) <= 5)) delete reqVal[key];
+            });
+          } catch {
+            console.log('---error updating custom links');
+            reqVal = undefined;
+          }
+        }
+        if (!reqVal || reqVal === 'undefined' || reqVal === 'null' || reqVal === '') reqVal = null;
+        if (!reqVal && profileKey === 'username') return;
+        updateAccountOptions[profileKey] = reqVal;
+      });
+  
+      // Validate and update username
+      if (username) {
+        username = username.toLowerCase();
+        const validation = await isValidUsername(address, username);
+        if (validation.error) return res.json(validation);
+        updateAccountOptions[userProfileKeys.username] = username;
+      }
+    
+      // File upload handling with cdnService
+      const coverImgFile = coverImage
+      const avatarImgFile = avatarImage
+      const targetFormat = 'jpg';
+      const convertImageBuffer = async(fileBuffer: Buffer):Promise<Buffer> => await sharp(fileBuffer).toFormat(targetFormat).toBuffer();
+
+  
+      if (coverImgFile) {
+        const coverImagePath = await this.cdnService.uploadFile(await convertImageBuffer(coverImgFile.buffer) ,"covers", normalizeAddress(address)+".jpg");
+        updateAccountOptions[userProfileKeys.coverImageUrl] = coverImagePath;
+      }
+  
+      if (avatarImgFile) {
+        const avatarImagePath = await this.cdnService.uploadFile(await convertImageBuffer(avatarImgFile.buffer), "avatars", normalizeAddress(address)+".jpg");
+        updateAccountOptions[userProfileKeys.avatarImageUrl] = avatarImagePath;
+      }
+  
+      // Update account in the database
+      const updatedAccount = await AccountModel.findOneAndUpdate(
+        { address: address.toLowerCase() },
+        updateAccountOptions,
+        overrideOptions,
+      );
+  
+      // Set a default username if necessary
+      if (updatedAccount.displayName && !updatedAccount.username) {
+        username = updatedAccount.displayName.toLowerCase().replace(' ', '_');
+        let tailNumber = 0;
+        for (let i = 0; i < 10000; i++) {
+          const updatedUsername = tailNumber === 0 ? username : `${username}_${tailNumber}`;
+          const validation = await isValidUsername(address, updatedUsername);
+          if (validation.result) {
+            await AccountModel.updateOne({ address }, { username: updatedUsername });
+            break;
+          } else {
+            tailNumber++;
+          }
+        }
+      }
+  
+      return res.json({ result: true });
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      return res.status(500).json({ message: 'Error updating profile', error: error.message });
+    }
+  }
+
+
+async requestFollow  (address, following){
+  following = normalizeAddress(following);
+  if (address === following) return { result: false, error: "Can't follow yourself" };
+  const updatedResult:any = await Follow.updateOne({ address, following }, {}, overrideOptions);
+  if (updatedResult?.nModified > 0) return { result: false, error: 'Already following' };
+  return { result: updatedResult };
+};
+
+async unFollow (address, following){
+  following = normalizeAddress(following);
+  const deletedResult = await Follow.deleteOne({ address, following });
+  if (deletedResult?.deletedCount > 0) return { result: true };
+  return { result: false, error: 'no following' };
+};
+
+async getFollowing (address){
+  address = normalizeAddress(address);
+  const followes = Follow.find({ address }, { following: 1 }).distinct('following');
+  return followes;
+};
+
+async getFollowers (address) {
+  address = normalizeAddress(address);
+  const followes = Follow.find({ following: address }, { address: 1 }).distinct('address');
+  return followes;
+};
+
+async getUsernames() {
+  try {
+    const result = await AccountModel.find({}, { username: 1 }).distinct('username');
+    return { result };
+  } catch (error) {
+    console.error('-----request getUsernames error', error);
+    throw new Error('Failed to fetch usernames');
+  }
+}
+
+async publicAccountData (req:Request, res:Response) {
+  const addressList = reqParam(req, 'addressList');
+  if (!addressList || addressList.length < 1)
+    return res.status(400).json({ result: false, error: 'Bad Request: Address List is required' });
+  try {
+    const accountTemplate = {
+      _id: 0,
+      address: 1,
+      username: 1,
+      displayName: 1,
+      avatarImageUrl: 1,
+    };
+    return res.json({ result: await AccountModel.find({ address: { $in: addressList } }, accountTemplate) });
+  } catch (err) {
+    console.log('-----public account data', err);
+    return res.status(500).json({ result: false, error: err.message || 'Could not fetch account data' });
+  }
+}
+
+async getNumberOfUsers() {
+  try {
+    const userCount = await AccountModel.countDocuments({});
+    return { result: userCount };
+  } catch (error) {
+    console.error('Error getting user count:', error.message);
+    throw new Error('Internal Server Error');
+  }
+}
+
+async searchUsers(req:Request, res:Response) {
+  try {
+      const { searchParam } = req.query;
+
+      const filter:any = {};
+      if (searchParam) {
+          filter.username = { $regex: searchParam, $options: "i" }; 
+      }
+      const users = await AccountModel.find(filter).limit(10)
+      return res.send({ result: users });
+  } catch (error) {
+      console.error('Error searching for users:', error.message);
+      return res.status(500).json({ error: error.message || 'Internal Server Error' });
+  }
+}
+
+async isValidUsername(address: string, username: string) {
+  try {
+    const normalizedAddress = normalizeAddress(address);
+    const normalizedUsername = normalizeAddress(username);
+    const validationResult = await isValidUsername(normalizedAddress, normalizedUsername);
+    return { result: validationResult };
+  } catch (error) {
+    console.error('-----validate username error', error);
+    throw new Error('Could not validate username');
+  }
+}
+
+
+}
