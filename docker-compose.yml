@@ -6,13 +6,3 @@ services:
       context: .
       dockerfile: Dockerfile.redis
     network_mode: "host"
-
-  nest-app:
-    build:
-      context: .
-      dockerfile: Dockerfile.nest
-    depends_on:
-      - redis
-    network_mode: "host"
-    env_file:
-      - .env
