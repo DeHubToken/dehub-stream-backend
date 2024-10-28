@@ -1,8 +1,13 @@
+require('dotenv').config();
+/**
+ * @notice this should not contain any other js.
+ */
+const isDevMode = process.env.RUN_MODE === 'dev';
 
 export const MAX_MINT = process.env.RUN_MODE == 'dev' ? 100 : 3;
 export const NFT_NAME_PREFIX = "Stream NFT";
-export const EXPIRED_TIME_FOR_MINTING = 60000 * 2; 
-const isDevMode = process.env.RUN_MODE === 'dev';
+export const EXPIRED_TIME_FOR_MINTING = 60000 * 2; //ms
+
 
 const paramNames = {
   address: 'address',
@@ -99,6 +104,8 @@ const ChainId = {
   FANTOM_MAINNET: 250,
   AVALANCHE_MAINNET: 43114,
   POLYGON_MAINNET: 137,
+  OKEX_MAINNET: undefined,
+  KOVAN: undefined
 };
 
 const dhbTokenAddresses = {
@@ -127,12 +134,12 @@ const stakingContractAddresses = {
 const multicallContractAddresses = {
   [ChainId.MAINNET]: '0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696',
   [ChainId.GORLI]: '0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696',
-  // [ChainId.KOVAN]: '0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696',
+  [ChainId.KOVAN]: '0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696',
   [ChainId.BSC_MAINNET]: '0x41B90b73a88804f2aed1C4672b3dbA74eb9A92ce',
   [ChainId.BSC_TESTNET]: '0x80d0d36d9E3Cb0Bd4561beB1d9d1cC8e1a33F5b1',
   [ChainId.FANTOM_MAINNET]: '0xbb804a896E1A6962837c0813a5F89fDb771d808f',
   [ChainId.AVALANCHE_MAINNET]: '0x84514BeaaF8f9a4cbe25A9C5a7EBdd16B4FE7154',
-  // [ChainId.OKEX_MAINNET]: '0xdf4CDd4b8F1790f62a91Bcc4cb793159c641B1bd',
+  [ChainId.OKEX_MAINNET]: '0xdf4CDd4b8F1790f62a91Bcc4cb793159c641B1bd',
   [ChainId.POLYGON_MAINNET]: '0x275617327c958bD06b5D6b871E7f491D76113dd8',
 };
 
@@ -144,11 +151,11 @@ const streamCollectionAddresses = {
   [ChainId.POLYGON_MAINNET]: '0x1065F5922a336C75623B55D22c4a0C760efCe947',
   // testnets
   [ChainId.GORLI]: '0xfdFe40A30416e0aEcF4814d1d140e027253c00c7',
-  [ChainId.BSC_TESTNET]: '0x5Ae62dF56fF1E68Fb1772a337859b856CAEEFab6',
+  [ChainId.BSC_TESTNET]: '0xfdFe40A30416e0aEcF4814d1d140e027253c00c7',
 
   [ChainId.FANTOM_MAINNET]: '0xbb804a896E1A6962837c0813a5F89fDb771d808f',
   [ChainId.AVALANCHE_MAINNET]: '0x84514BeaaF8f9a4cbe25A9C5a7EBdd16B4FE7154',
-  // [ChainId.OKEX_MAINNET]: '0xdf4CDd4b8F1790f62a91Bcc4cb793159c641B1bd',
+  [ChainId.OKEX_MAINNET]: '0xdf4CDd4b8F1790f62a91Bcc4cb793159c641B1bd',
 };
 
 // this contract addresses should be unique for each network
@@ -163,7 +170,7 @@ const streamControllerContractAddresses = {
 
   [ChainId.FANTOM_MAINNET]: '0xbb804a896E1A6962837c0813a5F89fDb771d808f',
   [ChainId.AVALANCHE_MAINNET]: '0x84514BeaaF8f9a4cbe25A9C5a7EBdd16B4FE7154',
-  // [ChainId.OKEX_MAINNET]: '0xdf4CDd4b8F1790f62a91Bcc4cb793159c641B1bd',
+  [ChainId.OKEX_MAINNET]: '0xdf4CDd4b8F1790f62a91Bcc4cb793159c641B1bd',
 };
 
 const overrideOptions = { new: true, upsert: true, returnOriginal: false };

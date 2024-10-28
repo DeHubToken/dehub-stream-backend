@@ -1,10 +1,9 @@
+require('dotenv').config();
+    
 import { normalizeAddress } from "common/util/format";
-import { config as loadEnv } from 'dotenv';
-
-loadEnv();
 
 const isDevMode = process.env.RUN_MODE === 'dev';
-export const config = {
+const config = {
     port: process.env.API_PORT || 9015,
     socket: 9003,
     baseUrl: `http://127.0.0.1:${process.env.API_PORT || 9015}`,
@@ -35,3 +34,6 @@ export const config = {
     blockLimitsForFetching: isDevMode ? 5000 : 1000, // fetch blockchain data in a range of this block using graphql 
     itemLimitsForFetching: 500, // count of max items that are fetched
 };
+export {
+    config
+}

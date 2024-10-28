@@ -1,7 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ethers } from 'ethers';
-import { Request } from 'express';
 import multer from 'multer';
 
 @Injectable()
@@ -46,7 +45,7 @@ export class AuthGuard implements CanActivate {
       }
 
       // Validate the provided credentials
-      if (!this.isValidAccount(address, timestamp, rawSig)) {
+      if (!this.isValidAccount(address, timestamp, rawSig)){
         throw new UnauthorizedException('Invalid credentials');
       }
 
@@ -80,7 +79,7 @@ export class AuthGuard implements CanActivate {
     }
 
     const displayedDate = new Date(timestamp * 1000);
-    const signedMsg = `Welcome to Dehub!\n\nClick to sign in for authentication.\nSignatures are valid for ${this.expireSecond / 3600} hours.\nYour wallet address is ${address.toLowerCase()}.\nIt is ${displayedDate.toUTCString()}.`;
+    const signedMsg = `Welcome to DeHub!\n\nClick to sign in for authentication.\nSignatures are valid for ${this.expireSecond / 3600} hours.\nYour wallet address is ${address.toLowerCase()}.\nIt is ${displayedDate.toUTCString()}.`;
 
     try {
       const signedAddress = ethers.verifyMessage(signedMsg, sig).toLowerCase();
