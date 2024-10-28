@@ -58,6 +58,14 @@ export class NFTController {
       return res.status(500).json({ message: 'Failed to fetch NFTs', error: error.message });
     }
   }
+  @Get('get_categories')
+  async getCat(@Res() res: Response) {
+    try {
+      return await this.nftServices.getCategories(res)
+    } catch (error) {
+      return res.status(500).json({ message: 'Failed to fetch Categories', error: error.message });
+    }
+  }
  
   @Get('/claim_bounty')
   async claimBounty(@Req() req: Request, @Res() res: Response) {

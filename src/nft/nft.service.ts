@@ -78,6 +78,16 @@ export class NftService {
      return res
   }
 
+  async getCategories (res:Response) {
+    try {
+      let result = await CategoryModel.find({}, { _id: 0, name: 1 }).distinct('name');
+      return res.json(result);
+    } catch (err) {
+      console.log('-----request follow error', err);
+      return res.status(500).json({ result: false, error: 'Could not fetch catergories' });
+    }
+  }
+
   async updateNFT(
     videoFile: Express.Multer.File,
     imageFile: Express.Multer.File,
