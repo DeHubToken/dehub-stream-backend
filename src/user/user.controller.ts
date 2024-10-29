@@ -25,10 +25,9 @@ export class UserController {
     @Res() res: Response
   ) {
     try {
-      
-    const coverImage = files.find(file => file.fieldname === 'coverImage') || null;
-    const avatarImage = files.find(file => file.fieldname === 'avatarImage') || null;
-    console.log(coverImage, avatarImage);
+      const coverImage = files.find(file => file.fieldname === 'coverImg') || null;
+      const avatarImage = files.find(file => file.fieldname === 'avatarImg') || null;
+      console.log(coverImage, avatarImage);
 
 
       // Forward the request, including any uploaded files, to your service

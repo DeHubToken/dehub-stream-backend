@@ -23,6 +23,7 @@ import { defaultVideoFilePath } from 'common/util/file';
 import { statSync } from 'fs';
 import { JobService } from 'src/job/job.service';
 import { VoteModel } from 'models/Vote';
+import sharp from 'sharp';
 
 const signer = new ethers.Wallet(process.env.SIGNER_KEY || '');
 
@@ -66,15 +67,14 @@ export class NftService {
   ): Promise<any> { // Adjust the return type based on what signatureForMintingNFT returns
 
     // Upload video and image files to the CDN
-    console.log(imageFile)
-    const imageUrl = await this.cdnService.uploadFile(imageFile.buffer, address, imageFile.originalname+".jpg");
+    const convertImageBuffer = async(fileBuffer: Buffer):Promise<Buffer> => await sharp(fileBuffer).toFormat("jpg").toBuffer()
 
 
     // Call the signatureForMintingNFT method with the uploaded URLs
-    console.log("here", imageUrl)
-    const {res, video}:any = await this.signatureForMintingNFT(imageUrl, name, description, streamInfo, address, chainId, category)
-    await this.jobService.addUploadAndTranscodeJob(videoFile.buffer, address, videoFile.originalname, videoFile.mimetype, video)
-
+   
+    const {res, video}:any = await this.signatureForMintingNFT(name, description, streamInfo, address, chainId, category)
+    const imageUrl = await this.cdnService.uploadFile(await convertImageBuffer(imageFile.buffer), address, video.tokenId+".jpg")
+    await this.jobService.addUploadAndTranscodeJob(videoFile.buffer, address, videoFile.originalname, videoFile.mimetype, video, imageUrl)
      return res
   }
 
@@ -88,24 +88,8 @@ export class NftService {
     }
   }
 
-  async updateNFT(
-    videoFile: Express.Multer.File,
-    imageFile: Express.Multer.File,
-    address: string,
-    video: TokenDocument
-  ): Promise<any> { 
-    const imageUrl = await this.cdnService.uploadFile(imageFile.buffer, address, imageFile.originalname+".jpg");
-
-    video.imageUrl = imageUrl
-    video.save()
-
-    const res = await this.jobService.addUploadAndTranscodeJob(videoFile.buffer, address, videoFile.originalname, videoFile.mimetype, video.id)
-
-     return res
-  }
 
   private async signatureForMintingNFT(
-    imageUrl: string,
     name: string,
     description: string,
     streamInfo: any,
@@ -115,7 +99,7 @@ export class NftService {
   ){
     const collectionAddress = normalizeAddress(streamCollectionAddresses[chainId]);
     address = normalizeAddress(address);
-    let imageExt = imageUrl.split('.').pop(); // Extract image extension from URL
+    let imageExt = "jpg"
     
 
     // Checking category
@@ -154,8 +138,7 @@ export class NftService {
       chainId,
       category,
       minter: normalizeAddress(address),
-      ...addedOptions,
-      imageUrl, // Store the image URL
+      ...addedOptions
     });
     // 4. Signature for minting token
     const totalSupply = 1000;

@@ -1,9 +1,7 @@
-import { Controller, Get, Post, Req, Res, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Post, Req, Res, UploadedFiles, UseGuards } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from 'common/guards/auth.guard';
 import { NftService } from './nft.service';
-import { TokenModel } from 'models/Token';
 
 @Controller()
 export class NFTController {
@@ -81,25 +79,8 @@ export class NFTController {
     const { address, name, description, streamInfo, chainId, category } = req.body;
     
     try {
-      const nft = await this.nftServices.mintNFT(files[0], files[1], name, description,streamInfo, address, chainId, category)
-      return res.status(201).json(nft); // Send the minted NFT as a JSON response
-    } catch (error) {
-      return res.status(500).json({ message: 'Failed to mint NFT', error: error.message });
-    }
-  }
-
-  @Post('user_update')
-  @UseGuards(AuthGuard)
-  async userUpdateMint(@Req() req: Request, @Res() res: Response, @UploadedFiles() files?: Express.Multer.File[]) {
-    if (!files || files.length === 0) {
-      return res.status(400).json({ message: 'No files provided for minting' });
-    }
-    const { address, videoId } = req.body;
-    const video = await TokenModel.findOne({tokenId:videoId})
-    console.log(video)
-    try {
-      const nft = await this.nftServices.updateNFT(files[0], files[1], address, video)
-      return res.status(201).json(nft); // Send the minted NFT as a JSON response
+      const resp = await this.nftServices.mintNFT(files[0], files[1], name, description,streamInfo, address, chainId, category)
+      return res.json(resp); 
     } catch (error) {
       return res.status(500).json({ message: 'Failed to mint NFT', error: error.message });
     }

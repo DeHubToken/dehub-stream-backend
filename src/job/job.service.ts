@@ -8,7 +8,7 @@ export class JobService {
     @InjectQueue('transcode') private readonly transcodeQueue: Queue,
   ) {}
 
-  async addUploadAndTranscodeJob(buffer: Buffer, slug: string, filename: string, mimeType: string, videoId: string) {
+  async addUploadAndTranscodeJob(buffer: Buffer, slug: string, filename: string, mimeType: string, videoId: string, imageUrl: string) {
     
     await this.transcodeQueue.add({
       buffer,
@@ -16,6 +16,7 @@ export class JobService {
       filename,
       mimeType,
       videoId,
+      imageUrl
     })
     console.log('Job added to queue:', { slug, filename });
 

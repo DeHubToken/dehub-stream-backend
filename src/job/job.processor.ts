@@ -13,7 +13,7 @@ export class VideoQueueProcessor {
   @Process()
   async handleJob(job: Job) {
     console.log('Job received:');
-    const { buffer, slug, filename, mimeType, videoId } = job.data;
+    const { buffer, slug, filename, mimeType, videoId, imageUrl } = job.data;
     
     const video = await TokenModel.findById(videoId);
     if (!video) {
@@ -24,6 +24,8 @@ export class VideoQueueProcessor {
       video.transcodingStatus = 'on';
       const url = await this.transcodeAndUploadFile(buffer, filename, mimeType, video)
       video.videoUrl = url
+      video.imageUrl = imageUrl
+      video.imageExt = "jpg"
       video.progress= 100
       video.videoDuration = await this.cdnService.getFileDuration(process.env.CDN_BASE_URL+url)
       video.transcodingStatus = "done"
