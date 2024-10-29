@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import { ethers, solidityPackedKeccak256 } from 'ethers'; // Import ethers
 import { arrayify, splitSignature } from '@ethersproject/bytes';
 import { CdnService } from '../cdn/cdn.service';
-import { TokenDocument, TokenModel } from 'models/Token';
+import { TokenModel } from 'models/Token';
 import { normalizeAddress } from 'common/util/format';
 import { paramNames, streamCollectionAddresses, streamInfoKeys, tokenTemplate } from 'config/constants';
 import { eligibleBountyForAccount, isValidSearch, removeDuplicatedElementsFromArray } from 'common/util/validation';
@@ -624,7 +624,7 @@ export class NftService {
     }
   }
 
-  async signatureForClaimBounty(address:string, tokenId:number, bountyType:any) {
+  private async signatureForClaimBounty(address:string, tokenId:number, bountyType:any) {
     console.log('------sig for bounty', address, tokenId, bountyType);
     const tokenItem = await TokenModel.findOne({ tokenId }, { chainId: 1, streamInfo: 1 }).lean();
     const chainId = tokenItem?.chainId || config.defaultChainId;
