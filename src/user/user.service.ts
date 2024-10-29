@@ -114,22 +114,19 @@ export class UserService {
       // File upload handling with cdnService
       const coverImgFile = coverImage
       const avatarImgFile = avatarImage
-      const targetFormat = 'jpg';
-      const convertImageBuffer = async(fileBuffer: Buffer):Promise<Buffer> => await sharp(fileBuffer).toFormat(targetFormat).toBuffer()
+      // const convertImageBuffer = async(fileBuffer: Buffer):Promise<Buffer> => await sharp(fileBuffer).toFormat(targetFormat).toBuffer()
 
       
       if (coverImgFile) {
-        const covImg = await convertImageBuffer(coverImgFile.buffer)
-        const coverImagePath = await this.cdnService.uploadFile(covImg ,"covers", normalizeAddress(address)+".jpg");
+        const coverImagePath = await this.cdnService.uploadFile(coverImgFile.buffer ,"covers", normalizeAddress(address)+".jpg");
         updateAccountOptions[userProfileKeys.coverImageUrl] = coverImagePath;
         console.log(coverImagePath)
       }
   
       if (avatarImgFile) {
-        const avaImg = await convertImageBuffer(avatarImgFile.buffer)
-        const avatarImagePath = await this.cdnService.uploadFile(avaImg, "avatars", normalizeAddress(address)+".jpg");
+        const avatarImagePath = await this.cdnService.uploadFile(avatarImgFile.buffer, "avatars", normalizeAddress(address)+".jpg");
         updateAccountOptions[userProfileKeys.avatarImageUrl] = avatarImagePath;
-        console.log(avaImg)
+        
       }
   
       // Update account in the database
