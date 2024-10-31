@@ -1,7 +1,6 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { TokenModel } from 'models/Token';
-import path from 'path';
 import * as fs from 'fs'
 import { normalizeAddress } from 'common/util/format';
 import { overrideOptions, streamInfoKeys } from 'config/constants';
@@ -41,7 +40,7 @@ export class AssetService {
     console.log('----start stream:', tokenId);
     const tokenItem:any = await TokenModel.findOne({ tokenId, status: 'minted' }, tokenTemplateForStream).lean();
     if (!tokenItem) return res.status(404).json({ error: 'Not Found: Token not found' });
-    const videoPath = `${path.dirname(__dirname)}/assets/videos/${tokenId}.mp4`;
+    const videoPath = `${process.env.CDN_BASE_URL}videos/${tokenId}.mp4`;
     let fileSize;
     if (tokenItem.videoInfo?.size) {
       fileSize = tokenItem.videoInfo?.size;
@@ -131,7 +130,7 @@ export class AssetService {
       let filter:any = { tokenId, exitedAt: { $gt: new Date(nowTimestamp - config.extraPeriodForHistory) } };
       if (userAddress && isAddress(userAddress)) {
         filter = { ...filter, watcherAddress: userAddress };
-        const watch = await WatchHistoryModel.updateOne(
+        await WatchHistoryModel.updateOne(
           filter,
           { exitedAt: new Date(nowTimestamp), lastWatchedFrame: end },
           overrideOptions,
@@ -139,13 +138,14 @@ export class AssetService {
       }
     } else return res.status(500).send('No video range');
   }
+
   async getImage (req:Request, res:Response) {
     const id = req.params.id;
     const width = Number(reqParam(req, 'w') || 450);
     if (!id) return res.status(400).json({ error: 'Bad Request: Id is required' });
     const tokenItem = await TokenModel.findOne({ tokenId: parseInt(id) }, { tokenId: 1, imageExt: 1 }).lean();
     if (tokenItem) {
-      const imageLocalFilePath = defaultImageFilePath(parseInt(id), tokenItem.imageExt, tokenItem.minter);
+      const imageLocalFilePath = defaultImageFilePath(parseInt(id), tokenItem.imageExt);
 
       // Will have to compress all the images on server later and make sure it gets compressed before it gets stored
       const compressedImage:any = await sharp(imageLocalFilePath).resize({ width }).toBuffer();
@@ -204,7 +204,7 @@ export class AssetService {
     const imageExt = addressWithExt.split('.').pop();
     const address = addressWithExt.substring(0, addressWithExt.length - imageExt.length - 1);
     if (!isAddress(address)) return res.json({ error: true });
-    const coverImagePath = `${process.env.CDN_URL}/${address.toLowerCase()}/cover.${imageExt}`;
+    const coverImagePath = `${process.env.CDN_BASE_URL}covers/${address}.${imageExt}`;
 
     const compressedImage:any = await sharp(coverImagePath).resize({ width, height: 300, fit: 'cover' }).toBuffer();
     res.set('Content-Type', 'image/png');

@@ -1,16 +1,16 @@
 const fs = require("fs");
 const path = require("path");
 
-const defaultVideoFilePath = (tokenId, videoExt = 'mp4', minter:string) => {
-    return `${process.env.CCDN_URL}/${minter}/${tokenId}.${videoExt}`;
+const defaultVideoFilePath = (tokenId) => {
+    return `${process.env.CDN_BASE_URL}videos/${tokenId}.mp4`;
 }
 
 const getTempVideoFilePath = (tokenId:number, videoExt = 'mp4') => {
     return `${path.dirname(__dirname)}/assets/videos/${tokenId}_c.${videoExt}`;
 }
 
-const defaultImageFilePath = (tokenId:number, imageExt = 'png', minter:string) => {
-    return `${process.env.CDN_URL}/${minter}/${tokenId}.${imageExt}`;
+const defaultImageFilePath = (tokenId:number, imageExt = 'jpg') => {
+    return `${process.env.CDN_BASE_URL}images/${tokenId}.${imageExt}`;
 }
 
 

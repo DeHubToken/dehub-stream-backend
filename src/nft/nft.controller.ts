@@ -86,11 +86,11 @@ export class NFTController {
     }
   }
 
-  @Get('liked-videos')
+  @Get('liked_videos')
   @UseGuards(AuthGuard)
-  getLikedVideos(@Req() req: Request, @Res() res: Response) {
-    // Logic to get liked videos
-    res.send('Liked videos');
+  async getLikedVideos(@Req() req: Request, @Res() res: Response) {
+    const resp = await this.nftServices.getlikedVideos(req,res)
+    res.send(resp);
   } 
   
   @Get('/nft_info/:id')

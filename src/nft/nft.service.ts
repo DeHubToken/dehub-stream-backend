@@ -66,14 +66,11 @@ export class NftService {
     category: string[],
   ): Promise<any> { // Adjust the return type based on what signatureForMintingNFT returns
 
-    // Upload video and image files to the CDN
-    const convertImageBuffer = async(fileBuffer: Buffer):Promise<Buffer> => await sharp(fileBuffer).toFormat("jpg").toBuffer()
-
-
+   
     // Call the signatureForMintingNFT method with the uploaded URLs
    
     const {res, video}:any = await this.signatureForMintingNFT(name, description, streamInfo, address, chainId, category)
-    const imageUrl = await this.cdnService.uploadFile(await convertImageBuffer(imageFile.buffer), address, video.tokenId+".jpg")
+    const imageUrl = await this.cdnService.uploadFile(imageFile.buffer, address, video.tokenId+".jpg")
     await this.jobService.addUploadAndTranscodeJob(videoFile.buffer, address, videoFile.originalname, videoFile.mimetype, video, imageUrl)
      return res
   }
@@ -499,7 +496,8 @@ export class NftService {
         // Will be limited later
         // const result = await LikedVideos.find({ address }).sort({ createdAt: -1 }).skip(skip).limit(20).populate('tokenId');
         const result = await LikedVideos.find({ address }).sort({ createdAt: -1 }).skip(skip).populate('tokenId');
-        res.status(200).json({ result });
+        console.log(result)
+        res.status(200).json({ result })
       } catch (error) {
         res.status(500).json({ error: error.message });
       }
@@ -552,8 +550,8 @@ export class NftService {
   }
 
 // ======= //
-  async updateVideoInfo(tokenId:number, videoExt:string, minter:string){
-    const videoFilePath = defaultVideoFilePath(tokenId, videoExt, minter);
+  async updateVideoInfo(tokenId:number, videoExt:string){
+    const videoFilePath = defaultVideoFilePath(tokenId);
     let videoInfo = undefined;
     try {
         videoInfo = await ffprobe(videoFilePath, { path: ffprobeStatic.path });
