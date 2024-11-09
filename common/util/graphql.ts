@@ -1,12 +1,12 @@
-const fetch = require('node-fetch');
-const { config } = require('../../config');
+import { config } from 'config';
+// import fetch from 'node-fetch'
 
 /**
  * @notice Fetches transaction from graphql
  *  
  * @param
  */
-const getHistoryFromGraphGL = async (minBlockNumber, maxBlockNumber, url) => {
+export const getHistoryFromGraphGL = async (minBlockNumber, maxBlockNumber, url) => {
     const query = `
      {
         _meta {
@@ -105,6 +105,7 @@ const getHistoryFromGraphGL = async (minBlockNumber, maxBlockNumber, url) => {
             }) // Get some from re-orgs
         });
         const result = await res.json();
+        // @ts-ignore
         const { data } = result
         retData = data;
     }
@@ -119,7 +120,7 @@ const getHistoryFromGraphGL = async (minBlockNumber, maxBlockNumber, url) => {
  *  
  * @param
  */
-const getMintTxesFromGraphGL = async (url) => {
+export const getMintTxesFromGraphGL = async (url) => {
     const query = `
      {        
         nftTransfers(where:{from: "0x0000000000000000000000000000000000000000"}, orderBy: tokenId, orderDirection:asc){
@@ -141,6 +142,7 @@ const getMintTxesFromGraphGL = async (url) => {
             }) // Get some from re-orgs
         });
         const result = await res.json();
+        // @ts-ignore
         const { data } = result
         retData = data;
     }
@@ -150,7 +152,7 @@ const getMintTxesFromGraphGL = async (url) => {
     return retData;
 }
 
-module.exports = {
-    getHistoryFromGraphGL,
-    getMintTxesFromGraphGL,
-}
+// module.exports = {
+//     getHistoryFromGraphGL,
+//     getMintTxesFromGraphGL,
+// }
