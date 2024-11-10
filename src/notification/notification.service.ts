@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { reqParam } from 'common/util/auth';
+import { verifyFields } from 'common/util/misc';
 import { paramNames } from 'config/constants';
 import { Request, Response } from 'express';
 import { AccountModel } from 'models/Account';
