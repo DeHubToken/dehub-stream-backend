@@ -73,7 +73,7 @@ export class StreamCronService implements OnModuleInit {
                 await this.updateWalletBalanceFromTransfer(transfer, chainId);
             }
             // full fetching
-            if (transfers.length < config.itemLimitsForFetching) lastBlockFetchedForTransfer = fetchedEndBlockNumber;
+            if (transfers.length <= config.itemLimitsForFetching) lastBlockFetchedForTransfer = fetchedEndBlockNumber;
             else lastBlockFetchedForTransfer = transfers[0].blockNumber - 1; // limited with 500 options
             const protocolTxes = fetchedData.protocolTxes;
             for (const protocolTx of protocolTxes) {
@@ -86,7 +86,7 @@ export class StreamCronService implements OnModuleInit {
             }
 
             // full fetching
-            if (protocolTxes.length < config.itemLimitsForFetching) lastBlockFetchedForProtocolTx = fetchedEndBlockNumber;
+            if (protocolTxes.length <= config.itemLimitsForFetching) lastBlockFetchedForProtocolTx = fetchedEndBlockNumber;
             else lastBlockFetchedForProtocolTx = protocolTxes[0].blockNumber - 1; // limited with 500 options
             this.logger.log(`~${curNetwork.shortName} ---fetched ${startBlockNumber} ${lastBlockFetchedForTransfer} ${lastBlockFetchedForProtocolTx} ${transfers.length} ${protocolTxes.length}`
             );
