@@ -498,12 +498,13 @@ export class NftService {
         // Will be limited later
         // const result = await LikedVideos.find({ address }).sort({ createdAt: -1 }).skip(skip).limit(20).populate('tokenId');
         const result = await LikedVideos.find({ address }).sort({ createdAt: -1 }).lean();
-        for (let video of result) {
-          const token = await TokenModel.findOne({ tokenId: video.tokenId });
-          // @ts-ignore
-          video = token; 
-        }
-        res.status(200).json({ result })
+        const updatedResult = await Promise.all(
+          result.map(async (video) => {
+            const token = await TokenModel.findOne({ tokenId: video.tokenId });
+            return token;
+          })
+        );
+        res.status(200).json({ result:updatedResult })
       } catch (error) {
         res.status(500).json({ error: error.message });
       }

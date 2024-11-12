@@ -62,13 +62,7 @@ export class ReactionsController {
   @Get('/request_vote')
   @UseGuards(AuthGuard)
   async requestVote(@Req() req: Request, @Res() res: Response) {
-    try {
-      const result = await this.reactionsService.requestVote(req,res);
-      return res.json(result);
-    } catch (error) {
-      console.error('-----request vote error', error);
-      return res.status(500).json({ result: false, error: 'Voting request failed' });
-    }
+      return this.reactionsService.requestVote(req,res);
   }
 
   @Get('/request_follow')

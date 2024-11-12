@@ -98,6 +98,7 @@ export class ReactionService {
       const owner = await TokenModel.findOne({ tokenId: streamTokenId }, {}).lean();
       await this.requestVoteFunc(address, streamTokenId, vote.toString());
       // notify owner
+      console.log(owner.owner, address)
       await this.notificationService.createNotificationfunc(
         normalizeAddress(owner.owner),
         vote === 'true' ? 'like' : 'dislike',
@@ -117,7 +118,7 @@ export class ReactionService {
       return res.json({});
     } catch (err) {
       console.log('-----request vote error', err);
-      return res.status(500).json({ result: false, error: 'Voting failed' });
+      return res.status(500).json({ result: false, error: err.message || 'Voting failed' });
     }
   }
   async requestFollow (req, res) {

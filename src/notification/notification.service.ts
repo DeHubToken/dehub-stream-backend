@@ -60,8 +60,8 @@ export class NotificationsService {
       }
   
       // Notification trigger address/username
-      additionalData.senderAddress = additionalData.senderAddress.toLowerCase();
-      recipentAddress = recipentAddress.toLowerCase();
+      additionalData.senderAddress = additionalData?.senderAddress?.toLowerCase();
+      recipentAddress = recipentAddress?.toLowerCase();
       const account = await AccountModel.findOne({ address: additionalData.senderAddress }, {}).lean();
       if (account.username) {
         additionalData.username = account.username;
