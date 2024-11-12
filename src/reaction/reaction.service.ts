@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { reqParam } from 'common/util/auth';
 import { overrideOptions, paramNames, RewardType, supportedTokens } from 'config/constants';
 import { isAddress } from 'ethers';
@@ -96,7 +96,7 @@ export class ReactionService {
       if (!vote) return res.status(400).json({ error: true, message: 'Vote params is required' });
       streamTokenId = parseInt(streamTokenId, 10);
       const owner = await TokenModel.findOne({ tokenId: streamTokenId }, {}).lean();
-      const result = await this.requestVoteFunc(address, streamTokenId, vote.toString());
+      await this.requestVoteFunc(address, streamTokenId, vote.toString());
       // notify owner
       await this.notificationService.createNotificationfunc(
         normalizeAddress(owner.owner),
@@ -114,7 +114,7 @@ export class ReactionService {
         })
         await payload.save()
       }
-      return res.json(result);
+      return res.json({});
     } catch (err) {
       console.log('-----request vote error', err);
       return res.status(500).json({ result: false, error: 'Voting failed' });
@@ -245,16 +245,16 @@ export class ReactionService {
 async requestVoteFunc(account, tokenId, vote){
   account = normalizeAddress(account);
   const voteItem = await VoteModel.findOne({ address: account, tokenId }, { vote: 1 }).lean();
-  if (voteItem) return { result: false, error: `already voted ${voteItem.vote ? 'yes' : 'no'}` };
+  if (voteItem) throw new ConflictException(`Already voted ${voteItem.vote ? 'up' : 'down'}`)
 
   const nftStreamItem = await TokenModel.findOne({ tokenId }, {}).lean();
-  if (!nftStreamItem) return { result: false, error: 'This stream no exist' };
+  if (!nftStreamItem) throw new NotFoundException("Stream doesn't exist");
 
   await VoteModel.create({ address: account, tokenId, vote: vote === 'true' ? true : false });
   const updateTokenOption = {};
   updateTokenOption[vote === 'true' ? 'totalVotes.for' : 'totalVotes.against'] = 1;
   await TokenModel.updateOne({ tokenId }, { $inc: updateTokenOption }, overrideOptions);
   console.log('-- voted', account, tokenId, vote);
-  return { result: true };
+  return;
 };
 }
