@@ -262,6 +262,8 @@ export class NftService {
                 break;
             }
             searchQuery['$match']['createdAt'] = { $gt: fromDate };
+          }else {
+            searchQuery['$match']['createdAt'] = { $gt: new Date(Date.now() - config.recentTimeDiff) };
           }
           sortRule = { views: -1 };
           break;
