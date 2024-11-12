@@ -501,9 +501,8 @@ export class NftService {
         for (let video of result) {
           const token = await TokenModel.findOne({ tokenId: video.tokenId });
           // @ts-ignore
-          video.token = token; 
+          video = token; 
         }
-        console.log(result)
         res.status(200).json({ result })
       } catch (error) {
         res.status(500).json({ error: error.message });

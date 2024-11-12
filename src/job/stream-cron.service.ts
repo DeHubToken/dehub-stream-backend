@@ -21,27 +21,22 @@ export class StreamCronService implements OnModuleInit {
 
     async onModuleInit() {
         this.logger.log("--- Starting stream Loops")
-        // mongoose.connect(`mongodb://${config.mongo.host}:${config.mongo.port}/${config.mongo.dbName}`, {
-            //   useNewUrlParser: true,
-            //   useUnifiedTopology: true,
-        // });
-        // this.logger.log('Connected to MongoDB');
     }
 
     // Loops for each chain
-    @Cron(CronExpression.EVERY_10_SECONDS)
+    @Cron(CronExpression.EVERY_MINUTE)
     async bscLoop() {
         const networkName = 'bsc';
         await this.mainLoop(networkName)
     }
 
-    @Cron(CronExpression.EVERY_10_SECONDS)
+    @Cron(CronExpression.EVERY_MINUTE)
     async ethLoop() {
         const networkName = 'mainnet';
         await this.mainLoop(networkName)
     }
 
-    @Cron(CronExpression.EVERY_10_SECONDS)
+    @Cron(CronExpression.EVERY_MINUTE)
     async polyLoop() {
         const networkName = 'polygon';
         await this.mainLoop(networkName)
