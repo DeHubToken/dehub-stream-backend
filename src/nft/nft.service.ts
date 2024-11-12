@@ -497,7 +497,12 @@ export class NftService {
         address = address.toLowerCase();
         // Will be limited later
         // const result = await LikedVideos.find({ address }).sort({ createdAt: -1 }).skip(skip).limit(20).populate('tokenId');
-        const result = await LikedVideos.find({ address }).sort({ createdAt: -1 }).skip(skip).populate('tokenId');
+        const result = await LikedVideos.find({ address }).sort({ createdAt: -1 }).lean();
+        for (let video of result) {
+          const token = await TokenModel.findOne({ tokenId: video.tokenId });
+          // @ts-ignore
+          video.token = token; 
+        }
         console.log(result)
         res.status(200).json({ result })
       } catch (error) {
