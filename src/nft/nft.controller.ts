@@ -79,8 +79,8 @@ export class NFTController {
     const { address, name, description, streamInfo, chainId, category } = req.body;
     
     try {
-      const resp = await this.nftServices.mintNFT(files[0], files[1], name, description,streamInfo, address, chainId, category)
-      return res.json(resp); 
+      const nft = await this.nftServices.mintNFT(files[0], files[1], name, description,streamInfo, address, chainId, category)
+      return res.status(201).json(nft); // Send the minted NFT as a JSON response
     } catch (error) {
       return res.status(500).json({ message: 'Failed to mint NFT', error: error.message });
     }
