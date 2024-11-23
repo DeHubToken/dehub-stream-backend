@@ -10,15 +10,15 @@ import { eligibleBountyForAccount, isValidSearch, removeDuplicatedElementsFromAr
 import { CategoryModel } from 'models/Category';
 import { Request, Response } from 'express';
 import { AccountModel } from 'models/Account';
-import {config} from 'config';
+import { config } from 'config';
 import { reqParam } from 'common/util/auth';
 import { WatchHistoryModel } from 'models/WatchHistory';
 import { CommentModel } from 'models/Comment';
 import { PPVTransactionModel } from 'models/PPVTransaction';
 import { LikedVideos } from 'models/LikedVideos';
-import { streamControllerContractAddresses } from "config/constants";
-import ffprobe from 'ffprobe'
-import ffprobeStatic from 'ffprobe-static'
+import { streamControllerContractAddresses } from 'config/constants';
+import ffprobe from 'ffprobe';
+import ffprobeStatic from 'ffprobe-static';
 import { defaultVideoFilePath } from 'common/util/file';
 import { statSync } from 'fs';
 import { JobService } from 'src/job/job.service';
@@ -30,20 +30,20 @@ const signer = new ethers.Wallet(process.env.SIGNER_KEY || '');
 @Injectable()
 export class NftService {
   constructor(
-    private readonly cdnService: CdnService, 
-    private readonly jobService: JobService, 
+    private readonly cdnService: CdnService,
+    private readonly jobService: JobService,
   ) {}
 
-  async getAllNfts (req:Request, res:Response) {
+  async getAllNfts(req: Request, res: Response) {
     const skip = req.body.skip || req.query.skip || 0;
     const limit = req.body.limit || req.query.limit || 1000;
     const filter = { status: 'minted' };
-    const totalCount = await TokenModel.countDocuments(filter, tokenTemplate)
+    const totalCount = await TokenModel.countDocuments(filter, tokenTemplate);
     const all = await this.getStreamNfts(filter, skip, limit);
     return res.json({ result: { items: all, totalCount, skip, limit } });
   }
 
-  async getMyNfts (req:Request, res:Response) {
+  async getMyNfts(req: Request, res: Response) {
     const skip = req.body.skip || req.query.skip || 0;
     const limit = req.body.limit || req.query.limit || 1000;
     const owner = req.body.owner || req.query.owner;
@@ -64,18 +64,38 @@ export class NftService {
     address: string,
     chainId: number,
     category: string[],
-  ): Promise<any> { // Adjust the return type based on what signatureForMintingNFT returns
+  ): Promise<any> {
+    // Adjust the return type based on what signatureForMintingNFT returns
 
-   
     // Call the signatureForMintingNFT method with the uploaded URLs
-   
-    const {res, video}:any = await this.signatureForMintingNFT(name, description, streamInfo, address, chainId, category)
-    const imageUrl = await this.cdnService.uploadFile(imageFile.buffer, "images", video.tokenId+".jpg")
-    await this.jobService.addUploadAndTranscodeJob(videoFile.buffer, address, videoFile.originalname, videoFile.mimetype, video, imageUrl)
-     return res
+
+    const { res, video }: any = await this.signatureForMintingNFT(
+      name,
+      description,
+      streamInfo,
+      address,
+      chainId,
+      category,
+    );
+
+    console.log(imageFile);
+
+    const imageUrl = await this.cdnService.uploadFile(imageFile.buffer, 'images', video.id + '.jpg');
+
+    console.log('here', imageUrl);
+
+    await this.jobService.addUploadAndTranscodeJob(
+      videoFile.buffer,
+      address,
+      videoFile.originalname,
+      videoFile.mimetype,
+      video.id,
+      imageUrl,
+    );
+    return res;
   }
 
-  async getCategories (res:Response) {
+  async getCategories(res: Response) {
     try {
       let result = await CategoryModel.find({}, { _id: 0, name: 1 }).distinct('name');
       return res.json(result);
@@ -85,7 +105,6 @@ export class NftService {
     }
   }
 
-
   private async signatureForMintingNFT(
     name: string,
     description: string,
@@ -93,11 +112,10 @@ export class NftService {
     address: string,
     chainId: number,
     category: any,
-  ){
+  ) {
     const collectionAddress = normalizeAddress(streamCollectionAddresses[chainId]);
     address = normalizeAddress(address);
-    let imageExt = "jpg"
-    
+    let imageExt = 'jpg';
 
     // Checking category
     if (category?.length > 0) {
@@ -135,7 +153,7 @@ export class NftService {
       chainId,
       category,
       minter: normalizeAddress(address),
-      ...addedOptions
+      ...addedOptions,
     });
     // 4. Signature for minting token
     const totalSupply = 1000;
@@ -143,13 +161,13 @@ export class NftService {
       ['address', 'uint256', 'uint256', 'uint256', 'uint256'],
       [collectionAddress, tokenItem.tokenId, chainId, totalSupply, timestamp],
     );
-    const { r, s, v } = splitSignature(await signer.signMessage(arrayify(messageHash)))
-    const res:any = { r, s, v, createdTokenId: tokenItem.tokenId.toString(), timestamp }
-    console.log(res)
-    return {res, video: tokenItem}
+    const { r, s, v } = splitSignature(await signer.signMessage(arrayify(messageHash)));
+    const res: any = { r, s, v, createdTokenId: tokenItem.tokenId.toString(), timestamp };
+    console.log("signature res:", res);
+    return { res, video: tokenItem };
   }
 
- async getStreamNfts (filter:any, skip:number, limit:number, sortOption = null) {
+  async getStreamNfts(filter: any, skip: number, limit: number, sortOption = null) {
     try {
       const query = [
         {
@@ -230,19 +248,20 @@ export class NftService {
         category,
         range,
         address, // Add address to the destructured query parameters
-      }:any = req.query;
-      const searchQuery:any = {};
+      }: any = req.query;
+      const searchQuery: any = {};
       if (!unit) unit = 20;
       if (unit > 100) unit = 100;
-  
-      let sortRule:any = { createdAt: -1 };
-      searchQuery['$match'] = { 
+
+      let sortRule: any = { createdAt: -1 };
+      searchQuery['$match'] = {
         $and: [
-          { status: 'minted'},
-          { $or: [{ isHidden: false }, { isHidden: { $exists: false } }] }
-        ]
+          { status: 'minted' },
+          { $or: [{ isHidden: false }, { isHidden: { $exists: false } }] },
+          // { transcodingStatus: 'done' }
+        ],
       };
-  
+
       console.log('Range- sortMode', range, sortMode);
       switch (sortMode) {
         case 'trends':
@@ -284,7 +303,7 @@ export class NftService {
                 break;
             }
             searchQuery['$match']['createdAt'] = { $gt: fromDate };
-          } 
+          }
           break;
         case 'mostLiked':
           sortRule = { likes: -1 };
@@ -299,14 +318,14 @@ export class NftService {
           searchQuery['$match'][`streamInfo.${streamInfoKeys.isLockContent}`] = true;
           break;
       }
-  
+
       if (!page) page = 0;
       if (minter) searchQuery['$match'] = { minter: minter.toLowerCase() };
       if (owner) searchQuery['$match'] = { owner: owner.toLowerCase() };
       if (category) {
         searchQuery['$match']['category'] = { $elemMatch: { $eq: category } };
       }
-  
+
       if (bulkIdList) {
         let idList = bulkIdList.split('-');
         if (idList.length > 0) {
@@ -314,33 +333,33 @@ export class NftService {
           searchQuery['$match'] = { id: { $in: idList } };
         }
       }
-  
+
       if ((verifiedOnly + '').toLowerCase() === 'true' || verifiedOnly === '1') {
         searchQuery['$match'] = { ...searchQuery['$match'], verified: true };
       }
-  
+
       if (search) {
         if (!isValidSearch(search)) return res.json({ result: [] });
-        var re:any = new RegExp(search, 'gi');
-        let orOptions:any = [{ name: re }, { description: re }, { owner: normalizeAddress(re) }];
+        var re: any = new RegExp(search, 'gi');
+        let orOptions: any = [{ name: re }, { description: re }, { owner: normalizeAddress(re) }];
         if (Number(search) > 0) orOptions.push({ tokenId: Number(search) });
         searchQuery['$match'] = { ...searchQuery['$match'], $or: orOptions };
-  
+
         // Search through the accounts table
         const accounts = await AccountModel.find({ username: { $regex: new RegExp(search, 'i') } });
-        const videos:any = await this.getStreamNfts(
+        const videos: any = await this.getStreamNfts(
           searchQuery['$match'],
           unit * page,
           unit * page + unit * 1,
           sortRule,
         );
-  
+
         // Include userLike logic
         for (let video of videos) {
           const userLike = await VoteModel.findOne({ tokenId: video.tokenId, address });
           video.isLiked = Boolean(userLike);
         }
-  
+
         return res.send({
           result: {
             accounts,
@@ -348,13 +367,8 @@ export class NftService {
           },
         });
       }
-  
-      const ret:any = await this.getStreamNfts(
-        searchQuery['$match'],
-        unit * page,
-        unit * page + unit * 1,
-        sortRule,
-      )
+
+      const ret: any = await this.getStreamNfts(searchQuery['$match'], unit * page, unit * page + unit * 1, sortRule);
       // Include userLike logic
       for (let nft of ret) {
         const userLike = await VoteModel.findOne({ tokenId: nft.tokenId, address });
@@ -367,14 +381,14 @@ export class NftService {
     }
   }
 
-  async getMyWatchedNfts (req:Request, res:Response) {
-    let watcherAddress:any = req.query.watcherAddress || req.query.watcherAddress;
+  async getMyWatchedNfts(req: Request, res: Response) {
+    let watcherAddress: any = req.query.watcherAddress || req.query.watcherAddress;
     const category = reqParam(req, 'category');
     if (!watcherAddress) return res.status(400).json({ error: 'Watcher address is required' });
     watcherAddress = watcherAddress.toLowerCase();
     const watchedTokenIds = await WatchHistoryModel.find({ watcherAddress }).limit(20).distinct('tokenId');
     if (!watchedTokenIds || watchedTokenIds.length < 1) return res.json({ result: [] });
-    const myWatchedNfts:any = await this.getStreamNfts(
+    const myWatchedNfts: any = await this.getStreamNfts(
       { tokenId: { $in: watchedTokenIds }, category: category ? { $elemMatch: { $eq: category } } : null },
       0,
       20,
@@ -386,77 +400,78 @@ export class NftService {
     return res.json({ result: myWatchedNfts });
   }
 
-
-  async getNftInfo (req:Request, res:Response) {
+  async getNftInfo(req: Request, res: Response) {
     let tokenId = req.query.id || req.query.id || req.params?.id;
-    
+
     if (!tokenId) return res.status(400).json({ error: 'Bad request: No token id' });
     // const nftInfo = await Token.findOne({ tokenId }, tokenTemplate).lean();
     const nftInfo = (await this.getStreamNfts({ tokenId: Number(tokenId) }, 0, 1))?.[0];
-    const userLike = await VoteModel.findOne({tokenId, address: req.query?.address})
+    const userLike = await VoteModel.findOne({ tokenId, address: req.query?.address });
     if (!nftInfo) return res.status(404).json({ error: 'Not Found: NFT does not exist' });
     const comments = await this.commentsForTokenId(tokenId);
     nftInfo.comments = comments;
-    return res.json({ result: {...nftInfo, isLiked: Boolean(userLike)} });
+    return res.json({ result: { ...nftInfo, isLiked: Boolean(userLike) } });
   }
 
-  async commentsForTokenId(tokenId:any){
+  async commentsForTokenId(tokenId: any) {
     const query: mongoose.PipelineStage[] = [
-        {
-            $match: {
-                tokenId: Number(tokenId)
-            }
+      {
+        $match: {
+          tokenId: Number(tokenId),
         },
-        {
-            $lookup: {
-                from: 'accounts',
-                localField: 'address',
-                foreignField: 'address',
-                as: 'account'
-            }
+      },
+      {
+        $lookup: {
+          from: 'accounts',
+          localField: 'address',
+          foreignField: 'address',
+          as: 'account',
         },
-        {
-            $sort: {
-                id: -1
-            }
+      },
+      {
+        $sort: {
+          id: -1,
         },
-        {
-            $limit: 50
+      },
+      {
+        $limit: 50,
+      },
+      {
+        $project: {
+          _id: 0,
+          address: 1,
+          content: 1,
+          account: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          parentId: 1,
+          replyIds: 1,
+          id: 1,
+          tokenId: 1,
         },
-        {
-            $project: {
-                _id: 0,
-                address: 1,
-                content: 1,
-                account: 1,
-                createdAt: 1,
-                updatedAt: 1,
-                parentId: 1,
-                replyIds: 1,
-                id: 1,
-                tokenId: 1,
-            }
-        }
+      },
     ];
     let result = await CommentModel.aggregate(query);
     result.forEach(comment => {
-        if (comment.account?.[0]) {
-            comment.writor = {
-                username: comment.account?.[0]?.username,
-                avatarUrl: comment.account?.[0]?.avatarImageUrl? process.env.DEFAULT_DOMAIN + "/" + comment.account?.[0]?.avatarImageUrl: undefined
-            }
-            delete comment.account;
-        }
+      if (comment.account?.[0]) {
+        comment.writor = {
+          username: comment.account?.[0]?.username,
+          avatarUrl: comment.account?.[0]?.avatarImageUrl
+            ? process.env.DEFAULT_DOMAIN + '/' + comment.account?.[0]?.avatarImageUrl
+            : undefined,
+        };
+        delete comment.account;
+      }
     });
     return result;
   }
 
-  async getUnlockedNfts (req:Request, res:Response) {
+  async getUnlockedNfts(req: Request, res: Response) {
     /// walletAddress param can be username or address
-    let walletAddress:any = req.query.id || req.query.id || req.params?.id;
+    let walletAddress: any = req.query.id || req.query.id || req.params?.id;
     if (!walletAddress) return res.status(400).json({ error: 'Bad request: No wallet sent' });
     walletAddress = normalizeAddress(walletAddress);
-    let accountInfo:any = {};
+    let accountInfo: any = {};
     const unlockedPPVStreams = await PPVTransactionModel.find(
       { address: walletAddress, createdAt: { $gt: new Date(Date.now() - config.availableTimeForPPVStream) } },
       { streamTokenId: 1 },
@@ -464,9 +479,8 @@ export class NftService {
     accountInfo.unlocked = unlockedPPVStreams;
     return res.json({ result: accountInfo });
   }
-  
 
-  async createLikedVideo(req:Request, res:Response) {
+  async createLikedVideo(req: Request, res: Response) {
     try {
       const { userId, type } = req.body;
       const existingLikedVideo = await LikedVideos.findOne({ userId, type });
@@ -474,10 +488,10 @@ export class NftService {
         throw new Error('Video already liked');
       }
       const payload = new LikedVideos({
-        address:userId,
-        tokenId:type,
-      })
-  
+        address: userId,
+        tokenId: type,
+      });
+
       await payload.save();
       res.status(200).json({ message: 'Video added to liked videos' });
     } catch (error) {
@@ -485,7 +499,7 @@ export class NftService {
     }
   }
 
-  async getlikedVideos (req:Request, res:Response) {
+  async getlikedVideos(req: Request, res: Response) {
     try {
       let address = reqParam(req, paramNames.address);
       const page = reqParam(req, 'page');
@@ -496,21 +510,21 @@ export class NftService {
         // const result = await LikedVideos.find({ address }).sort({ createdAt: -1 }).skip(skip).limit(20).populate('tokenId');
         const result = await LikedVideos.find({ address }).sort({ createdAt: -1 }).lean();
         const updatedResult = await Promise.all(
-          result.map(async (video) => {
+          result.map(async video => {
             const token = await TokenModel.findOne({ tokenId: video.tokenId });
             return token;
-          })
+          }),
         );
-        res.status(200).json({ result:updatedResult })
+        res.status(200).json({ result: updatedResult });
       } catch (error) {
         res.status(500).json({ error: error.message });
       }
-    }catch(e){
-      res.status(500).json({error: e.message})
+    } catch (e) {
+      res.status(500).json({ error: e.message });
     }
   }
 
-  async removeLikedVideo(req:Request, res:Response) {
+  async removeLikedVideo(req: Request, res: Response) {
     try {
       const id = req.params.id;
       const liked = await LikedVideos.findById(id);
@@ -524,27 +538,27 @@ export class NftService {
     }
   }
 
-  async updateTokenVisibility (req:Request, res:Response) {
+  async updateTokenVisibility(req: Request, res: Response) {
     try {
       const { isHidden, id } = req.body;
-      
+
       // Validate input data
       if (!id || typeof isHidden === 'undefined') {
         return res.status(400).json({ result: false, error: 'Invalid data provided' });
       }
-  
+
       // Find the token and update its visibility
       const updatedToken = await TokenModel.findOneAndUpdate(
-        {tokenId: id},
+        { tokenId: id },
         { isHidden },
-        { new: true } // Returns the updated document
+        { new: true }, // Returns the updated document
       );
-      
+
       // Check if the token was successfully found and updated
       if (!updatedToken) {
         return res.status(404).json({ result: false, error: 'Token not found' });
       }
-  
+
       // Return the updated token
       return res.status(200).json({ result: true, data: updatedToken });
     } catch (e) {
@@ -553,24 +567,23 @@ export class NftService {
     }
   }
 
-// ======= //
-  async updateVideoInfo(tokenId:number, videoExt:string){
+  // ======= //
+  async updateVideoInfo(tokenId: number, videoExt: string) {
     const videoFilePath = defaultVideoFilePath(tokenId);
     let videoInfo = undefined;
     try {
-        videoInfo = await ffprobe(videoFilePath, { path: ffprobeStatic.path });
-    }
-    catch (e) {
-        console.log('---ffprobe error', e);
-        await TokenModel.updateOne({ tokenId: tokenId }, { transcodingStatus: 'failed' });
-        return;
+      videoInfo = await ffprobe(videoFilePath, { path: ffprobeStatic.path });
+    } catch (e) {
+      console.log('---ffprobe error', e);
+      await TokenModel.updateOne({ tokenId: tokenId }, { transcodingStatus: 'failed' });
+      return;
     }
 
     const videoStream = videoInfo?.streams?.find(e => e.codec_type === 'video');
     if (!videoStream) {
-        console.log('not find video stream', tokenId);
-        await TokenModel.updateOne({ tokenId: tokenId }, { transcodingStatus: 'failed' });
-        return;
+      console.log('not find video stream', tokenId);
+      await TokenModel.updateOne({ tokenId: tokenId }, { transcodingStatus: 'failed' });
+      return;
     }
     const videoDuration = videoStream.duration;
     const w = videoStream.width;
@@ -580,19 +593,24 @@ export class NftService {
     const audioStream = videoInfo?.streams?.find(e => e.codec_type === 'audio');
     let channelLayout = 'mono';
     if (audioStream) {
-        channelLayout = audioStream.channel_layout;
-        bitrate += Number(audioStream.bit_rate);
+      channelLayout = audioStream.channel_layout;
+      bitrate += Number(audioStream.bit_rate);
     }
-    let updateTokenOption:any = {};
+    let updateTokenOption: any = {};
     let videoStat;
     try {
-        videoStat = statSync(videoFilePath);
+      videoStat = statSync(videoFilePath);
     } catch (e) {
-        console.log('----error when fetching for video size', e);
+      console.log('----error when fetching for video size', e);
     }
     const fileSize = videoStat?.size;
-    if (videoExt === 'mp4' && videoStream.start_time === '0.000000' && videoStream.codec_name === 'h264' && videoStream.is_avc === 'true')
-        updateTokenOption.transcodingStatus = 'done';
+    if (
+      videoExt === 'mp4' &&
+      videoStream.start_time === '0.000000' &&
+      videoStream.codec_name === 'h264' &&
+      videoStream.is_avc === 'true'
+    )
+      updateTokenOption.transcodingStatus = 'done';
 
     updateTokenOption.videoDuration = videoDuration;
     updateTokenOption.videoInfo = { w, h, bitrate, channelLayout, lang, size: fileSize };
@@ -601,13 +619,13 @@ export class NftService {
     console.log('updated video info', tokenId);
   }
 
-  async getSignForClaimBounty (req:Request, res:Response) {
+  async getSignForClaimBounty(req: Request, res: Response) {
     const address = reqParam(req, paramNames.address);
     const tokenId = reqParam(req, 'tokenId');
     if (!address || !tokenId)
       return res.status(400).json({ result: false, error: 'Address and token ID are required' });
     const eligibleResult = await eligibleBountyForAccount(address, tokenId);
-    const result:any = { error: false, result: {}, claimed: {} };
+    const result: any = { error: false, result: {}, claimed: {} };
     if (eligibleResult?.viewer_claimed) result.result.viewer_claimed = true;
     if (eligibleResult?.commentor_claimed) result.result.commentor_claimed = true;
 
@@ -626,16 +644,16 @@ export class NftService {
     }
   }
 
-  private async signatureForClaimBounty(address:string, tokenId:number, bountyType:any) {
+  private async signatureForClaimBounty(address: string, tokenId: number, bountyType: any) {
     console.log('------sig for bounty', address, tokenId, bountyType);
     const tokenItem = await TokenModel.findOne({ tokenId }, { chainId: 1, streamInfo: 1 }).lean();
     const chainId = tokenItem?.chainId || config.defaultChainId;
-    const toSignForClaim = ethers.solidityPackedKeccak256(["address", "address", "uint256", "uint256", "uint8"],
-        [streamControllerContractAddresses[chainId], address, chainId, tokenId, bountyType]);
+    const toSignForClaim = ethers.solidityPackedKeccak256(
+      ['address', 'address', 'uint256', 'uint256', 'uint8'],
+      [streamControllerContractAddresses[chainId], address, chainId, tokenId, bountyType],
+    );
     let signer = new ethers.Wallet(process.env.SIGNER_KEY);
     const { r, s, v } = splitSignature(await signer.signMessage(arrayify(toSignForClaim)));
-    return { v, r, s }
+    return { v, r, s };
   }
-
-
 }
