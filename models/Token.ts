@@ -107,10 +107,10 @@ TokenSchema.pre<TokenDocument>('save', async function (next) {
         doc.name = `${NFT_NAME_PREFIX} #${doc.tokenId}`;
       }
       if (!doc.imageUrl) {
-        doc.imageUrl = `nfts/images/${doc.tokenId}.${doc.imageExt || 'png'}`;
+        doc.imageUrl = `images/${doc.tokenId}.${doc.imageExt || 'png'}`;
       }
       if (!doc.videoUrl) {
-        doc.videoUrl = `streams/video/${doc.tokenId}`;
+        doc.videoUrl = `videos/${doc.tokenId}`;
       }
       next();
     } catch (error) {

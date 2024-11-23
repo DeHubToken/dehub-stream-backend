@@ -9,12 +9,15 @@ import { JobGateway } from './job.socket';
 
 @Processor('transcode')
 export class VideoQueueProcessor {
-  constructor(private readonly cdnService: CdnService, private readonly socketGateway: JobGateway){}
+  constructor(
+    private readonly cdnService: CdnService,
+    private readonly socketGateway: JobGateway,
+  ) {}
   @Process()
   async handleJob(job: Job) {
     console.log('Job received:');
     const { buffer, slug, filename, mimeType, videoId, imageUrl } = job.data;
-    
+
     const video = await TokenModel.findById(videoId);
     if (!video) {
       throw new Error('Video not found');
@@ -22,14 +25,25 @@ export class VideoQueueProcessor {
 
     try {
       video.transcodingStatus = 'on';
-      const url = await this.transcodeAndUploadFile(buffer, filename, mimeType, video)
-      video.videoUrl = url
-      video.imageUrl = imageUrl
-      video.imageExt = "jpg"
-      video.progress= 100
-      video.videoDuration = await this.cdnService.getFileDuration(process.env.CDN_BASE_URL+url)
-      video.transcodingStatus = "done"
-      await video.save()
+      const url = await this.transcodeAndUploadFile(
+        buffer,
+        filename,
+        mimeType,
+        video,
+      );
+      video.videoUrl = url;
+      video.imageUrl = imageUrl;
+      video.imageExt = 'jpg';
+      video.progress = 100;
+      const baseUrl = process.env.CDN_BASE_URL || '';
+      if (!baseUrl) {
+        throw new Error('CDN_BASE_URL is not configured');
+      }
+      video.videoDuration = await this.cdnService.getFileDuration(
+        baseUrl + url,
+      );
+      video.transcodingStatus = 'done';
+      await video.save();
 
       console.log('Video processed and uploaded:', url);
     } catch (error) {
@@ -42,16 +56,24 @@ export class VideoQueueProcessor {
     buffer: Buffer,
     filename: string,
     mimeType: string,
-    video: TokenDocument
+    video: TokenDocument,
   ): Promise<string> {
-    const isVideoAndNotMp4 = mimeType.startsWith('video/') && !filename.endsWith('.mp4');
+    const isVideoAndNotMp4 =
+      mimeType.startsWith('video/') && !filename.endsWith('.mp4');
 
     // Transcode if necessary
     if (isVideoAndNotMp4) {
-      
       try {
-        await this.transcodeToMp4(buffer, filename, video);
-        return await this.uploadAndSaveVideo(buffer, `${video.tokenId}.mp4`, video.tokenId);
+        const { uploadBuffer, uploadFileName } = await this.transcodeToMp4(
+          buffer,
+          filename,
+          video,
+        );
+        return await this.uploadAndSaveVideo(
+          uploadBuffer,
+          uploadFileName,
+          video.tokenId,
+        );
       } catch (error) {
         console.error('Error during transcoding:', error);
         video.transcodingStatus = 'failed';
@@ -59,11 +81,19 @@ export class VideoQueueProcessor {
         throw error;
       }
     } else {
-      return await this.uploadAndSaveVideo(buffer, `${video.tokenId}.mp4`, video.tokenId);
+      return await this.uploadAndSaveVideo(
+        buffer,
+        `${video.tokenId}.mp4`,
+        video.tokenId,
+      );
     }
   }
 
-  private async transcodeToMp4(buffer: Buffer, filename: string, video: TokenDocument): Promise<{ uploadBuffer: Buffer, uploadFileName: string }> {
+  private async transcodeToMp4(
+    buffer: Buffer,
+    filename: string,
+    video: TokenDocument,
+  ): Promise<{ uploadBuffer: Buffer; uploadFileName: string }> {
     const tempInputPath = `/tmp/${filename}`;
     const tempOutputPath = `/tmp/${path.parse(filename).name}.mp4`;
 
@@ -74,9 +104,16 @@ export class VideoQueueProcessor {
     await new Promise<void>((resolve, reject) => {
       ffmpeg(tempInputPath)
         .outputFormat('mp4')
-        .on('progress', async (progress: any) => {
-          console.log(progress)
-          this.socketGateway.emitProgress({progress: Math.floor(progress), stage:"transcoding"}, video.tokenId.toString())
+        .on('progress', (progress: any) => {
+          console.log(`transcoding progress ${progress}`);
+          const percentage =
+            progress.percent ||
+            (progress.frames / progress.totalFrames) * 100 ||
+            0;
+          this.socketGateway.emitProgress(
+            { progress: Math.floor(percentage), stage: 'transcoding' },
+            video.tokenId.toString(),
+          );
         })
         .on('end', async () => {
           console.log('Transcoding complete');
@@ -96,17 +133,27 @@ export class VideoQueueProcessor {
     await fs.unlink(tempInputPath);
     await fs.unlink(tempOutputPath);
 
-
     return { uploadBuffer, uploadFileName };
   }
 
-  private async uploadAndSaveVideo(buffer:Buffer, filename: string, tokenId:number): Promise<string> {
-    const onProgress = (progress:number)=>{
-      this.socketGateway.emitProgress({progress, stage:"uploading"}, tokenId.toString())
-    }
-    const url = this.cdnService.uploadFile(buffer, "videos", filename, onProgress)
-    
+  private async uploadAndSaveVideo(
+    buffer: Buffer,
+    filename: string,
+    tokenId: number,
+  ): Promise<string> {
+    const onProgress = (progress: number) => {
+      this.socketGateway.emitProgress(
+        { progress, stage: 'uploading' },
+        tokenId.toString(),
+      );
+    };
+    const url = await this.cdnService.uploadFile(
+      buffer,
+      'videos',
+      filename,
+      onProgress,
+    );
+
     return url;
   }
-  
 }

@@ -70,7 +70,7 @@ export class NftService {
     // Call the signatureForMintingNFT method with the uploaded URLs
    
     const {res, video}:any = await this.signatureForMintingNFT(name, description, streamInfo, address, chainId, category)
-    const imageUrl = await this.cdnService.uploadFile(imageFile.buffer, address, video.tokenId+".jpg")
+    const imageUrl = await this.cdnService.uploadFile(imageFile.buffer, "images", video.tokenId+".jpg")
     await this.jobService.addUploadAndTranscodeJob(videoFile.buffer, address, videoFile.originalname, videoFile.mimetype, video, imageUrl)
      return res
   }
@@ -264,9 +264,6 @@ export class NftService {
             }
             searchQuery['$match']['createdAt'] = { $gt: fromDate };
           }
-          // else {
-            // searchQuery['$match']['createdAt'] = { $gt: new Date(Date.now() - config.recentTimeDiff) };
-          // }
           sortRule = { views: -1 };
           break;
         case 'new':
@@ -288,9 +285,6 @@ export class NftService {
             }
             searchQuery['$match']['createdAt'] = { $gt: fromDate };
           } 
-          // else {
-            // searchQuery['$match']['createdAt'] = { $gt: new Date(Date.now() - config.recentTimeDiff) };
-          // }
           break;
         case 'mostLiked':
           sortRule = { likes: -1 };
