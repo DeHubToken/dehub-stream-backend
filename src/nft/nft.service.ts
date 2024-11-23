@@ -78,11 +78,7 @@ export class NftService {
       category,
     );
 
-    console.log(imageFile);
-
     const imageUrl = await this.cdnService.uploadFile(imageFile.buffer, 'images', video.id + '.jpg');
-
-    console.log('here', imageUrl);
 
     await this.jobService.addUploadAndTranscodeJob(
       videoFile.buffer,
