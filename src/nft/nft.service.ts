@@ -103,14 +103,14 @@ export class NftService {
       return res;
     }
 
-    const imageUrl = await this.cdnService.uploadFile(files[1].buffer, address, token.tokenId + '.jpg');
+    const imageUrl = await this.cdnService.uploadFile(files[1].buffer, address, token.tokenId + '.jpg'); 
 
     await this.jobService.addUploadAndTranscodeJob(
       files[0].buffer,
       address,
       files[0].originalname,
       files[0].mimetype,
-      token.id,
+      token._id,
       imageUrl,
     );
     return res;
