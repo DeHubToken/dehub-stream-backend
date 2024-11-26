@@ -49,7 +49,7 @@ const isAuthorized = async (req, res, next) => {
 
   if (token) {
     try {
-      const decodedToken = jwt.verify(token, secretKey);
+      const decodedToken :any= jwt.verify(token, secretKey);
       req.params.address = decodedToken.address.toLowerCase();
       req.params.rawSig = decodedToken.rawSig;
       req.params.timestamp = decodedToken.timestamp;
