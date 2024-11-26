@@ -49,6 +49,9 @@ const isAuthorized = async (req, res, next) => {
 
   if (token) {
     try {
+      // interface jwtRes extends JwtPayload {
+      //   address:string;rawSig:string;timestamp:string
+      // }
       const decodedToken :any= jwt.verify(token, secretKey);
       req.params.address = decodedToken.address.toLowerCase();
       req.params.rawSig = decodedToken.rawSig;
