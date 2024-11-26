@@ -41,11 +41,15 @@ export class StreamCronService implements OnModuleInit {
         const networkName = 'polygon';
         await this.mainLoop(networkName)
     }
+    @Cron(CronExpression.EVERY_MINUTE)
+    async bscTestLoop() {
+        const networkName = 'bsctest';
+        await this.mainLoop(networkName)
+    }
 
     async mainLoop(networkName) {
         const curNetwork = supportedNetworks.find(e => e.shortName === networkName);
         if (!curNetwork) return this.logger.error(`No supported network! -- ${curNetwork.shortName} ${curNetwork.chainId}`);
-
         const chainId = curNetwork.chainId;
         const graphUrl = curNetwork.graphUrl;
 
