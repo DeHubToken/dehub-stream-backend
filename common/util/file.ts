@@ -15,7 +15,7 @@ const defaultImageFilePath = (tokenId: number, imageExt = 'jpg') => {
 
 const defaultTokenImagePath = (tokenId: string, address: string) => {
   // Construct the base URL
-  let url = `${process.env.CDN_BASE_URL}/${address}/${tokenId}`;
+  let url = `${process.env.CDN_BASE_URL}${address}/${tokenId}`;
 
   // Check if the URL already has an extension (e.g., .jpg, .png, etc.)
   const hasExtension = /\.(jpg|jpeg|png|gif|svg)$/i.test(url);
