@@ -36,11 +36,13 @@ export class StreamCronService implements OnModuleInit {
         await this.mainLoop(networkName)
     }
 
-    @Cron(CronExpression.EVERY_MINUTE)
-    async polyLoop() {
-        const networkName = 'polygon';
-        await this.mainLoop(networkName)
-    }
+    // Disable polygon for now
+
+    // @Cron(CronExpression.EVERY_MINUTE)
+    // async polyLoop() {
+    //     const networkName = 'polygon';
+    //     await this.mainLoop(networkName)
+    // }
 
     async mainLoop(networkName) {
         const curNetwork = supportedNetworks.find(e => e.shortName === networkName);
