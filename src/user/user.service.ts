@@ -173,7 +173,7 @@ async unFollow (address, following){
   following = normalizeAddress(following);
   const deletedResult = await Follow.deleteOne({ address, following });
   if (deletedResult?.deletedCount > 0) return { result: true };
-  return  throw new ConflictException("Not following user");
+  throw new ConflictException("Not following user");
 };
 
 async getFollowing (address){
