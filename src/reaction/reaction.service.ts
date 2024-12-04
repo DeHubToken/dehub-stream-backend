@@ -121,26 +121,45 @@ export class ReactionService {
       return res.status(500).json({ result: false, error: err.message || 'Voting failed' });
     }
   }
-  async requestFollow (req, res) {
-    const address = reqParam(req, paramNames.address);
-    const following = reqParam(req, 'following');
-    const unFollowing = reqParam(req, 'unFollowing');
-    if (!following && !isAddress(following))
-      return res.status(400).json({ error: 'Following params is required', message: 'Following params is required' });
-    try {
-      let result = undefined;
-      if (unFollowing != 'true') {
-        result = await this.requestFollow(address, following);
-        await this.notificationService.createNotificationfunc(normalizeAddress(following), 'following', {
-          senderAddress: normalizeAddress(address),
-        });
-      } else result = await this.userService.unFollow(address, following);
-      return res.json(result);
-    } catch (err) {
-      console.log('-----request follow error', err);
-      return res.status(500).json({ result: false, error: 'Following failed' });
+
+  async handleRequestFollow(address: string, following: string, unFollowing: string | undefined): Promise<any> {
+    if (!following || !isAddress(following)) {
+      throw new Error('Following params is required');
+    }
+
+    if (unFollowing !== 'true') {
+      const result = await this.userService.requestFollow(address, following);
+      await this.notificationService.createNotificationfunc(
+        normalizeAddress(following),
+        'following',
+        { senderAddress: normalizeAddress(address) },
+      );
+      return result;
+    } else {
+      return this.userService.unFollow(address, following);
     }
   }
+
+  // async requestFollow (req, res) {
+  //   const address = reqParam(req, paramNames.address);
+  //   const following = reqParam(req, 'following');
+  //   const unFollowing = reqParam(req, 'unFollowing');
+  //   if (!following && !isAddress(following))
+  //     return res.status(400).json({ error: 'Following params is required', message: 'Following params is required' });
+  //   try {
+  //     let result = undefined;
+  //     if (unFollowing != 'true') {
+  //       result = await this.requestFollow(address, following);
+  //       await this.notificationService.createNotificationfunc(normalizeAddress(following), 'following', {
+  //         senderAddress: normalizeAddress(address),
+  //       });
+  //     } else result = await this.userService.unFollow(address, following);
+  //     return res.json(result);
+  //   } catch (err) {
+  //     console.log('-----request follow error', err);
+  //     return res.status(500).json({ result: false, error: 'Following failed' });
+  //   }
+  // }
 
    async requestReaction (req:Request, res:Response) {
     const address = reqParam(req, paramNames.address);

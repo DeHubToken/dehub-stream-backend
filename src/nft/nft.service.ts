@@ -80,6 +80,8 @@ export class NftService {
 
     const imageUrl = await this.cdnService.uploadFile(imageFile.buffer, 'images', video?.tokenId?.toString() + '.jpg');
 
+    console.log('here', imageUrl, video?.tokenId.toString());
+
     await this.jobService.addUploadAndTranscodeJob(
       videoFile.buffer,
       address,
@@ -254,7 +256,7 @@ export class NftService {
         $and: [
           { status: 'minted' },
           { $or: [{ isHidden: false }, { isHidden: { $exists: false } }] },
-          // { transcodingStatus: 'done' }
+          { transcodingStatus: 'done' } // Only trancoded videos 
         ],
       };
 
