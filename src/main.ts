@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import {  ValidationPipe } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
 import mongoose from 'mongoose';
@@ -10,7 +10,7 @@ import methodOverride from 'method-override';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { AllExceptionsFilter } from 'common/filters/allexceptions';
 import { SocketIoAdapter } from 'common/adapters/socket-io.adapters';
-import {config} from 'config';
+import { config } from 'config';
 import * as socketIO from 'socket.io';
 import { createServer } from 'http';
 import { addUserToOnlineList, getOnlineUsers, removeUserFromOnlineList } from 'common/util/socket';
@@ -38,10 +38,10 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   app.use(cookieParser());
-  app.use(cors())
-  
+  app.use(cors());
+
   app.use(json()); // Ensure JSON body parsing is set up
-  
+
   app.use(
     session({
       secret: '1234567890',
@@ -50,21 +50,21 @@ async function bootstrap() {
       cookie: { secure: false },
     }),
   );
-  
+
   app.use(flash());
   app.use(methodOverride('X-HTTP-Method-Override'));
   app.useGlobalPipes(new ValidationPipe());
-  app.setGlobalPrefix("api");
-  
+  app.setGlobalPrefix('api');
+
   // Set global error filter
   app.useGlobalFilters(new AllExceptionsFilter());
 
   // Connect to MongoDB
-  const mongoUri = `mongodb://${config.mongo.host}:${config.mongo.port}/${config.mongo.dbName}`;
-  console.log(config.mongo.dbName)
+  const mongoUri = config?.mongo?.url || `mongodb://${config.mongo.host}:${config.mongo.port}/${config.mongo.dbName}`;
+  console.log(config?.mongo?.url || config.mongo.dbName);
   await mongoose.connect(mongoUri); // Await connection
-  
-  mongoose.connection.on('error', (err) => {
+
+  mongoose.connection.on('error', err => {
     console.error('MongoDB connection error:', err);
   });
 

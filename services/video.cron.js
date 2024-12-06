@@ -174,7 +174,7 @@ async function cronLoop() {
     setTimeout(cronLoop, 10 * 1000);
 }
 /// -- minter listener
-mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/' + config.mongo.dbName,
+mongoose.connect(config?.mongo?.url||'mongodb://' + config.mongo.host + ':' + config.mongo.port + '/' + config.mongo.dbName,
     { useNewUrlParser: true, useUnifiedTopology: true, useFindAndModify: false }).then(async () => {
         console.log(' -- processing video files and watched streams...');
         cronLoop();

@@ -9,7 +9,7 @@ import { paramNames, streamCollectionAddresses, streamInfoKeys, tokenTemplate } 
 import { eligibleBountyForAccount, isValidSearch, removeDuplicatedElementsFromArray } from 'common/util/validation';
 import { CategoryModel } from 'models/Category';
 import { Request, Response } from 'express';
-import { AccountModel } from 'models/Account';
+import { AccountDocument, AccountModel } from 'models/Account';
 import { config } from 'config';
 import { reqParam } from 'common/util/auth';
 import { WatchHistoryModel } from 'models/WatchHistory';
@@ -65,6 +65,7 @@ export class NftService {
     chainId: number,
     category: string[],
     postType: string,
+    plans: any,
     files: Express.Multer.File[],
   ): Promise<any> {
     // Adjust the return type based on what signatureForMintingNFT returns
@@ -79,6 +80,7 @@ export class NftService {
       chainId,
       category,
       postType,
+      plans,
     );
 
     if (postType == 'feed-simple') {
@@ -95,16 +97,15 @@ export class NftService {
       );
       // Filter out null values (in case some uploads failed)
       const filteredUrls = imageUrls.filter(url => url);
-
-      console.log('Final Image URLs:', filteredUrls);
-
       // Update database
-      const data = await TokenModel.findOneAndUpdate({ _id: token._id }, { $set: { imageUrls: filteredUrls } });
+      await TokenModel.findOneAndUpdate({ _id: token._id }, { $set: { imageUrls: filteredUrls } });
       return res;
     }
+    //clg type video
+    console.log('type video');
 
-    const imageUrl = await this.cdnService.uploadFile(files[1].buffer, address, token.tokenId + '.jpg'); 
-
+    const imageUrl = await this.cdnService.uploadFile(files[1].buffer, address, token.tokenId + '.jpg');
+    console.log('adding cron ');
     await this.jobService.addUploadAndTranscodeJob(
       files[0].buffer,
       address,
@@ -113,6 +114,8 @@ export class NftService {
       token._id,
       imageUrl,
     );
+
+    console.log('if redis run then adding job and response is sending to client');
     return res;
   }
 
@@ -134,6 +137,7 @@ export class NftService {
     chainId: number,
     category: any,
     postType: string,
+    plans: any,
   ) {
     let imageExt = postType != 'feed-simple' ? 'jpg' : null;
     const collectionAddress = normalizeAddress(streamCollectionAddresses[chainId]);
@@ -175,6 +179,7 @@ export class NftService {
       chainId,
       category,
       postType,
+      plans,
       minter: normalizeAddress(address),
       ...addedOptions,
     });
@@ -190,13 +195,81 @@ export class NftService {
     return { res, token: tokenItem };
   }
 
-  async getStreamNfts(filter: any, skip: number, limit: number, sortOption = null) {
+  async getStreamNfts(
+    filter: any,
+    skip: number,
+    limit: number,
+    sortOption = null,
+    subscriber = '0x35BAa69f84E19B8F0F864E69501Ef9A6b0a53D15',
+  ) {
+    const user: any = await AccountModel.findOne({ address: subscriber?.toLowerCase() });
+ 
     try {
       console.log('myfilter', filter);
       const query = [
         {
           $match: filter,
         },
+
+        {
+          $lookup: {
+            from: 'plans',
+            localField: 'plans',
+            foreignField: 'id',
+            as: 'planDetails', // Join the plans collection to the token documents
+          },
+        },
+
+        {
+          $lookup: {
+            from: 'plans',
+            localField: 'plans',
+            foreignField: 'id',
+            as: 'planDetails', // Join the plans collection to the token documents
+          },
+        },
+        {
+          $lookup: {
+            from: 'subscriptions',
+            let: { planIds: '$plans' }, // Reference the 'plans' field in Token documents
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$userId',user?._id?user?._id:null] }, // Match the userId
+                      { $eq: ['$active', true] }, // Check if the subscription is active
+                      {
+                        $and: [
+                          { $lte: ['$startDate', new Date()] }, // Check if current date is after startDate
+                          { $gte: ['$endDate', new Date()] }, // Check if current date is before endDate
+                        ],
+                      },
+                    ],
+                  },
+                },
+              },
+              {
+                $project: { _id: 1 }, // Only return the _id of matching subscriptions
+              },
+            ],
+            as: 'userSubscriptions',
+          },
+        },
+        {
+          $unwind: {
+            path: '$planDetails',
+            preserveNullAndEmptyArrays: true, // Keep plans without subscriptions
+          },
+        },
+        {
+          $addFields: {
+            'planDetails.alreadySubscribed': {
+              $cond: { if: { $gt: [{ $size: '$userSubscriptions' }, 0] }, then: true, else: false },
+            },
+          },
+        },
+
         {
           $lookup: {
             from: 'accounts',
@@ -229,6 +302,7 @@ export class NftService {
         {
           $project: {
             ...tokenTemplate,
+            planDetails: 1,
             mintername: { $first: '$account.username' },
             minterDisplayName: { $first: '$account.displayName' },
             minterAvatarUrl: { $first: '$account.avatarImageUrl' },
@@ -283,7 +357,7 @@ export class NftService {
         postFilter['$or'] = [{ postType: 'feed-simple' }, { postType: 'feed-images' }];
       } else {
         postFilter['postType'] = postType;
-        // postFilter['transcodingStatus']= 'done';
+        postFilter['transcodingStatus']= 'done';
       }
 
       console.log('sortMode', { sortMode, postType, searchQuery });
@@ -442,6 +516,7 @@ export class NftService {
 
     if (!tokenId) return res.status(400).json({ error: 'Bad request: No token id' });
     // const nftInfo = await Token.findOne({ tokenId }, tokenTemplate).lean();
+
     const nftInfo = (await this.getStreamNfts({ tokenId: Number(tokenId) }, 0, 1))?.[0];
     const userLike = await VoteModel.findOne({ tokenId, address: req.query?.address });
     if (!nftInfo) return res.status(404).json({ error: 'Not Found: NFT does not exist' });

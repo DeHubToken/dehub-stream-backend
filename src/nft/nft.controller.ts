@@ -76,7 +76,7 @@ export class NFTController {
     if (postType != 'feed-simple' && (!files || files.length === 0)) {
       return res.status(400).json({ message: 'No files provided for minting' });
     }
-    const { address, name, description, streamInfo, chainId, category } = req.body;
+    const { address, name, description, streamInfo, chainId, category,plans } = req.body;
 
     try {
       const nft = await this.nftServices.mintNFT(
@@ -86,7 +86,7 @@ export class NFTController {
         address,
         chainId,
         category,
-        postType,
+        postType,JSON.parse(plans),
         files,
       );
       return res.json(nft);

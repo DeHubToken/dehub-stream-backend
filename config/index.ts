@@ -11,6 +11,7 @@ const config = {
     devPort: 9002,
     devBaseUrl: 'http://127.0.0.1:9002',
     mongo: {
+        url:process.env.DB_URL,
         host: '127.0.0.1',
         port: 27017,
         dbName: process.env.DB_NAME || 'streaming_production_db',
@@ -37,3 +38,5 @@ const config = {
 export {
     config
 }
+
+ 

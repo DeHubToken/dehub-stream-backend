@@ -186,7 +186,7 @@ const devTokens = [
     symbol: 'DHB',
     customAbbreviation: 'dhb',
     chainId: 97,
-    address: '0x06EdA7889330031a8417f46e4C771C628c0b6418',
+    address: '0xeb6acdcfe1f13187126a504d56f7970bf6f3c5e1',
     iconUrl: 'assets/icons/tokens/DHB.png',
     decimals: 18,
   },
@@ -445,13 +445,15 @@ const mainNetworks = [
     rpcUrls: [process.env.BSC_RPC_ENDPOINT],
     startBlockNumber: 25834000,
     graphUrl: process.env.BSC_GRAPH_API_ENDPOINT,
+    eventRpc: [process.env.BSC_RPC_ENDPOINT],
   },
   {
     chainId: ChainId.BASE_MAINNET,
     shortName: `base`,
-    rpcUrls: [process.env.BASE_RPC_ENDPOINT],
-    startBlockNumber: 16428469,
+    rpcUrls: [`https://base-sepolia.infura.io/v3/${process.env.INFURA_API_KEY}`],
+    startBlockNumber: 14205375,
     graphUrl: process.env.BASE_GRAPH_API_ENDPOINT,
+    eventRpc: [`https://endpoints.omniatech.io/v1/base/mainnet/public`],
   },
   {
     chainId: ChainId.MAINNET,
@@ -459,6 +461,7 @@ const mainNetworks = [
     rpcUrls: [`https://mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`],
     startBlockNumber: 16428469,
     graphUrl: process.env.ETHEREUM_GRAPH_API_ENDPOINT,
+    eventRpc: [`https://mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`],
   },
   {
     chainId: ChainId.POLYGON_MAINNET,
@@ -468,15 +471,17 @@ const mainNetworks = [
     ],
     startBlockNumber: 38197541,
     graphUrl: process.env.POLYGON_GRAPH_API_ENDPOINT,
+    eventRpc: [`https://rpc-mainnet.matic.quiknode.pro`],
   },
 ];
 const testNetworks = [
   {
     chainId: ChainId.BSC_TESTNET,
     shortName: `bsctest`,
-    rpcUrls: [process.env.BSCTEST_RPC_ENDPOINT],
+    rpcUrls: [process.env.BSCTEST_RPC_ENDPOINT, process.env.BSCTEST_RPC_ENDPOINT],
     startBlockNumber: 8708163,
     graphUrl: 'https://api.thegraph.com/subgraphs/name/bscscan/bsc-testnet',
+    eventRpc: [`https://data-seed-prebsc-1-s1.bnbchain.org:8545`],
   },
   {
     chainId: ChainId.GORLI,
@@ -516,6 +521,7 @@ const tokenTemplate = {
   chainId: 1,
   category: 1,
   postType: 1,
+  // plans:1,
   _id: 0,
 };
 
@@ -527,7 +533,16 @@ const blacklistOnLeaderboard = [
 ];
 
 const publicChatChannelId = 'public_chn';
-
+export const durations = [
+  { title: '1 month', value: 1, tier: 1 },
+  { title: '3 months', value: 3, tier: 2 },
+  { title: '6 months', value: 6, tier: 3 },
+  { title: '1 year', value: 12, tier: 4 },
+  { title: 'lifetime', value: 999, tier: 5 },
+];
+const subscriptionCollectionAddress = {
+  [ChainId.BSC_TESTNET]: '0x3A76858fb35520c3CA20E826901c7cB73F715251',
+};
 export {
   paramNames,
   supportedVideoTypes,
@@ -550,6 +565,7 @@ export {
   multicallContractAddresses,
   stakingContractAddresses,
   streamCollectionAddresses,
+  subscriptionCollectionAddress,
   streamControllerContractAddresses,
   tokenTemplate,
   blacklistOnLeaderboard,

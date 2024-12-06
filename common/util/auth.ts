@@ -42,7 +42,17 @@ const reqParam = (req, paramName) => {
   const result = req.query?.[paramName] || req.body?.[paramName] || req.params?.[paramName];
   return typeof result === 'string' ? result?.trim() : result;
 };
+ 
 
+const addProperty = (req,obj:any,key: string ,as?:string) => {
+  const value = reqParam(req, key);
+  if (value !== undefined && value !== null) {
+    if(as){
+      obj[as] = value;
+    } 
+    obj[key] = value;
+  }
+};
 
 const isAuthorized = async (req, res, next) => {
   const token = req.headers?.authorization?.split(' ')[1];
@@ -83,4 +93,5 @@ export {
   isValidAccount,
   reqParam,
   isAuthorized,
+  addProperty
 };

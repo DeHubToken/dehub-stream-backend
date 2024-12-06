@@ -8,7 +8,7 @@ import { normalizeAddress } from 'common/util/format';
 import { CommentModel } from 'models/Comment';
 import Reward from 'models/Reward';
 import { Balance } from 'models/Balance';
-import {config} from 'config';
+import { config } from 'config';
 import { Feature } from 'models/Feature';
 import { VoteModel } from 'models/Vote';
 import { NotificationsService } from 'src/notification/notification.service';
@@ -21,10 +21,10 @@ import Reaction from 'models/Reaction';
 export class ReactionService {
   constructor(
     private readonly notificationService: NotificationsService,
-    private readonly userService: UserService
-  ){}
-  
-  async requestLike (req:Request, res:Response) {
+    private readonly userService: UserService,
+  ) {}
+
+  async requestLike(req: Request, res: Response) {
     const address = reqParam(req, paramNames.address);
     let streamTokenId = reqParam(req, paramNames.streamTokenId);
     if (!streamTokenId) return res.status(404).json({ error: true, message: 'Not Found: Token does not exist' });
@@ -37,8 +37,8 @@ export class ReactionService {
       return res.status(500).json({ result: false, error: 'Like request failed' });
     }
   }
-  
-  async requestTip (req:Request, res:Response) {
+
+  async requestTip(req: Request, res: Response) {
     const address = reqParam(req, paramNames.address);
     let amount = reqParam(req, 'amount');
     let chainId = reqParam(req, 'chainId');
@@ -63,14 +63,18 @@ export class ReactionService {
     }
   }
 
-  async requestComment (req, res) {
+  async requestComment(req, res) {
     const address = reqParam(req, paramNames.address);
     let content = reqParam(req, 'content');
     let commentId = reqParam(req, 'commentId');
     let streamTokenId = reqParam(req, paramNames.streamTokenId);
-    if (!streamTokenId) return res.status(404).json({ error: true, message: 'Not Found: Token does not exist' });
+    if (!streamTokenId) {
+      return res.status(404).json({ error: true, message: 'Not Found: Token does not exist' });
+    }
     try {
-      if (!content) return res.status(400).json({ error: true, message: 'Comment content is required' });
+      if (!content) {
+        return res.status(400).json({ error: true, message: 'Comment content is required' });
+      }
       streamTokenId = parseInt(streamTokenId, 10);
       commentId = commentId ? parseInt(commentId, 10) : undefined;
       const owner = await TokenModel.findOne({ tokenId: streamTokenId }, {}).lean();
@@ -79,7 +83,7 @@ export class ReactionService {
       await this.notificationService.createNotificationfunc(normalizeAddress(owner.owner), 'comment', {
         tokenId: streamTokenId,
         senderAddress: normalizeAddress(address),
-      });
+      }); 
       return res.json(result);
     } catch (err) {
       console.log('-----request comment error', err);
@@ -87,7 +91,7 @@ export class ReactionService {
     }
   }
 
-  async requestVote (req, res) {
+  async requestVote(req, res) {
     const address = reqParam(req, paramNames.address);
     const vote = reqParam(req, 'vote'); // 'true' => yes or 'false' => no
     let streamTokenId = reqParam(req, paramNames.streamTokenId);
@@ -98,7 +102,7 @@ export class ReactionService {
       const owner = await TokenModel.findOne({ tokenId: streamTokenId }, {}).lean();
       await this.requestVoteFunc(address, streamTokenId, vote.toString());
       // notify owner
-      console.log(owner.owner, address)
+      console.log(owner.owner, address);
       await this.notificationService.createNotificationfunc(
         normalizeAddress(owner.owner),
         vote === 'true' ? 'like' : 'dislike',
@@ -112,8 +116,8 @@ export class ReactionService {
         const payload = new LikedVideos({
           address: normalizeAddress(address),
           tokenId: streamTokenId,
-        })
-        await payload.save()
+        });
+        await payload.save();
       }
       return res.json({});
     } catch (err) {
@@ -121,26 +125,45 @@ export class ReactionService {
       return res.status(500).json({ result: false, error: err.message || 'Voting failed' });
     }
   }
-  async requestFollow (req, res) {
-    const address = reqParam(req, paramNames.address);
-    const following = reqParam(req, 'following');
-    const unFollowing = reqParam(req, 'unFollowing');
-    if (!following && !isAddress(following))
-      return res.status(400).json({ error: 'Following params is required', message: 'Following params is required' });
-    try {
-      let result = undefined;
-      if (unFollowing != 'true') {
-        result = await this.requestFollow(address, following);
-        await this.notificationService.createNotificationfunc(normalizeAddress(following), 'following', {
-          senderAddress: normalizeAddress(address),
-        });
-      } else result = await this.userService.unFollow(address, following);
-      return res.json(result);
-    } catch (err) {
-      console.log('-----request follow error', err);
-      return res.status(500).json({ result: false, error: 'Following failed' });
+
+  async handleRequestFollow(address: string, following: string, unFollowing: string | undefined): Promise<any> {
+    if (!following || !isAddress(following)) {
+      throw new Error('Following params is required');
+    }
+
+    if (unFollowing !== 'true') {
+      const result = await this.userService.requestFollow(address, following);
+      await this.notificationService.createNotificationfunc(
+        normalizeAddress(following),
+        'following',
+        { senderAddress: normalizeAddress(address) },
+      );
+      return result;
+    } else {
+      return this.userService.unFollow(address, following);
     }
   }
+
+  // async requestFollow (req, res) {
+  //   const address = reqParam(req, paramNames.address);
+  //   const following = reqParam(req, 'following');
+  //   const unFollowing = reqParam(req, 'unFollowing');
+  //   if (!following && !isAddress(following))
+  //     return res.status(400).json({ error: 'Following params is required', message: 'Following params is required' });
+  //   try {
+  //     let result = undefined;
+  //     if (unFollowing != 'true') {
+  //       result = await this.requestFollow(address, following);
+  //       await this.notificationService.createNotificationfunc(normalizeAddress(following), 'following', {
+  //         senderAddress: normalizeAddress(address),
+  //       });
+  //     } else result = await this.userService.unFollow(address, following);
+  //     return res.json(result);
+  //   } catch (err) {
+  //     console.log('-----request follow error', err);
+  //     return res.status(500).json({ result: false, error: 'Following failed' });
+  //   }
+  // }
 
    async requestReaction (req:Request, res:Response) {
     const address = reqParam(req, paramNames.address);
@@ -160,7 +183,7 @@ export class ReactionService {
     }
   }
 
-  async getReactions (req:Request, res:Response) {
+  async getReactions(req: Request, res: Response) {
     const subjectType = reqParam(req, 'subjectType');
     const skip = req.body.skip || req.query.skip || 0;
     const limit = req.body.limit || req.query.limit || 200;
@@ -178,84 +201,105 @@ export class ReactionService {
     const { subjectId, subjectType, reactionType, address } = requestData;
     const reaction = await Reaction.findOne({ type: reactionType, subjectType, subjectId });
     let result = null;
-    const reactionOptions = { ...overrideOptions, fields: { value: 1, subjectId: 1, subjectType: 1, type: 1, _id: 0 } }
+    const reactionOptions = { ...overrideOptions, fields: { value: 1, subjectId: 1, subjectType: 1, type: 1, _id: 0 } };
     if (!reaction || reaction.value === 0) {
-        result = await Reaction.findOneAndUpdate({ subjectId, subjectType, type: reactionType }, { addresses: [address], value: 1 }, reactionOptions).lean();
-    }
-    else {
-        if (reaction.addresses?.includes(address)) {
-            if (reaction.value <= 1)
-                await Reaction.deleteOne({ subjectId, subjectType, type: reactionType });
-            else
-                result = await Reaction.findOneAndUpdate({ subjectId, subjectType, type: reactionType }, { $pull: { addresses: address }, $inc: { value: -1 } }, reactionOptions).lean();
-        }
+      result = await Reaction.findOneAndUpdate(
+        { subjectId, subjectType, type: reactionType },
+        { addresses: [address], value: 1 },
+        reactionOptions,
+      ).lean();
+    } else {
+      if (reaction.addresses?.includes(address)) {
+        if (reaction.value <= 1) await Reaction.deleteOne({ subjectId, subjectType, type: reactionType });
         else
-            result = await Reaction.findOneAndUpdate({ subjectId, subjectType, type: reactionType }, { $push: { addresses: address }, $inc: { value: 1 } }, reactionOptions).lean();
+          result = await Reaction.findOneAndUpdate(
+            { subjectId, subjectType, type: reactionType },
+            { $pull: { addresses: address }, $inc: { value: -1 } },
+            reactionOptions,
+          ).lean();
+      } else
+        result = await Reaction.findOneAndUpdate(
+          { subjectId, subjectType, type: reactionType },
+          { $push: { addresses: address }, $inc: { value: 1 } },
+          reactionOptions,
+        ).lean();
     }
     return { result };
-}
+  }
 
- async requestTipFunc(account, tokenId, tipAmount, chainId) {
+  async requestTipFunc(account, tokenId, tipAmount, chainId) {
     const nftStreamItem = await TokenModel.findOne({ tokenId }, {}).lean();
     if (!nftStreamItem) return { result: false, error: 'This stream no exist' };
     const tokenItem = supportedTokens.find(e => e.symbol === config.defaultTokenSymbol && e.chainId === chainId);
     const tokenAddress = normalizeAddress(tokenItem.address);
     const sender = normalizeAddress(account);
-    const balanceItem = await Balance.findOne({ address: sender, tokenAddress, chainId, }, { balance: 1 });
-    if (!balanceItem?.balance || balanceItem.balance < tipAmount) return { result: false, error: 'Deposit or buy more tokens in the profile section' };
+    const balanceItem = await Balance.findOne({ address: sender, tokenAddress, chainId }, { balance: 1 });
+    if (!balanceItem?.balance || balanceItem.balance < tipAmount)
+      return { result: false, error: 'Deposit or buy more tokens in the profile section' };
     if (nftStreamItem.owner === sender) return { result: false, error: `Can't tip for stream owned by yourself` };
     if (nftStreamItem.owner) {
-        await Balance.updateOne({ address: sender, tokenAddress, chainId },
-            { $inc: { balance: -tipAmount, sentTips: tipAmount } });
-        await Balance.updateOne({ address: nftStreamItem.owner, tokenAddress, chainId },
-            { $inc: { balance: tipAmount, paidTips: tipAmount } });
-        await Reward.create({ address: nftStreamItem.owner, rewardAmount: tipAmount, tokenId, from: sender, chainId, type: RewardType.Tip });
-        await TokenModel.updateOne({ tokenId }, { $inc: { totalTips: tipAmount } });
+      await Balance.updateOne(
+        { address: sender, tokenAddress, chainId },
+        { $inc: { balance: -tipAmount, sentTips: tipAmount } },
+      );
+      await Balance.updateOne(
+        { address: nftStreamItem.owner, tokenAddress, chainId },
+        { $inc: { balance: tipAmount, paidTips: tipAmount } },
+      );
+      await Reward.create({
+        address: nftStreamItem.owner,
+        rewardAmount: tipAmount,
+        tokenId,
+        from: sender,
+        chainId,
+        type: RewardType.Tip,
+      });
+      await TokenModel.updateOne({ tokenId }, { $inc: { totalTips: tipAmount } });
     }
     return { result: true };
-}
+  }
 
- async requestCommentFunc(account, tokenId, content, commentId) {
+  async requestCommentFunc(account, tokenId, content, commentId) {
     const nftStreamItem = await TokenModel.findOne({ tokenId }, {}).lean();
     if (!nftStreamItem) return { result: false, error: 'This stream no exist' };
     account = normalizeAddress(account);
-    if (commentId) { // reply
-        const commentItem = await CommentModel.findOne({ id: commentId }, { tokenId: 1 }).lean();
-        if (commentItem?.tokenId != tokenId) return { result: false, error: 'invalid comment' };
-        const createdComment = await CommentModel.create({ tokenId, address: account, content, parentId: commentId });
-        await CommentModel.updateOne({ id: commentId }, { $push: { replyIds: createdComment.id } });
-    }
-    else {
-        await CommentModel.create({ tokenId, address: account, content });
+    if (commentId) {
+      // reply
+      const commentItem = await CommentModel.findOne({ id: commentId }, { tokenId: 1 }).lean();
+      if (commentItem?.tokenId != tokenId) return { result: false, error: 'invalid comment' };
+      const createdComment = await CommentModel.create({ tokenId, address: account, content, parentId: commentId });
+      await CommentModel.updateOne({ id: commentId }, { $push: { replyIds: createdComment.id } });
+    } else {
+      await CommentModel.create({ tokenId, address: account, content });
     }
     // claim on chain
     // await payBounty(account, tokenId, RewardType.BountyForCommentor);
     return { result: true };
-}
+  }
 
- async requestLikeFunc(account, tokenId){
-  const nftStreamItem = await TokenModel.findOne({ tokenId }, {}).lean();
-  if (!nftStreamItem) return { result: false, error: 'This stream no exist' };
-  const likeItem = await Feature.findOne({ tokenId, address: normalizeAddress(account) });
-  if (likeItem) return { result: false, error: 'Already you marked like' };
-  await Feature.create({ tokenId, address: normalizeAddress(account) });
-  await TokenModel.updateOne({ tokenId }, { $inc: { likes: 1 } });
-  return { result: true };
-}
+  async requestLikeFunc(account, tokenId) {
+    const nftStreamItem = await TokenModel.findOne({ tokenId }, {}).lean();
+    if (!nftStreamItem) return { result: false, error: 'This stream no exist' };
+    const likeItem = await Feature.findOne({ tokenId, address: normalizeAddress(account) });
+    if (likeItem) return { result: false, error: 'Already you marked like' };
+    await Feature.create({ tokenId, address: normalizeAddress(account) });
+    await TokenModel.updateOne({ tokenId }, { $inc: { likes: 1 } });
+    return { result: true };
+  }
 
-async requestVoteFunc(account, tokenId, vote){
-  account = normalizeAddress(account);
-  const voteItem = await VoteModel.findOne({ address: account, tokenId }, { vote: 1 }).lean();
-  if (voteItem) throw new ConflictException(`Already voted ${voteItem.vote ? 'up' : 'down'}`)
+  async requestVoteFunc(account, tokenId, vote) {
+    account = normalizeAddress(account);
+    const voteItem = await VoteModel.findOne({ address: account, tokenId }, { vote: 1 }).lean();
+    if (voteItem) throw new ConflictException(`Already voted ${voteItem.vote ? 'up' : 'down'}`);
 
-  const nftStreamItem = await TokenModel.findOne({ tokenId }, {}).lean();
-  if (!nftStreamItem) throw new NotFoundException("Stream doesn't exist");
+    const nftStreamItem = await TokenModel.findOne({ tokenId }, {}).lean();
+    if (!nftStreamItem) throw new NotFoundException("Stream doesn't exist");
 
-  await VoteModel.create({ address: account, tokenId, vote: vote === 'true' ? true : false });
-  const updateTokenOption = {};
-  updateTokenOption[vote === 'true' ? 'totalVotes.for' : 'totalVotes.against'] = 1;
-  await TokenModel.updateOne({ tokenId }, { $inc: updateTokenOption }, overrideOptions);
-  console.log('-- voted', account, tokenId, vote);
-  return;
-};
+    await VoteModel.create({ address: account, tokenId, vote: vote === 'true' ? true : false });
+    const updateTokenOption = {};
+    updateTokenOption[vote === 'true' ? 'totalVotes.for' : 'totalVotes.against'] = 1;
+    await TokenModel.updateOne({ tokenId }, { $inc: updateTokenOption }, overrideOptions);
+    console.log('-- voted', account, tokenId, vote);
+    return;
+  }
 }

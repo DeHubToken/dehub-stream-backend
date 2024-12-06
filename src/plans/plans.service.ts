@@ -1,0 +1,217 @@
+import { Injectable } from '@nestjs/common';
+import { addProperty, reqParam } from 'common/util/auth';
+import { durations } from 'config/constants';
+import { Request, Response } from 'express';
+import { AccountModel } from 'models/Account';
+import { PlansModel } from 'models/Plans';
+import { SubscriptionModel } from 'models/subscription';
+
+const planTemplate = {
+  id: 1,
+  name: 1,
+  description: 1,
+  duration: 1,
+  tier: 1,
+  benefits: 1,
+  chains: 1, // Includes all chain details (chainId, token, price, isPublished, isActive)
+  createdAt: 1,
+  updatedAt: 1,
+  address: 1,
+  _id: 0, // Exclude the MongoDB document ID
+};
+
+@Injectable()
+export class PlansService {
+  constructor() {}
+
+  // GET single plan by ID
+  async getPlan(req: Request, res: Response) {
+    const { id } = req.params; // Extract plan ID from request parameters
+    try {
+      const plan = await PlansModel.findOne({ id }, planTemplate);
+      if (!plan) {
+        return res.status(404).json({ error: 'Plan not found' });
+      }
+      return res.status(200).json({ plan });
+    } catch (error) {
+      return res.status(500).json({ error: 'Error retrieving plan', details: error });
+    }
+  }
+
+  // GET all plans
+  async getPlans(req: Request, res: Response) {
+    try {
+      const obj = {};
+      addProperty(req, obj, 'address');
+      const plans = await PlansModel.find(obj, planTemplate);
+      return res.status(200).json({ plans });
+    } catch (error) {
+      return res.status(500).json({ error: 'Error retrieving plans', details: error });
+    }
+  }
+
+  // CREATE a new plan
+  async createPlan(req: Request, res: Response) {
+    const obj: any = {};
+    addProperty(req, obj, 'benefits');
+    addProperty(req, obj, 'name');
+    addProperty(req, obj, 'description');
+    addProperty(req, obj, 'duration');
+    addProperty(req, obj, 'tier');
+    addProperty(req, obj, 'address');
+    addProperty(req, obj, 'chains');
+
+    // Check if a plan with the same tier and duration already exists
+    const isExist = await PlansModel.findOne({ tier: obj.tier, duration: obj.duration });
+    if (isExist) {
+      return res.status(409).json({ error: 'Plan Already Exist!', msg: 'Plan Already Exist!' });
+    }
+    obj.address = obj.address.toLowerCase();
+    const user: any = await AccountModel.findOne({ address: obj.address }).select('_id');
+    if (!user) {
+      return res.status(409).json({ error: 'Account not Found!', msg: 'Account not Found!' });
+    }
+
+    obj.userId = user._id;
+    // Create the new plan in the database
+    const plan = await PlansModel.create(obj);
+    return res.status(200).json({ msg: 'Plan created successfully', plan });
+  }
+
+  // UPDATE an existing plan
+  async updatePlan(req: Request, res: Response) {
+    const { id } = req.params; // Extract plan ID from request parameters
+    const obj: any = {};
+    addProperty(req, obj, 'benefits');
+    addProperty(req, obj, 'name');
+    addProperty(req, obj, 'description');
+    addProperty(req, obj, 'duration');
+    addProperty(req, obj, 'tier');
+    addProperty(req, obj, 'address');
+    addProperty(req, obj, 'chains');
+
+    try {
+      // Find the plan by ID and update with the new data
+      const updatedPlan = await PlansModel.findOneAndUpdate({ id: `${id}` }, obj, { new: true });
+      if (!updatedPlan) {
+        return res.status(404).json({ error: 'Plan not found for update' });
+      }
+      return res.status(200).json({ msg: 'Plan updated successfully', plan: updatedPlan });
+    } catch (error) {
+      return res.status(500).json({ error: 'Error updating plan', details: error });
+    }
+  }
+  async createSubscription(req: Request, res: Response) {
+    const obj: any = {};
+    // Add necessary properties to the object
+    addProperty(req, obj, 'planId');
+    addProperty(req, obj, 'account');
+    try {
+      // Check if user exists
+      const user = await AccountModel.findOne({ address: obj.account?.toLowerCase() });
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Check if plan exists
+      const plan = await PlansModel.findOne({
+        id: obj.planId,
+      });
+      if (!plan) {
+        return res.status(404).json({ error: 'Plan not found' });
+      }
+
+      // Find the duration object from the durations array based on the plan's duration
+      const duration = durations.find(d => d.value === plan.duration);
+      if (!duration) {
+        return res.status(400).json({ error: 'Invalid plan duration' });
+      }
+
+      // Check if the user already has an active subscription to this plan
+      const activeSubscription = await SubscriptionModel.findOne({
+        userId: user._id,
+        planId: plan._id,
+        active: true,
+      });
+      if (activeSubscription) {
+        return res.status(400).json({ error: 'User already has an active subscription to this plan' });
+      }
+
+      // Add default startDate if not present
+      // obj.startDate = new Date();
+
+      // Set the endDate based on the selected duration
+      // obj.endDate = new Date(obj.startDate); // Make a copy of the start date
+
+      // if (duration.value === 1) {
+      //   // 1 month expiration
+      //   obj.endDate.setMonth(obj.endDate.getMonth() + 1);
+      // } else if (duration.value === 999) {
+      //   // 999 years expiration (lifetime)
+      //   obj.endDate.setFullYear(obj.endDate.getFullYear() + 999);
+      // } else {
+      //   // For other durations (3 months, 6 months, 1 year)
+      //   const currentMonth = obj.endDate.getMonth(); // Get the current month (0-11)
+      //   obj.endDate.setMonth(currentMonth + duration.value); // Add the duration in months
+
+      //   // Adjust the year if the month overflows (i.e., exceeds December)
+      //   if (obj.endDate.getMonth() < currentMonth) {
+      //     obj.endDate.setFullYear(obj.endDate.getFullYear() + 1);
+      //   }
+      // }
+
+      // obj.active = true;
+
+      // Create new subscription
+      const subscription = new SubscriptionModel({
+        planId: plan._id,
+        userId: user._id,
+        active: false,
+      });
+      await subscription.save();
+
+      return res.status(201).json({
+        success: true,
+        message: 'Subscription created successfully',
+        data: subscription,
+      });
+    } catch (error) {
+      return res.status(500).json({ error: 'Error creating subscription', details: error.message });
+    }
+  }
+  // DELETE a plan by ID
+  async deletePlan(req: Request, res: Response) {
+    const { id } = req.params; // Extract plan ID from request parameters
+    try {
+      const deletedPlan = await PlansModel.findByIdAndDelete(id);
+      if (!deletedPlan) {
+        return res.status(404).json({ error: 'Plan not found for deletion' });
+      }
+      return res.status(200).json({ msg: 'Plan deleted successfully' });
+    } catch (error) {
+      return res.status(500).json({ error: 'Error deleting plan', details: error });
+    }
+  } 
+  async getSubscription(req: Request, res: Response) {
+    const obj = {};
+    addProperty(req, obj, 'id');
+    console.log('obj', obj);
+    const subscription = await SubscriptionModel.findOne(obj, {
+      _id: 0,
+      id: 0,
+    });
+    return res.status(200).json({ subscription });
+  } 
+  async getMySubscription(req: Request, res: Response) {
+    const obj: any = {};
+    // addProperty(req, obj, 'account', 'address');
+    addProperty(req, obj, 'address');
+    obj.address = obj?.address?.toLowerCase();
+    const user = await AccountModel.findOne(obj);
+    console.log('user', user);
+    const subscription = await SubscriptionModel.find({ userId: user._id, active: true })
+      // .populate('userId')  // Populates the Account details
+      .populate('planId'); // Populates the Plan details
+    return res.status(200).json({ subscription });
+  }
+}
