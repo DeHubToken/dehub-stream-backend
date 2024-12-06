@@ -40,7 +40,8 @@ export class NftService {
     const postType = req.body.postType || req.query.postType || 'video';
     const filter = { status: 'minted', postType };
     const totalCount = await TokenModel.countDocuments(filter, tokenTemplate);
-    const all = await this.getStreamNfts(filter, skip, limit);
+    const address = reqParam(req, 'address');
+    const all = await this.getStreamNfts(filter, skip, limit, null, address);
     return res.json({ result: { items: all, totalCount, skip, limit } });
   }
 
@@ -195,37 +196,21 @@ export class NftService {
     return { res, token: tokenItem };
   }
 
-  async getStreamNfts(
-    filter: any,
-    skip: number,
-    limit: number,
-    sortOption = null,
-    subscriber = '0x35BAa69f84E19B8F0F864E69501Ef9A6b0a53D15',
-  ) {
+  async getStreamNfts(filter: any, skip: number, limit: number, sortOption = null, subscriber) {
     const user: any = await AccountModel.findOne({ address: subscriber?.toLowerCase() });
- 
+
     try {
       console.log('myfilter', filter);
       const query = [
         {
           $match: filter,
         },
-
         {
           $lookup: {
             from: 'plans',
             localField: 'plans',
             foreignField: 'id',
-            as: 'planDetails', // Join the plans collection to the token documents
-          },
-        },
-
-        {
-          $lookup: {
-            from: 'plans',
-            localField: 'plans',
-            foreignField: 'id',
-            as: 'planDetails', // Join the plans collection to the token documents
+            as: 'plansDetails', // Join the plans collection to the token documents
           },
         },
         {
@@ -237,7 +222,7 @@ export class NftService {
                 $match: {
                   $expr: {
                     $and: [
-                      { $eq: ['$userId',user?._id?user?._id:null] }, // Match the userId
+                      { $eq: ['$userId', user?._id ? user?._id : null] }, // Match the userId
                       { $eq: ['$active', true] }, // Check if the subscription is active
                       {
                         $and: [
@@ -250,26 +235,32 @@ export class NftService {
                 },
               },
               {
-                $project: { _id: 1 }, // Only return the _id of matching subscriptions
+                $project: { planId: 1 }, // Only return the _id of matching subscriptions
               },
             ],
             as: 'userSubscriptions',
           },
         },
         {
-          $unwind: {
-            path: '$planDetails',
-            preserveNullAndEmptyArrays: true, // Keep plans without subscriptions
-          },
-        },
-        {
           $addFields: {
-            'planDetails.alreadySubscribed': {
-              $cond: { if: { $gt: [{ $size: '$userSubscriptions' }, 0] }, then: true, else: false },
+            plansDetails: {
+              $map: {
+                input: '$plansDetails',
+                as: 'plan',
+                in: {
+                  $mergeObjects: [
+                    '$$plan',
+                    {
+                      alreadySubscribed: {
+                        $in: ['$$plan._id', { $map: { input: '$userSubscriptions', as: 'sub', in: '$$sub.planId' } }],
+                      },
+                    },
+                  ],
+                },
+              },
             },
           },
         },
-
         {
           $lookup: {
             from: 'accounts',
@@ -302,7 +293,7 @@ export class NftService {
         {
           $project: {
             ...tokenTemplate,
-            planDetails: 1,
+            plansDetails: 1,
             mintername: { $first: '$account.username' },
             minterDisplayName: { $first: '$account.displayName' },
             minterAvatarUrl: { $first: '$account.avatarImageUrl' },
@@ -357,7 +348,7 @@ export class NftService {
         postFilter['$or'] = [{ postType: 'feed-simple' }, { postType: 'feed-images' }];
       } else {
         postFilter['postType'] = postType;
-        postFilter['transcodingStatus']= 'done';
+        postFilter['transcodingStatus'] = 'done';
       }
 
       console.log('sortMode', { sortMode, postType, searchQuery });
@@ -457,11 +448,13 @@ export class NftService {
 
         // Search through the accounts table
         const accounts = await AccountModel.find({ username: { $regex: new RegExp(search, 'i') } });
+        const address = reqParam(req, 'address');
         const videos: any = await this.getStreamNfts(
           searchQuery['$match'],
           unit * page,
           unit * page + unit * 1,
           sortRule,
+          address,
         );
 
         // Include userLike logic
@@ -477,8 +470,13 @@ export class NftService {
           },
         });
       }
-
-      const ret: any = await this.getStreamNfts(searchQuery['$match'], unit * page, unit * page + unit * 1, sortRule);
+      const ret: any = await this.getStreamNfts(
+        searchQuery['$match'],
+        unit * page,
+        unit * page + unit * 1,
+        sortRule,
+        address,
+      );
       // Include userLike logic
       for (let nft of ret) {
         const userLike = await VoteModel.findOne({ tokenId: nft.tokenId, address });
@@ -503,6 +501,8 @@ export class NftService {
       { tokenId: { $in: watchedTokenIds }, postType, category: category ? { $elemMatch: { $eq: category } } : null },
       0,
       20,
+      null,
+      watcherAddress,
     );
     // myWatchedNfts.map(e => {
     //   e.imageUrl = process.env.DEFAULT_DOMAIN + '/' + e.imageUrl;
@@ -516,8 +516,8 @@ export class NftService {
 
     if (!tokenId) return res.status(400).json({ error: 'Bad request: No token id' });
     // const nftInfo = await Token.findOne({ tokenId }, tokenTemplate).lean();
-
-    const nftInfo = (await this.getStreamNfts({ tokenId: Number(tokenId) }, 0, 1))?.[0];
+    const address = reqParam(req, 'address');
+    const nftInfo = (await this.getStreamNfts({ tokenId: Number(tokenId) }, 0, 1, null, address))?.[0];
     const userLike = await VoteModel.findOne({ tokenId, address: req.query?.address });
     if (!nftInfo) return res.status(404).json({ error: 'Not Found: NFT does not exist' });
     const comments = await this.commentsForTokenId(tokenId);
@@ -762,6 +762,14 @@ export class NftService {
       if (!tokenId) {
         return res.status(400).json({ error: 'Token ID is required' });
       }
+
+      // console.log("req.cookies()",req.cookies())
+
+      // const isSubscriptionRequired = await getIsSubscriptionRequired(token.tokenId, address);
+      // const isUnlockedPPV = await isUnlockedPPVStream(token.tokenId.toString(), address);
+      // const isUnlockedLocked = await isUnlockedLockedContent(token.streamInfo, address);
+
+      console.log(" req.cookies", req.cookies)
       const tk = tokenId.toString().split('-')[0];
       const token = await TokenModel.findOne({ tokenId: tk });
       if (!token) {

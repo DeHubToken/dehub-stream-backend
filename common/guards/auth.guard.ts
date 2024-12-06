@@ -2,30 +2,32 @@ import { CanActivate, ExecutionContext, Injectable, UnauthorizedException, BadRe
 import { JwtService } from '@nestjs/jwt';
 import { ethers } from 'ethers';
 import multer from 'multer';
-
+import { config } from '../../config/index';
 @Injectable()
 export class AuthGuard implements CanActivate {
   private readonly jwtService: JwtService;
   private readonly expireSecond: number;
   private readonly secretKey: string;
+  private readonly cookieKey: string;
 
   constructor() {
-    this.jwtService = new JwtService({ secret: process.env.JWT_SECRET_KEY || 'your_secret_key' })
+    this.jwtService = new JwtService({ secret: process.env.JWT_SECRET_KEY || 'your_secret_key' });
     this.expireSecond = process.env.NODE_ENV === 'development' ? 60 * 60 * 2 : 60 * 60 * 24; // 2 hours in dev, 24 hours in prod
     this.secretKey = process.env.JWT_SECRET_KEY || 'your_secret_key';
+    this.cookieKey = config.isDevMode ? 'data_dev' : 'data_v2';
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const req = context.switchToHttp().getRequest ();
-    const request:any = await new Promise((resolve, reject) => {
-      multer().any()(req, {} as any, function(err) {
+    const req = context.switchToHttp().getRequest();
+    const request: any = await new Promise((resolve, reject) => {
+      multer().any()(req, {} as any, function (err) {
         if (err) reject(err);
         resolve(req);
       });
     });
 
-    const token = this.extractTokenFromHeader(request)
-   
+    const token = this.extractTokenFromHeader(request);
+
     if (token) {
       // Token is present; verify it
       try {
@@ -37,15 +39,29 @@ export class AuthGuard implements CanActivate {
       } catch (error) {
         throw new UnauthorizedException('Invalid authorization token');
       }
-    } else {
+    }
+
+    //new added if cookie exist verify it.
+    // const {
+    //   address: addressFromCookie,
+    //   rawSig: rawSigFromCookie,
+    //   timestamp: timestampFromCookie,
+    // }: any = 
+    // this.extractFromCookie(request);
+
+
+
+    
+
+    const { address, rawSig, timestamp } = this.extractParams(request);
+    if (address && rawSig && timestamp) {
       // Token is absent; extract parameters from the request
-      const { address, rawSig, timestamp } = this.extractParams(request);
       if (!rawSig || !address || !timestamp) {
         throw new BadRequestException('Signature, address, and timestamp are required');
       }
 
       // Validate the provided credentials
-      if (!this.isValidAccount(address, timestamp, rawSig)){
+      if (!this.isValidAccount(address, timestamp, rawSig)) {
         throw new UnauthorizedException('Invalid credentials');
       }
 
@@ -59,14 +75,17 @@ export class AuthGuard implements CanActivate {
       return true;
     }
   }
-
+  private extractFromCookie(request) {
+    
+    const cookie=JSON.parse(request.cookies[this.cookieKey])
+    console.log( "cookie=JSON.parse",cookie)
+  }
   private extractTokenFromHeader(request): string | null {
     const authHeader = request.headers.authorization || '';
     return authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
   }
 
   private extractParams(request): { address: string; rawSig: string; timestamp: number } {
-    
     const address = request.query.address || request.body.address || request.params.address;
     const rawSig = request.query.sig || request.body.sig || request.params.sig;
     const timestamp = request.query.timestamp || request.body.timestamp || request.params.timestamp;

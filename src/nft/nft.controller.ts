@@ -76,7 +76,7 @@ export class NFTController {
     if (postType != 'feed-simple' && (!files || files.length === 0)) {
       return res.status(400).json({ message: 'No files provided for minting' });
     }
-    const { address, name, description, streamInfo, chainId, category,plans } = req.body;
+    const { address, name, description, streamInfo, chainId, category,plans=null } = req.body;
 
     try {
       const nft = await this.nftServices.mintNFT(
@@ -112,6 +112,7 @@ export class NFTController {
   }
 
   @Get('/nfts/images/:id') 
+  // @UseGuards(AuthGuard)
   async nftImage(@Req() req: Request, @Res() res: Response) {
     try {
       return await this.nftServices.getNftImage(req, res);
