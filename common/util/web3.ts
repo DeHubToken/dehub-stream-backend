@@ -14,6 +14,7 @@ const getERC20TokenBalance = async (account, tokenAddress, chainId) => {
     const network = supportedNetworks.find(e => e.chainId === chainId);
     const token = supportedTokens.find(e => e.address.toLowerCase() === tokenAddress.toLowerCase());
     if (!network || !token) return 0;
+    console.log("getERC20TokenBalance JsonRpcProvider--->")
     const provider = new ethers.providers.JsonRpcProvider(network.rpcUrls[0]);
     const tokenContract = new ethers.Contract(tokenAddress, erc20ContractAbi, provider);
     const tokenBalance = await tokenContract.balanceOf(account);
@@ -119,6 +120,8 @@ const getTokenBalancesOfAddresses = async (addresses, tokenAddress, chainId) => 
     const network = supportedNetworks.find(e => e.chainId === chainId);
     const token = supportedTokens.find(e => e.address.toLowerCase() === tokenAddress.toLowerCase() && e.chainId === chainId);
     if (!network || !token) return 0;
+    console.log("getTokenBalancesOfAddresses JsonRpcProvider--->")
+
     const provider = new ethers.providers.JsonRpcProvider(network.rpcUrls[0]);
     const tokenContract = new ethers.Contract(tokenAddress, erc20ContractAbi, provider);
     const multicallContract = new ethers.Contract(multicallContractAddresses[chainId], multicallContractAbi, provider);
@@ -219,6 +222,8 @@ const getTokenHistories = async (fromBlock, toBlock, tokenAddress, chainId) => {
     const network = supportedNetworks.find(e => e.chainId === chainId);
     const token = supportedTokens.find(e => e.address.toLowerCase() === tokenAddress.toLowerCase() && e.chainId === chainId);
     if (!network || !token) return { tranfers: [] };
+    console.log("getTokenHistories JsonRpcProvider--->")
+
     const provider = new ethers.providers.JsonRpcProvider(network.rpcUrls[0]);
     const tokenContract = new ethers.Contract(tokenAddress, erc20ContractAbi, provider);
     let result = [];
@@ -247,6 +252,7 @@ const getTokenHistories = async (fromBlock, toBlock, tokenAddress, chainId) => {
 const getCollectionContract = (networkName) => {
     const curNetwork = supportedNetworks.find(e => e.shortName === networkName);
     if (!curNetwork) return undefined;
+    console.log("getCollectionContract JsonRpcProvider--->")
     const provider = new ethers.providers.JsonRpcProvider(curNetwork.rpcUrls[0]);
     return new ethers.Contract(streamCollectionAddresses[curNetwork.chainId], erc1155ContractAbi, provider);
 }
@@ -255,6 +261,8 @@ const getCreatorsOfCollection = async (chainId) => {
     const network = supportedNetworks.find(e => e.chainId === chainId);
     if (!network) return 0;
     const collectionAddress = streamCollectionAddresses[chainId];
+    console.log("getCreatorsOfCollection JsonRpcProvider--->")
+
     const provider = new ethers.providers.JsonRpcProvider(network.rpcUrls[0]);
     const colletionContract = new ethers.Contract(collectionAddress, erc1155ContractAbi, provider);
     const maxTokenId = 200;
@@ -275,6 +283,8 @@ const getCreatorsOfCollection = async (chainId) => {
 const getCreatorsForTokenIds = async (chainId, tokenItems) => {
     const network = supportedNetworks.find(e => e.chainId === chainId);
     if (!network) return [];
+    console.log("getCreatorsForTokenIds JsonRpcProvider--->")
+
     const provider = new ethers.providers.JsonRpcProvider(network.rpcUrls[0]);
     const multicallContract = new ethers.Contract(multicallContractAddresses[chainId], multicallContractAbi, provider);
     const callDataArray = [];
@@ -315,6 +325,8 @@ const getCollectionHistories = async (fromBlock, toBlock, collectionAddress, cha
     if (toBlock <= fromBlock) return { transfers: [] };
     const network = supportedNetworks.find(e => e.chainId === chainId);
     if (!network) return { tranfers: [] };
+    console.log("getCollectionHistories JsonRpcProvider--->")
+
     const provider = new ethers.providers.JsonRpcProvider(network.rpcUrls[0]);
     const collectionContract = new ethers.Contract(collectionAddress, erc1155ContractAbi, provider);
     let result = [];
@@ -353,6 +365,8 @@ const getERC721Histories = async (fromBlock, toBlock, collectionAddress, chainId
     if (toBlock <= fromBlock) return { transfers: [] };
     const network = supportedNetworks.find(e => e.chainId === chainId);
     if (!network) return { tranfers: [] };
+    console.log("getERC721Histories JsonRpcProvider--->")
+
     const provider = new ethers.providers.JsonRpcProvider(network.rpcUrls[0]);
     const collectionContract = new ethers.Contract(collectionAddress, erc721ContractAbi, provider);
     let result = [];
@@ -391,6 +405,8 @@ const getControllerHistories = async (fromBlock, toBlock, collectionAddress, cha
     if (toBlock <= fromBlock) return { transfers: [] };
     const network = supportedNetworks.find(e => e.chainId === chainId);
     if (!network) return { tranfers: [] };
+    console.log("getControllerHistories JsonRpcProvider--->")
+
     const provider = new ethers.providers.JsonRpcProvider(network.rpcUrls[0]);
     const collectionContract = new ethers.Contract(collectionAddress, erc1155ContractAbi, provider);
     let result = [];

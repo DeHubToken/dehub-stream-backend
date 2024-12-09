@@ -2,6 +2,7 @@ import { Controller, Get, Post, Req, Res, UploadedFiles, UseGuards } from '@nest
 import { Request, Response } from 'express';
 import { AuthGuard } from 'common/guards/auth.guard';
 import { NftService } from './nft.service';
+import { MediaAuthGuard } from 'common/guards/auth.meida.guard';
 
 @Controller()
 export class NFTController {
@@ -111,8 +112,9 @@ export class NFTController {
     }
   }
 
-  @Get('/nfts/images/:id') 
-  // @UseGuards(AuthGuard)
+  @Get('/nfts/images/:id')  
+  @UseGuards(MediaAuthGuard)
+
   async nftImage(@Req() req: Request, @Res() res: Response) {
     try {
       return await this.nftServices.getNftImage(req, res);

@@ -16,7 +16,7 @@ import { JobModule } from './job/job.module';
 import { BullModule } from '@nestjs/bull';
 import { ScheduleModule } from '@nestjs/schedule';
 import { StreamCronService } from './job/stream-cron.service';
-import { PlansModule } from './plans/plans.module'; 
+import { PlansModule } from './plans/plans.module';
 import { PlanEventListenerService } from './job/plans.listener';
 
 @Module({
@@ -28,10 +28,27 @@ import { PlanEventListenerService } from './job/plans.listener';
         port: 6379,
       },
     }),
-    UserModule, 
-    NftModule, NotificationModule, CdnModule, AuthModule, PlansModule, ReactionModule, CategoryModule, LeaderboardModule, AssetModule, JobModule, ScheduleModule.forRoot()],
-  controllers: [AppController],
-  providers: [AppService, StreamCronService,PlanEventListenerService],
+    UserModule,
+    NftModule,
+    NotificationModule,
+    CdnModule,
+    AuthModule,
+    PlansModule,
+    ReactionModule,
+    CategoryModule,
+    LeaderboardModule,
+    AssetModule,
+    JobModule,
+    ScheduleModule.forRoot(),
+  ],
+  controllers: [
+    AppController
+  ],
+  providers: [
+    AppService, 
+    StreamCronService,
+     PlanEventListenerService
+    ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

@@ -483,13 +483,13 @@ const testNetworks = [
     graphUrl: 'https://api.thegraph.com/subgraphs/name/bscscan/bsc-testnet',
     eventRpc: [`https://data-seed-prebsc-1-s1.bnbchain.org:8545`],
   },
-  {
-    chainId: ChainId.GORLI,
-    shortName: `goerli`,
-    rpcUrls: [`https://goerli.infura.io/v3/${process.env.INFURA_API_KEY}`],
-    startBlockNumber: 8804175,
-    graphUrl: process.env.GOERLI_GRAPH_API_ENDPOINT,
-  },
+  // {
+  //   chainId: ChainId.GORLI,
+  //   shortName: `goerli`,
+  //   rpcUrls: [`https://goerli.infura.io/v3/${process.env.INFURA_API_KEY}`],
+  //   startBlockNumber: 8804175,
+  //   graphUrl: process.env.GOERLI_GRAPH_API_ENDPOINT,
+  // },
 ];
 
 const supportedNetworks = isDevMode ? testNetworks : mainNetworks;

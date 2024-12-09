@@ -51,11 +51,10 @@ const isUnlockedPPVStream = async (streamTokenId: string, account: string): Prom
 };
 
 const isUnlockedLockedContent = async (streamInfo: any, account: string): Promise<boolean> => {
-  const symbol = streamInfo?.[streamInfoKeys.lockContentTokenSymbol] || config.defaultTokenSymbol;
-  const chainIds = streamInfo?.[streamInfoKeys.lockContentChainIds] || [config.defaultChainId];
-  const tokenAddresses = supportedTokens
-    .filter(e => e.symbol === symbol && chainIds?.includes(e.chainId))
-    ?.map(e => e.address);
+  const symbol = streamInfo?.[streamInfoKeys.lockContentTokenSymbol] || config?.defaultTokenSymbol;
+  const chainIds = streamInfo?.[streamInfoKeys.lockContentChainIds] || [config?.defaultChainId];
+  const tokenAddresses = supportedTokens?.filter(e => e.symbol === symbol && chainIds?.includes(e?.chainId))
+    ?.map(e => e?.address);
 
   const lockContentAmount = Number(streamInfo?.[streamInfoKeys.lockContentAmount] || 0);
 
@@ -214,7 +213,4 @@ export {
   getIsSubscriptionRequired,
 };
 
-setTimeout(async () => {
-  const data = await getIsSubscriptionRequired(22, '0x35baa69f84e19b8f0f864e69501ef9a6b0a53d15');
-  console.log(data);
-}, 2000);
+ 
