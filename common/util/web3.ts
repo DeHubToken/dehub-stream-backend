@@ -1,11 +1,12 @@
 require('dotenv').config();
-const { ethers } = require("ethers");
-const { supportedTokens, supportedNetworks, multicallContractAddresses, streamCollectionAddresses } = require("../../config/constants")
-const erc20ContractAbi = require('../../abis/erc20.json');
-const stakingContractAbi = require('../../abis/StakingDHB.json');
-const multicallContractAbi = require('../../abis/multicall.json');
-const erc1155ContractAbi = require('../../abis/erc1155.json');
-const erc721ContractAbi = require('../../abis/StreamNft.json');
+import {config }  from '../../config';
+import { ethers } from "ethers";
+import { supportedTokens, supportedNetworks, multicallContractAddresses, streamCollectionAddresses } from "config/constants";
+import erc20ContractAbi from '../../abis/erc20.json';
+import stakingContractAbi from '../../abis/StakingDHB.json';
+import multicallContractAbi from '../../abis/multicall.json';
+import erc1155ContractAbi from '../../abis/erc1155.json';
+import erc721ContractAbi from '../../abis/StreamNft.json';
 
 
 const getTokenByTokenAddress = (tokenAddress, chainId = 56) => supportedTokens.find(e => e.address.toLowerCase() === tokenAddress.toLowerCase() && e.chainId === chainId);
@@ -14,11 +15,10 @@ const getERC20TokenBalance = async (account, tokenAddress, chainId) => {
     const network = supportedNetworks.find(e => e.chainId === chainId);
     const token = supportedTokens.find(e => e.address.toLowerCase() === tokenAddress.toLowerCase());
     if (!network || !token) return 0;
-    console.log("getERC20TokenBalance JsonRpcProvider--->")
-    const provider = new ethers.providers.JsonRpcProvider(network.rpcUrls[0]);
+    const provider = new ethers.JsonRpcProvider(network.rpcUrls[0]);
     const tokenContract = new ethers.Contract(tokenAddress, erc20ContractAbi, provider);
     const tokenBalance = await tokenContract.balanceOf(account);
-    return Number(ethers.utils.formatUnits(tokenBalance, token.decimals));
+    return Number(ethers.formatUnits(tokenBalance, token.decimals));
 }
 
 const makeAggregateCalldata = (callObjectArray) => {
@@ -120,9 +120,7 @@ const getTokenBalancesOfAddresses = async (addresses, tokenAddress, chainId) => 
     const network = supportedNetworks.find(e => e.chainId === chainId);
     const token = supportedTokens.find(e => e.address.toLowerCase() === tokenAddress.toLowerCase() && e.chainId === chainId);
     if (!network || !token) return 0;
-    console.log("getTokenBalancesOfAddresses JsonRpcProvider--->")
-
-    const provider = new ethers.providers.JsonRpcProvider(network.rpcUrls[0]);
+    const provider = new ethers.JsonRpcProvider(network.rpcUrls[0]);
     const tokenContract = new ethers.Contract(tokenAddress, erc20ContractAbi, provider);
     const multicallContract = new ethers.Contract(multicallContractAddresses[chainId], multicallContractAbi, provider);
     let tempResult = {};
@@ -138,14 +136,14 @@ const getTokenBalancesOfAddresses = async (addresses, tokenAddress, chainId) => 
             });
         });
         const multicallResult = await multicallRead(multicallContract, callDataArray);
-        Object.keys(multicallResult).forEach(key => multicallResult[key] = Number(ethers.utils.formatUnits(multicallResult[key], token.decimals)));
+        Object.keys(multicallResult).forEach(key => multicallResult[key] = Number(ethers.formatUnits(multicallResult[key], token.decimals)));
         tempResult = { ...tempResult, ...multicallResult };
     }
     return tempResult;
 }
 
 const stakingContractAddress = "0x26d2Cd7763106FDcE443faDD36163E2ad33A76E6";
-const provider = new ethers.providers.JsonRpcProvider(process.env.BSC_RPC_ENDPOINT);
+const provider = new ethers.JsonRpcProvider(process.env.BSC_RPC_ENDPOINT);
 const chainId = 56;
 const stakingContract = new ethers.Contract(stakingContractAddress, stakingContractAbi, provider);
 const getStakedAmountOfAddresses = async (addresses) => {
@@ -163,7 +161,7 @@ const getStakedAmountOfAddresses = async (addresses) => {
             });
         });
         const multicallResult = await multicallRead(multicallContract, callDataArray);
-        Object.keys(multicallResult).forEach(key => multicallResult[key] = Number(ethers.utils.formatUnits(multicallResult[key], 18)));
+        Object.keys(multicallResult).forEach(key => multicallResult[key] = Number(ethers.formatUnits(multicallResult[key], 18)));
         tempResult = { ...tempResult, ...multicallResult };
     }
     return tempResult;
@@ -184,10 +182,12 @@ const getStakeHistories = async (fromBlock, toBlock) => {
         let eventResults = [];
         const filter1 = stakingContract.filters.Staked();
         const filter = {
+            // @ts-ignore
             address: filter1.address,
             topics: []
         }
-
+        
+        // @ts-ignore
         eventResults = await stakingContract.queryFilter(filter, fromBlock, toBlock);
         eventResults = eventResults.filter(e => e.event === 'Staked' || e.event === 'Unstaked'); // transaction with amount 0
         result = eventResults.map(e => {
@@ -222,9 +222,7 @@ const getTokenHistories = async (fromBlock, toBlock, tokenAddress, chainId) => {
     const network = supportedNetworks.find(e => e.chainId === chainId);
     const token = supportedTokens.find(e => e.address.toLowerCase() === tokenAddress.toLowerCase() && e.chainId === chainId);
     if (!network || !token) return { tranfers: [] };
-    console.log("getTokenHistories JsonRpcProvider--->")
-
-    const provider = new ethers.providers.JsonRpcProvider(network.rpcUrls[0]);
+    const provider = new ethers.JsonRpcProvider(network.rpcUrls[0]);
     const tokenContract = new ethers.Contract(tokenAddress, erc20ContractAbi, provider);
     let result = [];
     try {
@@ -252,8 +250,7 @@ const getTokenHistories = async (fromBlock, toBlock, tokenAddress, chainId) => {
 const getCollectionContract = (networkName) => {
     const curNetwork = supportedNetworks.find(e => e.shortName === networkName);
     if (!curNetwork) return undefined;
-    console.log("getCollectionContract JsonRpcProvider--->")
-    const provider = new ethers.providers.JsonRpcProvider(curNetwork.rpcUrls[0]);
+    const provider = new ethers.JsonRpcProvider(curNetwork.rpcUrls[0]);
     return new ethers.Contract(streamCollectionAddresses[curNetwork.chainId], erc1155ContractAbi, provider);
 }
 
@@ -261,9 +258,7 @@ const getCreatorsOfCollection = async (chainId) => {
     const network = supportedNetworks.find(e => e.chainId === chainId);
     if (!network) return 0;
     const collectionAddress = streamCollectionAddresses[chainId];
-    console.log("getCreatorsOfCollection JsonRpcProvider--->")
-
-    const provider = new ethers.providers.JsonRpcProvider(network.rpcUrls[0]);
+    const provider = new ethers.JsonRpcProvider(network.rpcUrls[0]);
     const colletionContract = new ethers.Contract(collectionAddress, erc1155ContractAbi, provider);
     const maxTokenId = 200;
     const multicallContract = new ethers.Contract(multicallContractAddresses[chainId], multicallContractAbi, provider);
@@ -283,9 +278,7 @@ const getCreatorsOfCollection = async (chainId) => {
 const getCreatorsForTokenIds = async (chainId, tokenItems) => {
     const network = supportedNetworks.find(e => e.chainId === chainId);
     if (!network) return [];
-    console.log("getCreatorsForTokenIds JsonRpcProvider--->")
-
-    const provider = new ethers.providers.JsonRpcProvider(network.rpcUrls[0]);
+    const provider = new ethers.JsonRpcProvider(network.rpcUrls[0]);
     const multicallContract = new ethers.Contract(multicallContractAddresses[chainId], multicallContractAbi, provider);
     const callDataArray = [];
     for (const tokenItem of tokenItems) {
@@ -325,9 +318,7 @@ const getCollectionHistories = async (fromBlock, toBlock, collectionAddress, cha
     if (toBlock <= fromBlock) return { transfers: [] };
     const network = supportedNetworks.find(e => e.chainId === chainId);
     if (!network) return { tranfers: [] };
-    console.log("getCollectionHistories JsonRpcProvider--->")
-
-    const provider = new ethers.providers.JsonRpcProvider(network.rpcUrls[0]);
+    const provider = new ethers.JsonRpcProvider(network.rpcUrls[0]);
     const collectionContract = new ethers.Contract(collectionAddress, erc1155ContractAbi, provider);
     let result = [];
     try {
@@ -365,9 +356,7 @@ const getERC721Histories = async (fromBlock, toBlock, collectionAddress, chainId
     if (toBlock <= fromBlock) return { transfers: [] };
     const network = supportedNetworks.find(e => e.chainId === chainId);
     if (!network) return { tranfers: [] };
-    console.log("getERC721Histories JsonRpcProvider--->")
-
-    const provider = new ethers.providers.JsonRpcProvider(network.rpcUrls[0]);
+    const provider = new ethers.JsonRpcProvider(network.rpcUrls[0]);
     const collectionContract = new ethers.Contract(collectionAddress, erc721ContractAbi, provider);
     let result = [];
     try {
@@ -405,9 +394,7 @@ const getControllerHistories = async (fromBlock, toBlock, collectionAddress, cha
     if (toBlock <= fromBlock) return { transfers: [] };
     const network = supportedNetworks.find(e => e.chainId === chainId);
     if (!network) return { tranfers: [] };
-    console.log("getControllerHistories JsonRpcProvider--->")
-
-    const provider = new ethers.providers.JsonRpcProvider(network.rpcUrls[0]);
+    const provider = new ethers.JsonRpcProvider(network.rpcUrls[0]);
     const collectionContract = new ethers.Contract(collectionAddress, erc1155ContractAbi, provider);
     let result = [];
     try {
@@ -432,6 +419,7 @@ const getControllerHistories = async (fromBlock, toBlock, collectionAddress, cha
     return { result, toBlock };
 
 }
+
 export {
     getTokenByTokenAddress,
     getERC20TokenBalance,
