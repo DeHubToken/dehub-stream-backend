@@ -67,11 +67,15 @@ export class MediaAuthGuard implements CanActivate {
         const parsedCookie = JSON.parse(cookie);
         console.log('Parsed cookie:', parsedCookie);
         // Extract dynamic address
-        const address = Object.keys(parsedCookie)[0]; // Get the dynamic address key
+        const address = Object.keys(parsedCookie).find(address=>{ 
+        return  parsedCookie[address].isActive==true 
+        }); // Get the dynamic address key 
         const { timestamp, sig } = parsedCookie[address];
+        console.log({address, timestamp, sig } )
         req.params.address = address.toLowerCase();
         req.params.timestamp = timestamp;
         req.params.rawSig = sig;
+        req.params.isActive = sig;
         return { address: address.toLowerCase(), timestamp, rawSig: sig };
       }
     } catch (error) {

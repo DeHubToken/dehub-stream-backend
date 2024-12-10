@@ -788,7 +788,7 @@ export class NftService {
         return res.status(404).json({ error: 'Token not found' });
       }
       console.log('Token found:', token);
-
+      const isOwner = token?.owner == address;
       // Extract stream info and check conditions for content
       const { isLockContent = false, isPayPerView = false }: any = token?.streamInfo;
       const { plans = null } = token;
@@ -825,21 +825,25 @@ export class NftService {
 
       // Function to determine whether blur should be applied
       const shouldApplyBlur = () => {
-        const result = !(isFree || (isUnlockedPPV && !isSubscribed) || (isUnlockedLocked && !isSubscribed));
-        console.log(`Should apply blur: ${result}`);
-        return result;
+        console.log({
+          isOwner , isFree , isUnlockedLocked , isSubscribed ,  
+        })
+        const result = isOwner || isFree || isUnlockedLocked || isSubscribed;
+        // const result = !(isFree || (isUnlockedPPV && !isSubscribed) || (isUnlockedLocked && !isSubscribed));
+        console.log(`Should apply blur: ${!result}`);
+        return !result;
       };
 
       // Apply blur and compression if necessary
       let sendImage = imageBuffer;
       if (shouldApplyBlur()) {
-        console.log('Applying blur and compression');
-        const compressedImage = await makeBlurAndCompress(imageBuffer, { blur: 0.3, compress: 0 });
-        sendImage = compressedImage;
+      //   console.log('Applying blur and compression');
+      const compressedImage = await makeBlurAndCompress(imageBuffer, { blur: 8, compress: 0 });
+      sendImage = compressedImage;
       }
 
       // Send the image (compressed or not) as the response
-      console.log('Sending image as response');
+      console.log('Sending image as response'); 
       res.set('Content-Type', 'image/jpg');
       res.send(sendImage);
     } catch (error) {

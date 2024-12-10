@@ -87,6 +87,8 @@ async function bootstrap() {
     webSockets(socket, io); // Initialize WebSocket handling
   });
 
+ 
+
   await app.listen(process.env.API_PORT);
 
   console.log(`Application is running on port :${process.env.API_PORT}`);
