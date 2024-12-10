@@ -212,6 +212,66 @@ export class NftService {
         {
           $match: filter,
         },
+
+        {
+          $lookup: {
+            from: 'plans',
+            localField: 'plans',
+            foreignField: 'id',
+            as: 'planDetails', // Join the plans collection to the token documents
+          },
+        },
+
+        {
+          $lookup: {
+            from: 'plans',
+            localField: 'plans',
+            foreignField: 'id',
+            as: 'planDetails', // Join the plans collection to the token documents
+          },
+        },
+        {
+          $lookup: {
+            from: 'subscriptions',
+            let: { planIds: '$plans' }, // Reference the 'plans' field in Token documents
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$userId',user?._id?user?._id:null] }, // Match the userId
+                      { $eq: ['$active', true] }, // Check if the subscription is active
+                      {
+                        $and: [
+                          { $lte: ['$startDate', new Date()] }, // Check if current date is after startDate
+                          { $gte: ['$endDate', new Date()] }, // Check if current date is before endDate
+                        ],
+                      },
+                    ],
+                  },
+                },
+              },
+              {
+                $project: { _id: 1 }, // Only return the _id of matching subscriptions
+              },
+            ],
+            as: 'userSubscriptions',
+          },
+        },
+        {
+          $unwind: {
+            path: '$planDetails',
+            preserveNullAndEmptyArrays: true, // Keep plans without subscriptions
+          },
+        },
+        {
+          $addFields: {
+            'planDetails.alreadySubscribed': {
+              $cond: { if: { $gt: [{ $size: '$userSubscriptions' }, 0] }, then: true, else: false },
+            },
+          },
+        },
+
         {
           $lookup: {
             from: 'plans',
