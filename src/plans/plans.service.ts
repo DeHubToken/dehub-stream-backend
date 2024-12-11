@@ -43,6 +43,7 @@ export class PlansService {
     try {
       const obj = {};
       addProperty(req, obj, 'address');
+      console.log(obj)
       const plans = await PlansModel.find(obj, planTemplate);
       return res.status(200).json({ plans });
     } catch (error) {
@@ -62,7 +63,7 @@ export class PlansService {
     addProperty(req, obj, 'chains');
 
     // Check if a plan with the same tier and duration already exists
-    const isExist = await PlansModel.findOne({ tier: obj.tier, duration: obj.duration });
+    const isExist = await PlansModel.findOne({ address:obj.address.toLowerCase(),tier: obj.tier, duration: obj.duration });
     if (isExist) {
       return res.status(409).json({ error: 'Plan Already Exist!', msg: 'Plan Already Exist!' });
     }
