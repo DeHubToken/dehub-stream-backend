@@ -654,4 +654,42 @@ export class NftService {
     const { r, s, v } = splitSignature(await signer.signMessage(arrayify(toSignForClaim)));
     return { v, r, s };
   }
+
+  async recordVideoView(watcherAddress, tokenId){
+    try {
+      const existingEntry = await WatchHistoryModel.findOne({
+        watcherAddress,
+        tokenId,
+        status: 'confirmed',
+      });
+  
+      if (!existingEntry) {
+        await new WatchHistoryModel({
+          tokenId,
+          watcherAddress,
+          status: 'confirmed',
+          watchedAt: new Date(),
+        }).save();
+  
+        const tokenFilter = { tokenId };
+        await TokenModel.updateOne(tokenFilter, { $inc: { views: 1 } });
+      }
+
+      // Always log the session, even if it's not a unique view
+      await new WatchHistoryModel({
+        tokenId,
+        watcherAddress,
+        status: 'session',
+        startedAt: new Date(),
+      }).save();
+
+      // increment total views for each session
+      const tokenFilter = { tokenId };
+      await TokenModel.updateOne(tokenFilter, { $inc: { views: 1 } });
+      return { success: true }
+    } catch (error) {
+      console.error('Error recording video view:', error);
+      throw new Error('Could not record video view');
+    }
+  }
 }

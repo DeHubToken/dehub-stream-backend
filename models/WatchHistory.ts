@@ -11,7 +11,10 @@ export class WatchHistory {
   @Prop({ type: String, index: true })
   watcherAddress: string;
 
-  @Prop({ type: Date, index: true })
+  @Prop({ type: Date })
+  watchedAt: Date;
+
+  @Prop({ type: Date })
   startedAt: Date;
 
   @Prop({ type: Date })
@@ -35,4 +38,4 @@ export class WatchHistory {
 
 export const WatchHistorySchema = SchemaFactory.createForClass(WatchHistory);
 
-export const WatchHistoryModel: Model<WatchHistoryDocument> = mongoose.model<WatchHistoryDocument>('watchhistories', WatchHistorySchema);
+export const WatchHistoryModel: Model<WatchHistoryDocument> = mongoose.model<WatchHistoryDocument>('watch_histories', WatchHistorySchema);

@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, BadRequestException,NotFoundException, } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { TokenModel } from 'models/Token';
 import * as fs from 'fs'
@@ -27,33 +27,46 @@ const tokenTemplateForStream = {
 export class AssetService {
   constructor(private readonly cdnService:CdnService){}
 
-  async getStream(req:Request, res:Response) {
-    let tokenId:any = req.params.id;
-    const signParams:any = req.query;
-    // { sig: '', timestamp: '0', account: 'undefined' } when not connecting with wallet
-    if (!tokenId) return res.status(400).json({ error: 'Bad Request: Token Id is required' });
+  async getStream(req: Request, res: Response) {
+    let tokenId: any = req.params.id;
+    const signParams: any = req.query;
+  
+    if (!tokenId) {
+      throw new BadRequestException('Token Id is required');
+    }
+  
     try {
       tokenId = parseInt(tokenId);
     } catch (e) {
-      return res.status(400).json({ error: 'Bad Request: Token Id is required' });
+      throw new BadRequestException('Token Id must be a valid number');
     }
+  
     console.log('----start stream:', tokenId);
-    const tokenItem:any = await TokenModel.findOne({ tokenId, status: 'minted' }, tokenTemplateForStream).lean();
-    if (!tokenItem) return res.status(404).json({ error: 'Not Found: Token not found' });
+  
+    const tokenItem: any = await TokenModel.findOne(
+      { tokenId, status: 'minted' },
+      tokenTemplateForStream,
+    ).lean();
+  
+    if (!tokenItem) {
+      throw new NotFoundException('Token not found');
+    }
+  
     const videoPath = `${process.env.CDN_BASE_URL}videos/${tokenId}.mp4`;
     let fileSize;
+  
     if (tokenItem.videoInfo?.size) {
       fileSize = tokenItem.videoInfo?.size;
     } else {
       try {
-        let videoStat;
-        videoStat = fs.statSync(videoPath);
+        const videoStat = fs.statSync(videoPath);
         fileSize = videoStat.size;
       } catch (e) {
-        console.log('----not video', tokenId);
-        return res.status(500).json({ error: e.message || 'Internal Server Error' });
+        console.error('----not video', tokenId);
+        throw new InternalServerErrorException(e.message || 'Video not found');
       }
     }
+  
     const videoRange = req.headers.range;
     const nowTimestamp = Date.now();
     const userAddress = signParams?.account?.toLowerCase();
@@ -63,81 +76,199 @@ export class AssetService {
     const initialBuffer = tokenItem.videoInfo?.bitrate
       ? Math.floor((tokenItem.videoInfo?.bitrate / 8) * 2)
       : defaultInitialBuffer;
-    // let chainId = signParams?.chainId;
-    // if (chainId) chainId = parseInt(chainId);
-    if (videoRange) {
-      const parts = videoRange.replace(/bytes=/, '').split('-');
-      let start = parseInt(parts[0], 10);
-      let end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-      let chunksize = end - start + 1;
-      // const oldChunkSize = chunksize;
-      // watching video at start position is always available.
-      if (videoRange === 'bytes=0-') {
-        start = 0;
-        chunksize = chunksize > initialBuffer + 1 ? initialBuffer + 1 : chunksize;
-        end = chunksize - 1;
-      } else {
-        if (chunksize > limitBuffer + 1) {
-          chunksize = limitBuffer + 1;
-          end = start + chunksize - 1;
+  
+    if (!videoRange) {
+      throw new InternalServerErrorException('No video range specified');
+    }
+  
+    const parts = videoRange.replace(/bytes=/, '').split('-');
+    let start = parseInt(parts[0], 10);
+    let end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+    let chunksize = end - start + 1;
+  
+    if (videoRange === 'bytes=0-') {
+      start = 0;
+      chunksize = Math.min(chunksize, initialBuffer + 1);
+      end = start + chunksize - 1;
+    } else {
+      if (chunksize > limitBuffer + 1) {
+        chunksize = limitBuffer + 1;
+        end = start + chunksize - 1;
+      }
+  
+      if (
+        tokenItem?.owner !== normalizeAddress(userAddress) &&
+        (tokenItem?.streamInfo?.[streamInfoKeys.isLockContent] ||
+          tokenItem?.streamInfo?.[streamInfoKeys.isPayPerView])
+      ) {
+        const result = isValidAccount(signParams?.account, signParams?.timestamp, signParams.sig);
+        if (!result) {
+          console.log('Failed account auth', signParams);
+          // Don't throw error as users still need to watch without auth
+          // throw new InternalServerErrorException('Authentication failed');
         }
-        if (
-          tokenItem?.owner !== normalizeAddress(userAddress) &&
-          (tokenItem?.streamInfo?.[streamInfoKeys.isLockContent] ||
-            tokenItem?.streamInfo?.[streamInfoKeys.isPayPerView])
-        ) {
-          // check signature for not start
-          const result = isValidAccount(signParams?.account, signParams?.timestamp, signParams.sig);
-          // return res.json({ error: 'error!' });  // for testing
-          if (!result) {
-            console.log('failed account auth', signParams);
-            // return res.status(500).send('Authentication Error');
-            // chunksize = 100;
-            // end = start + chunksize - 1;
+  
+        if (tokenItem?.streamInfo?.[streamInfoKeys.isLockContent]) {
+          const isUnlocked = await isUnlockedLockedContent(tokenItem?.streamInfo, userAddress);
+          if (!isUnlocked) {
+            throw new InternalServerErrorException('Locked content');
           }
-          if (tokenItem?.streamInfo?.[streamInfoKeys.isLockContent]) {
-            const isUnlocked = await isUnlockedLockedContent(tokenItem?.streamInfo, userAddress);
-            if (!isUnlocked) {
-              return res.status(500).send('Locked Content');
-            }
-          } // per view stream
-          else {
-            const isUnlocked = await isUnlockedPPVStream(tokenId, userAddress);
-            if (!isUnlocked) return res.status(500).send('A locked PPV stream');
+        } else {
+          const isUnlocked = await isUnlockedPPVStream(tokenId, userAddress);
+          if (!isUnlocked) {
+            throw new InternalServerErrorException('Locked PPV stream');
           }
         }
       }
-      console.log(
-        '---call stream',
-        nowTimestamp,
-        signParams?.account,
-        tokenId,
-        req.headers.range,
-        start,
-        end,
-        fileSize,
+    }
+  
+    console.log(
+      '---call stream',
+      nowTimestamp,
+      signParams?.account,
+      tokenId,
+      req.headers.range,
+      start,
+      end,
+      fileSize,
+    );
+  
+    const file = fs.createReadStream(videoPath, { start, end });
+    const header = {
+      'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+      'Accept-Ranges': 'bytes',
+      'Content-Length': chunksize,
+      'Content-Type': 'video/mp4',
+    };
+  
+    res.writeHead(206, header);
+    file.pipe(res);
+  
+    let filter: any = {
+      tokenId,
+      exitedAt: { $gt: new Date(nowTimestamp - config.extraPeriodForHistory) },
+    };
+  
+    if (userAddress && isAddress(userAddress)) {
+      filter = { ...filter, watcherAddress: userAddress };
+      await WatchHistoryModel.updateOne(
+        filter,
+        { exitedAt: new Date(nowTimestamp), lastWatchedFrame: end },
+        overrideOptions,
       );
-      const file = fs.createReadStream(videoPath, { start, end });
-      const header = {
-        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-        'Accept-Ranges': 'bytes',
-        'Content-Length': chunksize,
-        'Content-Type': 'video/mp4',
-      };
-
-      res.writeHead(206, header);
-      file.pipe(res);
-      let filter:any = { tokenId, exitedAt: { $gt: new Date(nowTimestamp - config.extraPeriodForHistory) } };
-      if (userAddress && isAddress(userAddress)) {
-        filter = { ...filter, watcherAddress: userAddress };
-        await WatchHistoryModel.updateOne(
-          filter,
-          { exitedAt: new Date(nowTimestamp), lastWatchedFrame: end },
-          overrideOptions,
-        );
-      }
-    } else return res.status(500).send('No video range');
+    }
   }
+  // async getStream(req:Request, res:Response) {
+  //   let tokenId:any = req.params.id;
+  //   const signParams:any = req.query;
+  //   // { sig: '', timestamp: '0', account: 'undefined' } when not connecting with wallet
+  //   if (!tokenId) return res.status(400).json({ error: 'Bad Request: Token Id is required' });
+  //   try {
+  //     tokenId = parseInt(tokenId);
+  //   } catch (e) {
+  //     return res.status(400).json({ error: 'Bad Request: Token Id is required' });
+  //   }
+  //   console.log('----start stream:', tokenId);
+  //   const tokenItem:any = await TokenModel.findOne({ tokenId, status: 'minted' }, tokenTemplateForStream).lean();
+  //   if (!tokenItem) return res.status(404).json({ error: 'Not Found: Token not found' });
+  //   const videoPath = `${process.env.CDN_BASE_URL}videos/${tokenId}.mp4`;
+  //   let fileSize;
+  //   if (tokenItem.videoInfo?.size) {
+  //     fileSize = tokenItem.videoInfo?.size;
+  //   } else {
+  //     try {
+  //       let videoStat;
+  //       videoStat = fs.statSync(videoPath);
+  //       fileSize = videoStat.size;
+  //     } catch (e) {
+  //       console.log('----not video', tokenId);
+  //       return res.status(500).json({ error: e.message || 'Internal Server Error' });
+  //     }
+  //   }
+  //   const videoRange = req.headers.range;
+  //   const nowTimestamp = Date.now();
+  //   const userAddress = signParams?.account?.toLowerCase();
+  //   const limitBuffer = tokenItem.videoInfo?.bitrate
+  //     ? Math.floor((tokenItem.videoInfo?.bitrate / 8) * 6)
+  //     : defaultLimitBuffer;
+  //   const initialBuffer = tokenItem.videoInfo?.bitrate
+  //     ? Math.floor((tokenItem.videoInfo?.bitrate / 8) * 2)
+  //     : defaultInitialBuffer;
+  //   // let chainId = signParams?.chainId;
+  //   // if (chainId) chainId = parseInt(chainId);
+  //   if (videoRange) {
+  //     const parts = videoRange.replace(/bytes=/, '').split('-');
+  //     let start = parseInt(parts[0], 10);
+  //     let end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+  //     let chunksize = end - start + 1;
+  //     // const oldChunkSize = chunksize;
+  //     // watching video at start position is always available.
+  //     if (videoRange === 'bytes=0-') {
+  //       start = 0;
+  //       chunksize = chunksize > initialBuffer + 1 ? initialBuffer + 1 : chunksize;
+  //       end = chunksize - 1;
+  //     } else {
+  //       if (chunksize > limitBuffer + 1) {
+  //         chunksize = limitBuffer + 1;
+  //         end = start + chunksize - 1;
+  //       }
+  //       if (
+  //         tokenItem?.owner !== normalizeAddress(userAddress) &&
+  //         (tokenItem?.streamInfo?.[streamInfoKeys.isLockContent] ||
+  //           tokenItem?.streamInfo?.[streamInfoKeys.isPayPerView])
+  //       ) {
+  //         // check signature for not start
+  //         const result = isValidAccount(signParams?.account, signParams?.timestamp, signParams.sig);
+  //         // return res.json({ error: 'error!' });  // for testing
+  //         if (!result) {
+  //           console.log('failed account auth', signParams);
+  //           // return res.status(500).send('Authentication Error');
+  //           // chunksize = 100;
+  //           // end = start + chunksize - 1;
+  //         }
+  //         if (tokenItem?.streamInfo?.[streamInfoKeys.isLockContent]) {
+  //           const isUnlocked = await isUnlockedLockedContent(tokenItem?.streamInfo, userAddress);
+  //           if (!isUnlocked) {
+  //             return res.status(500).send('Locked Content');
+  //           }
+  //         } // per view stream
+  //         else {
+  //           const isUnlocked = await isUnlockedPPVStream(tokenId, userAddress);
+  //           if (!isUnlocked) return res.status(500).send('A locked PPV stream');
+  //         }
+  //       }
+  //     }
+  //     console.log(
+  //       '---call stream',
+  //       nowTimestamp,
+  //       signParams?.account,
+  //       tokenId,
+  //       req.headers.range,
+  //       start,
+  //       end,
+  //       fileSize,
+  //     );
+  //     const file = fs.createReadStream(videoPath, { start, end });
+  //     const header = {
+  //       'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+  //       'Accept-Ranges': 'bytes',
+  //       'Content-Length': chunksize,
+  //       'Content-Type': 'video/mp4',
+  //     };
+
+  //     res.writeHead(206, header);
+  //     file.pipe(res);
+  //     let filter:any = { tokenId, exitedAt: { $gt: new Date(nowTimestamp - config.extraPeriodForHistory) } };
+  //     if (userAddress && isAddress(userAddress)) {
+  //       filter = { ...filter, watcherAddress: userAddress };
+  //       await WatchHistoryModel.updateOne(
+  //         filter,
+  //         { exitedAt: new Date(nowTimestamp), lastWatchedFrame: end },
+  //         overrideOptions,
+  //       );
+  //     }
+  //   } else return res.status(500).send('No video range');
+  // }
 
   async getImage (req:Request, res:Response) {
     const id = req.params.id;

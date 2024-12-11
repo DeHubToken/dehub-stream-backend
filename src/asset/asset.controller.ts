@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Post, Req, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Param, Post, Req, UploadedFiles, UseInterceptors } from '@nestjs/common';
 import { AssetService } from './asset.service';
 import { Request, Response } from 'express';
 import { FilesInterceptor } from '@nestjs/platform-express';
