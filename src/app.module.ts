@@ -16,6 +16,9 @@ import { JobModule } from './job/job.module';
 import { BullModule } from '@nestjs/bull';
 import { ScheduleModule } from '@nestjs/schedule';
 import { StreamCronService } from './job/stream-cron.service';
+import { PlansModule } from './plans/plans.module';
+import { PlanEventListenerService } from './job/plans.listener';
+import { DmModule } from './dm/dm.module';
 
 @Module({
   imports: [
@@ -27,9 +30,9 @@ import { StreamCronService } from './job/stream-cron.service';
       },
     }),
     UserModule, 
-    NftModule, NotificationModule, CdnModule, AuthModule, ReactionModule, CategoryModule, LeaderboardModule, AssetModule, JobModule, ScheduleModule.forRoot()],
+    NftModule, NotificationModule, CdnModule, AuthModule, PlansModule,DmModule, ReactionModule, CategoryModule, LeaderboardModule, AssetModule, JobModule, ScheduleModule.forRoot()],
   controllers: [AppController],
-  providers: [AppService, StreamCronService],
+  providers: [AppService, StreamCronService,PlanEventListenerService],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

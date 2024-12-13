@@ -14,7 +14,7 @@ import { config } from 'config';
 import * as socketIO from 'socket.io';
 import { createServer } from 'http';
 import { addUserToOnlineList, getOnlineUsers, removeUserFromOnlineList } from 'common/util/socket';
-import { json } from 'express';
+import { json } from 'express';  
 
 // WebSocket logic
 const webSockets = (socket: any, io: socketIO.Server) => {
@@ -81,13 +81,11 @@ async function bootstrap() {
       methods: ['GET', 'POST'],
     },
   });
-
+  
   io.on('connection', (socket: any) => {
     console.log('New client connected:', socket.id);
     webSockets(socket, io); // Initialize WebSocket handling
   });
-
- 
 
   await app.listen(process.env.API_PORT);
 
