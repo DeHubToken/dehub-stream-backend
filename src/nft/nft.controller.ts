@@ -113,7 +113,7 @@ export class NFTController {
   @Get('record-view/:tokenId')
   @UseGuards(AuthGuard)
   recordWatchVideo(@Req() req, @Param('tokenId') tokenId: string) {
-    const watcherAddress = req.user.address;
+    const watcherAddress = req.params.address;
     return this.nftServices.recordVideoView(watcherAddress, tokenId)
   }
   
