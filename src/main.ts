@@ -14,7 +14,7 @@ import { config } from 'config';
 import * as socketIO from 'socket.io';
 import { createServer } from 'http';
 import { addUserToOnlineList, getOnlineUsers, removeUserFromOnlineList } from 'common/util/socket';
-import { json } from 'express';  
+import { json } from 'express';
 
 // WebSocket logic
 const webSockets = (socket: any, io: socketIO.Server) => {
@@ -53,6 +53,13 @@ async function bootstrap() {
 
   app.use(flash());
   app.use(methodOverride('X-HTTP-Method-Override'));
+  app.use(function (req, res, next) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,Content-type,Accept');
+    res.setHeader('Access-Control-Allow-Credentials', true);
+    next();
+  });
   app.useGlobalPipes(new ValidationPipe());
   app.setGlobalPrefix('api');
 
@@ -78,10 +85,10 @@ async function bootstrap() {
   const io = new socketIO.Server(server, {
     cors: {
       origin: '*',
-      methods: ['GET', 'POST'],
-    },
+    }, 
+    // reconnectionAttempts: 3, 
   });
-  
+
   io.on('connection', (socket: any) => {
     console.log('New client connected:', socket.id);
     webSockets(socket, io); // Initialize WebSocket handling
