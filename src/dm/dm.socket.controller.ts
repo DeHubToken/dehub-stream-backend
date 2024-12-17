@@ -28,7 +28,7 @@ export class DMSocketController {
     // Namespace for personal DMs
     this.dmNamespace.on(SocketEvent.connection, async socket => {
       const userAddress = socket.handshake.query.address;
-      console.log('SocketEvent.connection userAddress', userAddress);
+      console.log('SocketEvent.connection userAddress', userAddress,socket.handshake);
       await this.sessionSet(socket, userAddress);
 
       console.log(`Client connected to /dm: ${socket.id}`);
