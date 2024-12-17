@@ -32,8 +32,8 @@ export class DMSocketService {
       // If no DM session exists, create a new one
       const newDm = new DmModel({
         participants: [session.user._id, userId2],
-        createdBy:session.user._id,
-        conversationType:"dm",
+        createdBy: session.user._id,
+        conversationType: 'dm',
         lastMessageAt: new Date(),
       });
 
@@ -44,10 +44,10 @@ export class DMSocketService {
       socket.emit(SocketEvent.createAndStart, { msg: 'Created new DM', data: newDm });
     }
   }
- 
 
   async sendMessage({ socket, req, session }: { socket: any; req: any; session: any }) {
     const userId = session.user._id;
+    console.log(session.user);
     const newMsg: any = await DmMessageModel.create({
       conversation: req.dmId,
       sender: userId,
@@ -58,7 +58,6 @@ export class DMSocketService {
     socket.emit(SocketEvent.sendMessage, { ...newMsg?._doc, author: 'me' });
     const dm = await DmModel.findById(req.dmId);
 
-    
     let ids = dm.participants.filter(d => d.toString() != userId.toString());
 
     const socketsUsers = await this.getOnlineSocketsUsers(session, ids);
