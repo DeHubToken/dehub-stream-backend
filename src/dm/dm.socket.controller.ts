@@ -28,6 +28,7 @@ export class DMSocketController {
     // Namespace for personal DMs
     this.dmNamespace.on(SocketEvent.connection, async socket => {
       const userAddress = socket.handshake.query.address;
+      console.log('SocketEvent.connection userAddress', userAddress);
       await this.sessionSet(socket, userAddress);
 
       console.log(`Client connected to /dm: ${socket.id}`);
@@ -60,7 +61,7 @@ export class DMSocketController {
       { address: userAddress?.toLowerCase() },
       { username: 1, _id: 1, address: 1 },
     ).lean();
-
+    console.log('findOne', user);
     // If user already exists in the users map, update their socketIds
     let session = this.users.get(userAddress?.toLowerCase());
 
@@ -91,6 +92,7 @@ export class DMSocketController {
   async withSession(socket, req) {
     // Find the user in the map
     const userAddress = socket.handshake.query.address;
+    console.log('userAddress', userAddress);
     const session = await this.users.get(userAddress?.toLowerCase());
     return { req, socket, session: { user: session, users: this.users } };
   }
