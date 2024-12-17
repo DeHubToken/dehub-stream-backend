@@ -53,13 +53,6 @@ async function bootstrap() {
 
   app.use(flash());
   app.use(methodOverride('X-HTTP-Method-Override'));
-  app.use(function (req, res, next) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,Content-type,Accept');
-    res.setHeader('Access-Control-Allow-Credentials', true);
-    next();
-  });
   app.useGlobalPipes(new ValidationPipe());
   app.setGlobalPrefix('api');
 
@@ -85,12 +78,17 @@ async function bootstrap() {
   const io = new socketIO.Server(server, {
     cors: {
       origin: '*',
-    }, 
-    // reconnectionAttempts: 3, 
+      methods: ["GET", "POST"],
+      credentials: true,
+    },
+    transports: ["websocket"], // Allow only WebSocket
   });
 
   io.on('connection', (socket: any) => {
     console.log('New client connected:', socket.id);
+    const userAddress = socket.handshake.query.address;
+
+    console.log('userAddress connection', userAddress);
     webSockets(socket, io); // Initialize WebSocket handling
   });
 
