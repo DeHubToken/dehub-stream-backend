@@ -46,8 +46,8 @@ export class DMSocketService {
   }
 
   async sendMessage({ socket, req, session }: { socket: any; req: any; session: any }) {
+    console.log(session);
     const userId = session.user._id;
-    console.log(session.user);
     const newMsg: any = await DmMessageModel.create({
       conversation: req.dmId,
       sender: userId,
