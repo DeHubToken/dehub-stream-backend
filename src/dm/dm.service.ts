@@ -258,7 +258,7 @@ export class DMService {
       const newGroupChat = await DmModel.create({
         groupName,
         description: reqParam(req, 'description') || '', // Optional description
-        participants: users,
+        participants: [...users,creatorExists._id,],
         conversationType:"group",
         plans: [...validPlans,], // Assuming only one plan can be associated with a group
         createdBy: creatorExists._id,
