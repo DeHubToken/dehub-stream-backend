@@ -41,16 +41,12 @@ export class DMSocketController {
         SocketEvent.createAndStart,
         async (data: any) => await this.dmSocketService.createAndStart(await this.withSession(socket, data)),
       );
-      socket.on(
-        SocketEvent.fetchDMessages,
-        async data => await this.dmSocketService.fetchDMessages(await this.withSession(socket, data)),
-      );
-      
+
       socket.on(
         SocketEvent.sendMessage,
         async data => await this.dmSocketService.sendMessage(await this.withSession(socket, data)),
       );
-      
+
       socket.on(SocketEvent.disconnect, async () => {
         console.log(`Client disconnected from /dm: ${socket.id}`);
         await this.unset(socket, userAddress);

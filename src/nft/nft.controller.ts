@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Req, Res, UploadedFiles, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Post, Req, Res, UploadedFiles, UseGuards } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { AuthGuard } from 'common/guards/auth.guard';
 import { NftService } from './nft.service';
@@ -130,4 +130,12 @@ export class NFTController {
       return res.status(500).json({ message: 'Failed to fetch NFTs', error: error.message });
     }
   }
+
+  @Get('record-view/:tokenId')
+  @UseGuards(AuthGuard)
+  recordWatchVideo(@Req() req, @Param('tokenId') tokenId: string) {
+    const watcherAddress = req.params.address;
+    return this.nftServices.recordVideoView(watcherAddress, tokenId)
+  }
+  
 }
