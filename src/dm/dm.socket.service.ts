@@ -23,14 +23,26 @@ export class DMSocketService {
     }
     const existingDm = await DmModel.findOne({
       participants: { $all: [session.user._id, userId2] },
-    });
+      conversationType: 'dm',
+    }).lean();
+
+    const user2 = await AccountModel.findById(userId2, {
+      _id: 1,
+      username: 1,
+      avatarImageUrl: 1,
+      displayName: 1,
+      address: 1,
+    }).lean();
 
     if (existingDm) {
       // If a DM session exists, send it back to the client
-      socket.emit(SocketEvent.createAndStart, { msg: 'DM session exists', data: existingDm });
+      socket.emit(SocketEvent.createAndStart, {
+        msg: 'DM session exists',
+        data: { ...existingDm, participants: [user2] },
+      });
     } else {
       // If no DM session exists, create a new one
-      const newDm = new DmModel({
+      const newDm: any = new DmModel({
         participants: [session.user._id, userId2],
         createdBy: session.user._id,
         conversationType: 'dm',
@@ -41,7 +53,10 @@ export class DMSocketService {
       await newDm.save();
 
       // Emit the event to notify the client
-      socket.emit(SocketEvent.createAndStart, { msg: 'Created new DM', data: newDm });
+      socket.emit(SocketEvent.createAndStart, {
+        message: 'Created new DM',
+        data: { ...newDm._doc, participants: [user2] },
+      });
     }
   }
 
