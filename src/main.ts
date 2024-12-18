@@ -15,6 +15,7 @@ import * as socketIO from 'socket.io';
 import { createServer } from 'http';
 import { addUserToOnlineList, getOnlineUsers, removeUserFromOnlineList } from 'common/util/socket';
 import { json } from 'express';
+// import { DMSocketController } from './dm/dm.socket.controller';
 
 // WebSocket logic
 const webSockets = (socket: any, io: socketIO.Server) => {
@@ -83,15 +84,15 @@ async function bootstrap() {
     },
     transports: ["websocket"], // Allow only WebSocket
   });
-
+  // new DMSocketController(io);  
   io.on('connection', (socket: any) => {
     console.log('New client connected:', socket.id);
     const userAddress = socket.handshake.query.address;
 
     console.log('userAddress connection', userAddress);
     webSockets(socket, io); // Initialize WebSocket handling
+ 
   });
-
   await app.listen(process.env.API_PORT);
 
   console.log(`Application is running on port :${process.env.API_PORT}`);

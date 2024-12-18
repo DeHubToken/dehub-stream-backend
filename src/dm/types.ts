@@ -1,4 +1,4 @@
-import { Namespace } from 'socket.io';
+ 
 
 export const SocketEvent = {
   disconnect: 'disconnect',
@@ -6,8 +6,8 @@ export const SocketEvent = {
   fetchMessage: 'fetchMessage',
   ping: 'ping',
   pong: 'pong',
-  createAndStart: 'createAndStart',
-  fetchDMessages: 'fetchDMessages',
-  sendMessage: "sendMessage",
-  error: 'error'
+  createAndStart: 'createAndStart', 
+  sendMessage: 'sendMessage', 
+  error: 'error',
+  reConnect: 'reConnect',
 };

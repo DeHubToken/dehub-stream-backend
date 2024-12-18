@@ -28,11 +28,19 @@ export class DMSocketController {
     // Namespace for personal DMs
     this.dmNamespace.on(SocketEvent.connection, async socket => {
       const userAddress = socket.handshake.query.address;
-      console.log('SocketEvent.connection userAddress', userAddress,socket.handshake);
+      console.log('SocketEvent.connection userAddress', userAddress, socket.handshake);
+
+      if (!userAddress == undefined || !userAddress) {
+        console.log('need to reconnect...');
+        socket.emit(SocketEvent.reConnect, { msg: 'connecting....' });
+      }
+      if (!userAddress) {
+        return;
+      }
       await this.sessionSet(socket, userAddress);
+      socket.emit(SocketEvent.error, { msg: 'Unable to get user address.' });
 
       console.log(`Client connected to /dm: ${socket.id}`);
-
       // Handle socket events
       socket.on(SocketEvent.ping, data => {
         socket.emit(SocketEvent.pong, { msg: 'hi welcome' });
