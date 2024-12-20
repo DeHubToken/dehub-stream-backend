@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Namespace } from 'socket.io';
-import { DmMessageModel } from 'models/message/dm-messages';
+import { MessageModel } from 'models/message/dm-messages';
 import { SocketEvent } from './types';
 import { DmModel } from 'models/message/DM';
 import { AccountModel } from 'models/Account';
@@ -8,8 +8,7 @@ import { Types } from 'mongoose';
 
 @Injectable()
 export class DMSocketService {
-  private dmNamespace: Namespace;
-
+  private dmNamespace: Namespace; 
   constructor(dmNamespace) {
     this.dmNamespace = dmNamespace;
   }
@@ -60,21 +59,24 @@ export class DMSocketService {
     }
   }
 
-  async sendMessage({ socket, req, session }: { socket: any; req: any; session: any }) {
-    console.log(session);
-    const userId = session.user._id;
-    const newMsg: any = await DmMessageModel.create({
+  async sendMessage({ socket, req, session }: { socket: any; req: any; session: any }) { 
+    const userId = session.user._id; 
+    const state: any = {
       conversation: req.dmId,
       sender: userId,
       isRead: false,
-      content: req.msg,
-    });
-    console.log(newMsg);
+      content: req.content,
+      msgType: req.type,
+    };
+// console.log(state)
+console.log(req)
+    if (state.msgType == 'gif') {
+      state.mediaUrls = [req.gif];
+    } 
+    const newMsg: any = await MessageModel.create(state);
     socket.emit(SocketEvent.sendMessage, { ...newMsg?._doc, author: 'me' });
-    const dm = await DmModel.findById(req.dmId);
-
-    let ids = dm.participants.filter(d => d.toString() != userId.toString());
-
+    const dm = await DmModel.findById(req.dmId); 
+    let ids = dm.participants.filter(d => d.toString() != userId.toString()); 
     const socketsUsers = await this.getOnlineSocketsUsers(session, ids);
     socketsUsers.forEach(su => {
       // su.socketIds is assumed to be an array of socket IDs for this user
@@ -86,8 +88,7 @@ export class DMSocketService {
   }
 
   async getOnlineSocketsUsers(session, ids) {
-    const users = await AccountModel.find({ $or: [{ _id: { $in: ids } }] }, { address: 1 }).lean();
-    console.log('session.users', session.users);
+    const users = await AccountModel.find({ $or: [{ _id: { $in: ids } }] }, { address: 1 }).lean(); 
     return users.map(user => {
       const sessionUser = session.users.get(user.address.toLowerCase());
       if (sessionUser) {

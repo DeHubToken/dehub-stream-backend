@@ -186,7 +186,7 @@ const devTokens = [
     symbol: 'DHB',
     customAbbreviation: 'dhb',
     chainId: 97,
-    address: '0xeb6acdcfe1f13187126a504d56f7970bf6f3c5e1',
+    address: '0xeb6ACdcfe1F13187126A504d56f7970bf6f3C5E1',//'0xeb6acdcfe1f13187126a504d56f7970bf6f3c5e1',
     iconUrl: 'assets/icons/tokens/DHB.png',
     decimals: 18,
   },
@@ -216,7 +216,7 @@ const devTokens = [
     symbol: 'USDC',
     customAbbreviation: 'usdc',
     chainId: 97,
-    address: '0x4131fd3F1206d48A89410EE610BF1949934e0a72',
+    address:  '0x4355a87B8e08C81Fdc6eD49C374b4b47748841Ce',// '0x4131fd3F1206d48A89410EE610BF1949934e0a72',
     iconUrl: 'assets/icons/tokens/USDC.png',
     decimals: 18,
   },
@@ -541,7 +541,7 @@ export const durations = [
   { title: 'lifetime', value: 999, tier: 5 },
 ];
 const subscriptionCollectionAddress = {
-  [ChainId.BSC_TESTNET]: '0x3A76858fb35520c3CA20E826901c7cB73F715251',
+  [ChainId.BSC_TESTNET]: '0xD23dC2Eb9a6c7c7A50E5FA4B9644671c217D2A79'//'0x3A76858fb35520c3CA20E826901c7cB73F715251',
 };
 export {
   paramNames,

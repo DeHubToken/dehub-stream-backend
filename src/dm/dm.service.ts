@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { reqParam } from 'common/util/auth';
 import { AccountModel } from 'models/Account';
 import { Request, Response } from 'express';
-import { DmMessageModel } from 'models/message/dm-messages';
+import { MessageModel } from 'models/message/dm-messages';
 import mongoose from 'mongoose';
 import { DmModel } from 'models/message/DM'; 
 import { PlansModel } from 'models/Plans';
@@ -100,7 +100,7 @@ export class DMService {
       ];
 
       // Execute the aggregation
-      const messages = await DmMessageModel.aggregate(pipeline);
+      const messages = await MessageModel.aggregate(pipeline);
 
       // Send response
       return res.status(200).json({ messages: messages.reverse() });

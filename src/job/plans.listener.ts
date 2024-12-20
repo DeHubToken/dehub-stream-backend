@@ -3,27 +3,26 @@ import { ethers } from 'ethers';
 import { PlansModel } from 'models/Plans';
 import { SubscriptionModel } from 'models/subscription';
 
-const tokenABI = [
+const tokenABI = [  
   {
-    anonymous: false,
-    inputs: [
-      { indexed: true, internalType: 'address', name: 'creator', type: 'address' },
-      { indexed: false, internalType: 'uint256', name: 'id', type: 'uint256' },
-      { indexed: false, internalType: 'string', name: 'uri', type: 'string' },
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "creator", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "id", "type": "uint256" },
+      { "indexed": false, "internalType": "uint256", "name": "duration", "type": "uint256" }
     ],
-    name: 'PlanCreated',
-    type: 'event',
-  },
-  {
-    anonymous: false,
-    inputs: [
-      { indexed: true, internalType: 'address', name: 'subscriber', type: 'address' },
-      { indexed: false, internalType: 'uint256', name: 'id', type: 'uint256' },
-      { indexed: false, internalType: 'string', name: 'uri', type: 'string' },
+    "name": "PlanCreated",
+    "type": "event"
+  }, {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "subscriber", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "id", "type": "uint256" },
+      { "indexed": false, "internalType": "uint256", "name": "duration", "type": "uint256" }
     ],
-    name: 'SubscriptionBought',
-    type: 'event',
-  },
+    "name": "SubscriptionBought",
+    "type": "event"
+  }
 ];
 const { supportedNetworks, subscriptionCollectionAddress } = require('../../config/constants');
 
@@ -80,13 +79,13 @@ export class PlanEventListenerService implements OnModuleInit {
       this.listeners[network.chainId] = NFTContract;
 
       // Listen for SubscriptionBought event
-      NFTContract.on('SubscriptionBought', async (subscriber, id, uri) => {
-        await this.handleSubscriptionBought(network.chainId, NFTContract.address, subscriber, id, uri);
+      NFTContract.on('SubscriptionBought', async (subscriber, id, planDuration) => {
+        await this.handleSubscriptionBought(network.chainId, NFTContract.address, subscriber, id, planDuration);
       });
 
       // Listen for PlanCreated event
-      NFTContract.on('PlanCreated', async (creator, id, uri) => {
-        await this.handlePlanCreated(network.chainId, NFTContract.address, creator, id, uri);
+      NFTContract.on('PlanCreated', async (creator, id, planDuration) => {
+        await this.handlePlanCreated(network.chainId, NFTContract.address, creator, id, planDuration);
       });
 
       this.logger.log(`Listening for SubscriptionBought and PlanCreated events on ${networkName}`);
@@ -101,11 +100,11 @@ export class PlanEventListenerService implements OnModuleInit {
     contractAddress: string,
     subscriber: string,
     id: ethers.BigNumberish,
-    uri: string,
+    planDuration: string,
   ) {
     try {
       this.logger.log(`Received SubscriptionBought event on chainId ${chainId}`);
-      this.logger.log(`Event details: subscriber=${subscriber}, id=${id.toString()}, uri=${uri}`);
+      this.logger.log(`Event details: subscriber=${subscriber}, id=${id.toString()}, planDuration=${planDuration}`);
 
       // Find the subscription by id
       const subscription = await SubscriptionModel.findOne({ id: id.toString() });
@@ -170,11 +169,11 @@ export class PlanEventListenerService implements OnModuleInit {
     contractAddress: string,
     creator: string,
     id: ethers.BigNumberish,
-    uri: string,
+    planDuration: string,
   ) {
     try {
       this.logger.log(`Received PlanCreated event on chainId ${chainId}`);
-      this.logger.log(`Event details: creator=${creator}, id=${id.toString()}, uri=${uri}`);
+      this.logger.log(`Event details: creator=${creator}, id=${id.toString()}, planDuration=${planDuration}`);
 
       // Update the plan in the database by finding it based on the id and creator address
       const plan = await PlansModel.findOneAndUpdate(

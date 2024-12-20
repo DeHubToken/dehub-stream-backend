@@ -1,15 +1,4 @@
 [
-  {
-    "inputs": [{ "internalType": "address", "name": "target", "type": "address" }],
-    "name": "AddressEmptyCode",
-    "type": "error"
-  },
-  {
-    "inputs": [{ "internalType": "address", "name": "account", "type": "address" }],
-    "name": "AddressInsufficientBalance",
-    "type": "error"
-  },
-  { "inputs": [], "name": "FailedInnerCall", "type": "error" },
   { "inputs": [], "name": "InvalidInitialization", "type": "error" },
   { "inputs": [], "name": "NotInitializing", "type": "error" },
   {
@@ -27,7 +16,6 @@
     "name": "SafeERC20FailedOperation",
     "type": "error"
   },
-  { "inputs": [], "name": "notController", "type": "error" },
   {
     "anonymous": false,
     "inputs": [{ "indexed": false, "internalType": "uint64", "name": "version", "type": "uint64" }],
@@ -48,24 +36,20 @@
     "inputs": [
       { "indexed": true, "internalType": "address", "name": "creator", "type": "address" },
       { "indexed": false, "internalType": "uint256", "name": "id", "type": "uint256" },
-      { "indexed": false, "internalType": "string", "name": "uri", "type": "string" }
+      { "indexed": false, "internalType": "uint256", "name": "duration", "type": "uint256" }
     ],
     "name": "PlanCreated",
     "type": "event"
   },
   {
     "anonymous": false,
-    "inputs": [
-      { "indexed": true, "internalType": "address", "name": "account", "type": "address" }
-    ],
+    "inputs": [{ "indexed": true, "internalType": "address", "name": "account", "type": "address" }],
     "name": "SignerAdded",
     "type": "event"
   },
   {
     "anonymous": false,
-    "inputs": [
-      { "indexed": true, "internalType": "address", "name": "account", "type": "address" }
-    ],
+    "inputs": [{ "indexed": true, "internalType": "address", "name": "account", "type": "address" }],
     "name": "SignerRemoved",
     "type": "event"
   },
@@ -74,7 +58,7 @@
     "inputs": [
       { "indexed": true, "internalType": "address", "name": "subscriber", "type": "address" },
       { "indexed": false, "internalType": "uint256", "name": "id", "type": "uint256" },
-      { "indexed": false, "internalType": "string", "name": "uri", "type": "string" }
+      { "indexed": false, "internalType": "uint256", "name": "duration", "type": "uint256" }
     ],
     "name": "SubscriptionBought",
     "type": "event"
@@ -106,13 +90,6 @@
     "name": "buySubscription",
     "outputs": [],
     "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "controller",
-    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
-    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -151,13 +128,6 @@
       { "internalType": "bool", "name": "status", "type": "bool" },
       { "internalType": "address", "name": "buyCurrency", "type": "address" }
     ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{ "internalType": "uint256", "name": "id", "type": "uint256" }],
-    "name": "encodePackedData",
-    "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
     "stateMutability": "view",
     "type": "function"
   },
@@ -244,30 +214,25 @@
   },
   {
     "inputs": [
-      { "internalType": "uint256", "name": "id", "type": "uint256" },
-      { "internalType": "uint8", "name": "v", "type": "uint8" },
-      { "internalType": "bytes32", "name": "r", "type": "bytes32" },
-      { "internalType": "bytes32", "name": "s", "type": "bytes32" }
-    ],
-    "name": "getecrecover",
-    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
       { "internalType": "address", "name": "signer", "type": "address" },
-      { "internalType": "address", "name": "controller_", "type": "address" },
       { "internalType": "address", "name": "_dhbToken", "type": "address" },
       { "internalType": "address", "name": "_usdt", "type": "address" },
       { "internalType": "address", "name": "_usdc", "type": "address" },
       { "internalType": "address", "name": "_doge", "type": "address" },
       { "internalType": "address", "name": "_floki", "type": "address" },
-      { "internalType": "address", "name": "_feeReceiver", "type": "address" }
+      { "internalType": "address", "name": "_feeReceiver", "type": "address" },
+      { "internalType": "address", "name": "_nftAddress", "type": "address" }
     ],
     "name": "initializeDehubSubscriptionNft",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "name": "isId",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -279,35 +244,23 @@
   },
   {
     "inputs": [],
-    "name": "owner",
-    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "name": "nftAddress",
+    "outputs": [{ "internalType": "contract IDehubSubscriptionNFT", "name": "", "type": "address" }],
     "stateMutability": "view",
     "type": "function"
   },
   {
     "inputs": [],
-    "name": "renounceOwnership",
-    "outputs": [],
-    "stateMutability": "nonpayable",
+    "name": "owner",
+    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "stateMutability": "view",
     "type": "function"
   },
+  { "inputs": [], "name": "renounceOwnership", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+  { "inputs": [], "name": "renounceSigner", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
   {
-    "inputs": [],
-    "name": "renounceSigner",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{ "internalType": "address", "name": "_controller", "type": "address" }],
-    "name": "setController",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{ "internalType": "uint256", "name": "_expiredTime", "type": "uint256" }],
-    "name": "setExpiredTime",
+    "inputs": [{ "internalType": "address", "name": "_nftAddress", "type": "address" }],
+    "name": "setNFTAddress",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
