@@ -35,4 +35,4 @@ export class WatchHistory {
 
 export const WatchHistorySchema = SchemaFactory.createForClass(WatchHistory);
 
-export const WatchHistoryModel: Model<WatchHistoryDocument> = mongoose.model<WatchHistoryDocument>('watchhistories', WatchHistorySchema);
+export const WatchHistoryModel: Model<WatchHistoryDocument> = mongoose.model<WatchHistoryDocument>('watch_histories', WatchHistorySchema);
