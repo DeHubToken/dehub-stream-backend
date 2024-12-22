@@ -259,7 +259,7 @@ export class NftService {
         ],
       };
 
-      console.log('Range - sotMode', range, sortMode)
+      console.log('Range - sotMode - unit - page - search', range, sortMode, unit, page, search)
       switch (sortMode) {
         case 'trends':
           if (range) {
@@ -319,12 +319,14 @@ export class NftService {
           break;
       }
 
+      console.log('after sort mode', searchQuery)
       if (!page) page = 0;
       if (minter) searchQuery['$match'] = { minter: minter.toLowerCase() };
       if (owner) searchQuery['$match'] = { owner: owner.toLowerCase() };
       if (category) {
         searchQuery['$match']['category'] = { $elemMatch: { $eq: category } };
       }
+      console.log('after category', searchQuery)
 
       if (bulkIdList) {
         let idList = bulkIdList.split('-');
@@ -333,6 +335,7 @@ export class NftService {
           searchQuery['$match'] = { id: { $in: idList } };
         }
       }
+      console.log('after bulkIdList', searchQuery)
 
       if (
         (verifiedOnly + '').toLowerCase() === 'true' ||
@@ -340,6 +343,7 @@ export class NftService {
       ) {
         searchQuery['$match'] = { ...searchQuery['$match'], verified: true };
       }
+      console.log('after verified only', searchQuery)
 
       if (search) {
         if (!isValidSearch(search)) return res.json({ result: [] });
