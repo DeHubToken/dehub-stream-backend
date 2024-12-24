@@ -696,6 +696,7 @@ export class NftService {
   
         const tokenFilter = { tokenId };
         await TokenModel.updateOne(tokenFilter, { $inc: { views: 1 } });
+        return { success: true }
       }
 
       // Always log the session, even if it's not a unique view
