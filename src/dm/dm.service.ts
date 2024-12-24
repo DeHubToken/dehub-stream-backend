@@ -1,14 +1,20 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UploadedFile } from '@nestjs/common';
 import { reqParam } from 'common/util/auth';
 import { AccountModel } from 'models/Account';
 import { Request, Response } from 'express';
 import { MessageModel } from 'models/message/dm-messages';
 import mongoose from 'mongoose';
-import { DmModel } from 'models/message/DM'; 
+import { DmModel } from 'models/message/DM';
 import { PlansModel } from 'models/Plans';
+import { CdnService } from 'src/cdn/cdn.service';
+import { JobService } from 'src/job/job.service';
+import { UserReportModel } from 'models/user-report';
 @Injectable()
 export class DMService {
-  constructor() {}
+  constructor(
+    private readonly cdnService: CdnService,
+    private readonly jobService: JobService,
+  ) {}
 
   async searchUserOrGroup(req: Request, res: Response) {
     try {
@@ -202,27 +208,27 @@ export class DMService {
         },
       },
 
-     // Project relevant fields
-     {
-      $project: {
-        _id: 1,
-        conversationType: 1,
-        groupName: 1,
-        participants: {
+      // Project relevant fields
+      {
+        $project: {
           _id: 1,
-          displayName: 1,
-          username: 1,
-          avatarImageUrl: 1,
-          online: 1,
+          conversationType: 1,
+          groupName: 1,
+          participants: {
+            _id: 1,
+            displayName: 1,
+            username: 1,
+            avatarImageUrl: 1,
+            online: 1,
+            updatedAt: 1,
+            address: 1,
+          },
+          lastMessageAt: 1,
+          createdAt: 1,
           updatedAt: 1,
-          address: 1,
+          messages: { $slice: ['$messages', 20] }, // Last 20 messages
         },
-        lastMessageAt: 1,
-        createdAt: 1,
-        updatedAt: 1,
-        messages: { $slice: ['$messages', 20] }, // Last 20 messages
       },
-    },
     ];
 
     // Execute aggregation using DmModel
@@ -258,9 +264,9 @@ export class DMService {
       const newGroupChat = await DmModel.create({
         groupName,
         description: reqParam(req, 'description') || '', // Optional description
-        participants: [...users,creatorExists._id,],
-        conversationType:"group",
-        plans: [...validPlans,], // Assuming only one plan can be associated with a group
+        participants: [...users, creatorExists._id],
+        conversationType: 'group',
+        plans: [...validPlans], // Assuming only one plan can be associated with a group
         createdBy: creatorExists._id,
       });
 
@@ -277,19 +283,142 @@ export class DMService {
       });
     }
   }
-  // async getGroups(req: Request, res: Response) {
-  //   const address = reqParam(req, 'address').toLowerCase();
-  //   const user = await AccountModel.findOne({ address: address }, { _id: 1 });
-  //   // Define your aggregation pipeline
-  //   const pipeline: any = [{ $match: { members: { $in: [user._id] } } }];
 
-  //   // Execute aggregation using DmModel
-  //   const dms = await DmModel.aggregate(pipeline);
-  //   res.status(200).json(dms);
-  // }
+  async uploadDm(req: Request, res: Response, files: { files: Express.Multer.File[] }) {
+    const conversationId = reqParam(req, 'conversationId');
+    const senderId = reqParam(req, 'senderId');
+    const amount = reqParam(req, 'amount');
+    const token = reqParam(req, 'token');
+    const isPaid = reqParam(req, 'isPaid');
+    const user = await AccountModel.findOne({ address: senderId.toLowerCase() }, { _id: 1 });
+    const msg = await MessageModel.create({
+      sender: user._id,
+      conversation: conversationId,
+      msgType: 'media',
+      uploadStatus: 'pending',
+      isRead: false,
+    });
+
+    const { files: data } = files;
+    // Map files to MediaJobPayload[]
+    const payloads: {
+      buffer: Buffer;
+      slug: string;
+      filename: string;
+      mimeType: string;
+      messageId?: string;
+    }[] = data.map(file => ({
+      buffer: file.buffer,
+      slug: `${conversationId}-${file.originalname}`, // Generate a unique slug
+      filename: file.originalname,
+      mimeType: file.mimetype,
+      messageId: msg._id.toString(), // Optional: Define if you have pre-generated IDs
+    }));
+
+    // Add jobs to the queue
+    await this.jobService.bulkAddMediaUploadJob(payloads);
+
+    return res.status(200).json(msg);
+  }
+  async blockDm(req: Request, res: Response) {
+    try {
+      const conversationId = reqParam(req, 'conversationId'); // Get conversation ID from request
+      const reason = reqParam(req, 'reason'); // Get reason for blocking
+      const address = reqParam(req, 'address'); // Get user's address from request
+
+      const user = await AccountModel.findOne({ address: address.toLowerCase() });
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const conversation = await DmModel.findById(conversationId);
+      if (!conversation) {
+        return res.status(404).json({ error: 'Conversation not found' });
+      }
+
+      // Check if the block entry already exists
+      const existingBlock = await UserReportModel.findOne({
+        conversation: conversationId,
+        reportedBy: user._id,
+        action: 'block',
+      });
+
+      if (existingBlock) {
+        return res.status(400).json({
+          error: 'You have already blocked this conversation or user.',
+        });
+      }
+
+      // If conversation type is group, block the group
+      if (conversation.conversationType === 'group') {
+        const updatedReport = await UserReportModel.findOneAndUpdate(
+          {
+            conversation: conversationId,
+            reportedBy: user._id,
+          },
+          {
+            $set: {
+              action: 'block',
+              reason: reason || 'No reason provided',
+              resolved: false,
+              isGlobal: false,
+              reportedUser: null, // No specific user for group blocks
+              conversation: conversationId,
+            },
+          },
+          { new: true, upsert: true }, // Create a new document if one doesn't exist
+        );
+
+        return res.status(200).json({
+          message: 'Group successfully blocked.',
+          blocked: true,
+          conversationId: conversationId,
+          reportId: updatedReport._id,
+        });
+      }
+
+      // For DM, find the other participant to block
+      const reportedUserId = conversation.participants.find(
+        participantId => participantId.toString() !== user._id.toString(),
+      );
+
+      if (!reportedUserId) {
+        return res.status(404).json({ error: 'No other user found in this conversation.' });
+      }
+
+      // Update or create a block entry for the DM
+      const updatedReport = await UserReportModel.findOneAndUpdate(
+        {
+          conversation: conversationId,
+          reportedBy: user._id,
+        },
+        {
+          $set: {
+            action: 'block',
+            reason: reason || 'No reason provided',
+            resolved: false,
+            isGlobal: false,
+            reportedUser: reportedUserId, // Block the other participant in the DM
+            conversation: conversationId,
+          },
+        },
+        { new: true, upsert: true }, // Create a new document if one doesn't exist
+      );
+
+      return res.status(200).json({
+        message: 'User successfully blocked in the DM.',
+        blocked: true,
+        conversationId: conversationId,
+        reportId: updatedReport._id,
+      });
+    } catch (error) {
+      console.error('Error in blockDm:', error);
+      return res.status(500).json({
+        error: 'An error occurred while processing your request.',
+      });
+    }
+  }
+  async getVideoStream(req: Request, res: Response) {
+    res.status(400).json({ success: false, message: 'getVideoStream  not completed yat.' });
+  }
 }
-
-
-// conversationType: { $first: '$conversationType' },
-// groupName: { $first: '$groupName' },
-// updatedAt: { $first: '$updatedAt' },

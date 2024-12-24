@@ -9,40 +9,43 @@ export class Message extends Document {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'DM', required: true })
   conversation: mongoose.Schema.Types.ObjectId;
 
+  @Prop({ type: String, trim: true })
+  content: string;
+
   @Prop({
-    type: String, 
-    trim: true,
-  })
-  content: string; 
-  @Prop({
-    type: [String],
-    validate: {
-      validator: function (value: string[]) {
-        if (
-          this.msgType === 'gif' ||
-          this.msgType === 'image' ||
-          this.msgType === 'video' ||
-          this.msgType === 'audio' ||
-          this.msgType === 'mixed'
-        ) {
-          return value && value.length > 0;
-        }
-        return true;
+    type: [
+      {
+        url: { type: String, required: true }, // URL of the media
+        type: { type: String, required: true }, // Type of the media (e.g., 'image', 'video', etc.)
+        mimeType: { type: String, required: true }, // MIME type of the file (e.g., 'image/jpeg', 'video/mp4', etc.) 
       },
-      message: 'At least one media URL is required for GIF, image, video, audio, or mixed messages.',
-    },
+    ],
   })
-  mediaUrls: string[]; // Array to store one or more media URLs
+  mediaUrls: {
+    url: string;
+    type: string;
+    mimeType: string; 
+  }[]; // Array of media objects with additional details
 
   @Prop({
     type: String,
-    enum: ['msg', 'gif', 'image', 'video', 'audio', 'mixed'],
+    enum: ['pending', 'success', 'failure'],
+    default: 'pending',
+  })
+  uploadStatus: 'pending' | 'success' | 'failure';
+
+  @Prop({
+    type: String,
+    enum: ['msg', 'gif', 'media'],
     default: 'msg',
   })
-  msgType: 'msg' | 'gif' | 'image' | 'video' | 'audio' | 'mixed';
+  msgType: 'msg' | 'media' | 'gif';
 
   @Prop({ type: Boolean, default: false })
   isRead: boolean;
+
+  @Prop({ type: String, default: null })
+  failureReason: string; // Field to store error details in case of failure
 }
 
 export const MessageSchema = SchemaFactory.createForClass(Message);

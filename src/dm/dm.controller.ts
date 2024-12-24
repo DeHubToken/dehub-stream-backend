@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Req, Res } from '@nestjs/common';
+import { Controller, Get, Post, Req, Res, UploadedFiles, UseInterceptors } from '@nestjs/common';
 import { DMService } from './dm.service';
 import { Request, Response } from 'express';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 
 @Controller()
 export class DMController {
@@ -41,19 +42,6 @@ export class DMController {
       });
     }
   }
-
-  // @Get('/dm/group/:address')
-  // async getGroups(@Req() req: Request, @Res() res: Response) {
-  //   try {
-  //     return await this.dmServices.getGroups(req, res);
-  //   } catch (error) {
-  //     return res.status(500).json({
-  //       message: 'Failed to fetch contacts for the specified address',
-  //       error: error.message,
-  //     });
-  //   }
-  // }
-
   @Post('/dm/group')
   async createGroupChat(@Req() req: Request, @Res() res: Response) {
     try {
@@ -61,6 +49,47 @@ export class DMController {
     } catch (error) {
       return res.status(500).json({
         message: 'Failed to create the group chat',
+        error: error.message,
+      });
+    }
+  }
+
+  @Post('/dm/upload')
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'files', maxCount: 5 }, // Adjust the name and max count as per your requirement
+    ]),
+  )
+  async uploadDm(@Req() req: Request, @Res() res: Response, @UploadedFiles() files: { files: Express.Multer.File[] }) {
+    try {
+      // console.log('files', files); // Check the received files here
+      return await this.dmServices.uploadDm(req, res, files);
+    } catch (error) {
+      return res.status(500).json({
+        message: 'Failed to create the group chat',
+        error: error.message,
+      });
+    }
+  }
+  @Get('/dm/dm-videos')
+  async getVideosStream(@Req() req: Request, @Res() res: Response) {
+    try {
+      return await this.dmServices.getVideoStream(req, res);
+    } catch (error) {
+      return res.status(500).json({
+        message: 'Failed to search users or groups',
+        error: error.message,
+      });
+    }
+  }
+
+  @Post('/dm/block')
+  async blockDm(@Req() req: Request, @Res() res: Response) {
+    try {
+      return await this.dmServices.blockDm(req, res);
+    } catch (error) {
+      return res.status(500).json({
+        message: 'Failed to search users or groups',
         error: error.message,
       });
     }

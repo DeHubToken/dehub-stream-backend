@@ -898,7 +898,7 @@ export class NftService {
       let sendImage = imageBuffer;
       if (shouldApplyBlur()) {
       //   console.log('Applying blur and compression');
-      const compressedImage = await makeBlurAndCompress(imageBuffer, { blur: 8, compress: 0 });
+      const compressedImage = await makeBlurAndCompress(imageBuffer, { blur: 30, compress: 0 });
       sendImage = compressedImage;
       }
 
