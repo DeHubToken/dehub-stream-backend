@@ -421,10 +421,13 @@ export class NftService {
       console.log('sortMode', { sortMode, postType, searchQuery });
       let sortRule: any = { createdAt: -1 };
       searchQuery['$match'] = {
-        $and: [{ status: 'minted', ...postFilter }, { $or: [{ isHidden: false }, { isHidden: { $exists: false } }] }],
+        $and: [
+          { status: 'minted' },
+          { $or: [{ isHidden: false }, { isHidden: { $exists: false } }] },
+        ],
       };
 
-      console.log('Range- sortMode', range, searchQuery);
+      console.log('Range - sotMode - unit - page - search', range, sortMode, unit, page, search)
       switch (sortMode) {
         case 'trends':
           if (range) {
@@ -477,13 +480,16 @@ export class NftService {
           sortRule = { likes: -1 };
           break;
         case 'ppv':
-          searchQuery['$match'][`streamInfo.${streamInfoKeys.isPayPerView}`] = true;
+          searchQuery['$match'][`streamInfo.${streamInfoKeys.isPayPerView}`] =
+            true;
           break;
         case 'bounty':
-          searchQuery['$match'][`streamInfo.${streamInfoKeys.isAddBounty}`] = true;
+          searchQuery['$match'][`streamInfo.${streamInfoKeys.isAddBounty}`] =
+            true;
           break;
         case 'locked':
-          searchQuery['$match'][`streamInfo.${streamInfoKeys.isLockContent}`] = true;
+          searchQuery['$match'][`streamInfo.${streamInfoKeys.isLockContent}`] =
+            true;
           break;
       }
 
@@ -497,19 +503,26 @@ export class NftService {
       if (bulkIdList) {
         let idList = bulkIdList.split('-');
         if (idList.length > 0) {
-          idList = idList.map(e => '0x' + e);
+          idList = idList.map((e) => '0x' + e);
           searchQuery['$match'] = { id: { $in: idList } };
         }
       }
 
-      if ((verifiedOnly + '').toLowerCase() === 'true' || verifiedOnly === '1') {
+      if (
+        (verifiedOnly + '').toLowerCase() === 'true' ||
+        verifiedOnly === '1'
+      ) {
         searchQuery['$match'] = { ...searchQuery['$match'], verified: true };
       }
 
       if (search) {
         if (!isValidSearch(search)) return res.json({ result: [] });
         var re: any = new RegExp(search, 'gi');
-        let orOptions: any = [{ name: re }, { description: re }, { owner: normalizeAddress(re) }];
+        let orOptions: any = [
+          { name: re },
+          { description: re },
+          { owner: normalizeAddress(re) },
+        ];
         if (Number(search) > 0) orOptions.push({ tokenId: Number(search) });
         searchQuery['$match'] = { ...searchQuery['$match'], $or: orOptions };
 
@@ -526,7 +539,10 @@ export class NftService {
 
         // Include userLike logic
         for (let video of videos) {
-          const userLike = await VoteModel.findOne({ tokenId: video.tokenId, address });
+          const userLike = await VoteModel.findOne({
+            tokenId: video.tokenId,
+            address,
+          });
           video.isLiked = Boolean(userLike);
         }
 
@@ -546,7 +562,10 @@ export class NftService {
       );
       // Include userLike logic
       for (let nft of ret) {
-        const userLike = await VoteModel.findOne({ tokenId: nft.tokenId, address });
+        const userLike = await VoteModel.findOne({
+          tokenId: nft.tokenId,
+          address,
+        });
         nft.isLiked = Boolean(userLike);
       }
       res.send({ result: ret });
@@ -555,6 +574,7 @@ export class NftService {
       res.status(500).send({ error: e.message });
     }
   }
+
 
   async getMyWatchedNfts(req: Request, res: Response) {
     let watcherAddress: any = req.query.watcherAddress || req.query.watcherAddress;
