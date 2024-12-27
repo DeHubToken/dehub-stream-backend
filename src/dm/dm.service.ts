@@ -207,7 +207,74 @@ export class DMService {
           },
         },
       },
-
+      //include blocked users to disable chat.
+      {
+        $lookup: {
+          from: 'userreports', // Collection name for user reports
+          let: { conversationId: '$_id' }, // Pass the _id of the current document
+          localField: '_id',
+          foreignField: 'conversation',
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$conversation', '$$conversationId'] }, // Match the conversation ID
+                    { $ne: ['$action', 'unblock'] }, // Exclude unblocked users
+                    { $ne: ['$resolved', true] }, // Exclude resolved reports
+                  ],
+                },
+              },
+            },
+            {
+              $group: {
+                _id: { conversation: '$conversation', reportedBy: '$reportedBy' },
+                firstReport: { $first: '$$ROOT' },
+              },
+            },
+            {
+              $lookup: {
+                from: 'accounts',
+                localField: 'firstReport.reportedBy',
+                foreignField: '_id',
+                as: 'reportedByDetails',
+              },
+            },
+            {
+              $lookup: {
+                from: 'accounts',
+                localField: 'firstReport.reportedUser',
+                foreignField: '_id',
+                as: 'reportedUserDetails',
+              },
+            },
+            {
+              $project: {
+                _id:  '$firstReport._id',
+                conversation: '$firstReport.conversation',
+                reportedBy: '$firstReport.reportedBy',
+                action: '$firstReport.action',
+                createdAt: '$firstReport.createdAt',
+                isGlobal: '$firstReport.isGlobal',
+                reason: '$firstReport.reason',
+                reportedUser: '$firstReport.reportedUser',
+                resolved: '$firstReport.resolved',
+                updatedAt: '$firstReport.updatedAt',
+                // Flatten the arrays and select only the required fields
+                reportedUserDetails: {
+                  _id: { $arrayElemAt: ['$reportedUserDetails._id', 0] },
+                  address: { $arrayElemAt: ['$reportedUserDetails.address', 0] },
+                },
+                reportedByDetails: {
+                  _id: { $arrayElemAt: ['$reportedByDetails._id', 0] },
+                  address: { $arrayElemAt: ['$reportedByDetails.address', 0] },
+                },
+              },
+            },
+          ],
+          as: 'blockList', // Alias for the user reports
+        },
+      },
       // Project relevant fields
       {
         $project: {
@@ -226,6 +293,7 @@ export class DMService {
           lastMessageAt: 1,
           createdAt: 1,
           updatedAt: 1,
+          blockList: 1,
           messages: { $slice: ['$messages', 20] }, // Last 20 messages
         },
       },
@@ -374,6 +442,7 @@ export class DMService {
           blocked: true,
           conversationId: conversationId,
           reportId: updatedReport._id,
+          success: true,
         });
       }
 
@@ -408,6 +477,7 @@ export class DMService {
       return res.status(200).json({
         message: 'User successfully blocked in the DM.',
         blocked: true,
+        success: true,
         conversationId: conversationId,
         reportId: updatedReport._id,
       });
@@ -420,5 +490,97 @@ export class DMService {
   }
   async getVideoStream(req: Request, res: Response) {
     res.status(400).json({ success: false, message: 'getVideoStream  not completed yat.' });
+  }
+  async unBlockDm(req: Request, res: Response) {
+    try {
+      const conversationId = reqParam(req, 'conversationId'); // Get conversation ID from request
+      const address = reqParam(req, 'address'); // Get user's address from request
+      console.log('object', { conversationId, address });
+      const user = await AccountModel.findOne({ address: address.toLowerCase() });
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const conversation = await DmModel.findById(conversationId);
+      if (!conversation) {
+        return res.status(404).json({ error: 'Conversation not found' });
+      }
+
+      // Check if a block entry exists
+      const existingBlock = await UserReportModel.findOne({
+        conversation: conversationId,
+        reportedBy: user._id,
+        action: 'block',
+      });
+
+      if (!existingBlock) {
+        return res.status(400).json({
+          error: 'This conversation or user is not currently blocked.',
+        });
+      }
+
+      // If conversation type is group, unblock the group
+      if (conversation.conversationType === 'group') {
+        const updatedReport = await UserReportModel.findOneAndUpdate(
+          {
+            conversation: conversationId,
+            reportedBy: user._id,
+          },
+          {
+            $set: {
+              action: 'unblock',
+              resolved: true,
+            },
+          },
+          { new: true },
+        );
+        const out = {
+          message: 'Group successfully unblocked.',
+          unblocked: true,
+          conversationId: conversationId,
+          reportId: updatedReport._id,
+          success: true,
+        };
+        console.log(out);
+        return res.status(200).json(out);
+      }
+
+      // For DM, find the other participant to unblock
+      const reportedUserId = conversation.participants.find(
+        participantId => participantId.toString() !== user._id.toString(),
+      );
+
+      if (!reportedUserId) {
+        return res.status(404).json({ error: 'No other user found in this conversation.' });
+      }
+
+      // Update or create an unblock entry for the DM
+      const updatedReport = await UserReportModel.findOneAndUpdate(
+        {
+          conversation: conversationId,
+          reportedBy: user._id,
+        },
+        {
+          $set: {
+            action: 'unblock',
+            resolved: true,
+          },
+        },
+        { new: true },
+      );
+
+      return res.status(200).json({
+        message: 'User successfully unblocked in the DM.',
+        unblocked: true,
+        success: true,
+        conversationId: conversationId,
+        reportId: updatedReport._id,
+      });
+    } catch (error) {
+      console.error('Error in unBlockDm:', error);
+      return res.status(500).json({
+        error: 'An error occurred while processing your request.',
+      });
+    }
   }
 }

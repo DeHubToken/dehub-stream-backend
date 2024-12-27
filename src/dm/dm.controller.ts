@@ -6,7 +6,6 @@ import { FileFieldsInterceptor } from '@nestjs/platform-express';
 @Controller()
 export class DMController {
   constructor(private readonly dmServices: DMService) {}
-
   @Get('/dm/search')
   async searchDm(@Req() req: Request, @Res() res: Response) {
     try {
@@ -53,7 +52,6 @@ export class DMController {
       });
     }
   }
-
   @Post('/dm/upload')
   @UseInterceptors(
     FileFieldsInterceptor([
@@ -87,6 +85,17 @@ export class DMController {
   async blockDm(@Req() req: Request, @Res() res: Response) {
     try {
       return await this.dmServices.blockDm(req, res);
+    } catch (error) {
+      return res.status(500).json({
+        message: 'Failed to search users or groups',
+        error: error.message,
+      });
+    }
+  }
+  @Get('/dm/un-block/:conversationId')
+  async unBlock(@Req() req: Request, @Res() res: Response) {
+    try {
+      return await this.dmServices.unBlockDm(req, res);
     } catch (error) {
       return res.status(500).json({
         message: 'Failed to search users or groups',
