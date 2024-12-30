@@ -5,6 +5,7 @@ import { SocketEvent } from './types';
 import { DmModel } from 'models/message/DM';
 import { AccountModel } from 'models/Account';
 import { Types } from 'mongoose';
+import { ACTION_TYPE, UserReportModel } from 'models/user-report';
 
 @Injectable()
 export class DMSocketService {
@@ -12,19 +13,24 @@ export class DMSocketService {
   constructor(dmNamespace) {
     this.dmNamespace = dmNamespace;
   }
-
   async createAndStart({ socket, req, session }: { socket: any; req: any; session: any }) {
-    // Extract the two users' IDs from the data (assuming data contains the users' _id)
-
+    // Extract the second user's ID from the request
     const { _id: userId2 } = req;
-    if (!req._id) {
+
+    if (!userId2) {
       socket.emit(SocketEvent.error, { msg: 'Invalid user.' });
+      return;
     }
+
+    // Check if a DM session already exists between the two users
     const existingDm = await DmModel.findOne({
-      participants: { $all: [session.user._id, userId2] },
+      participants: {
+        $all: [{ $elemMatch: { participant: session.user._id } }, { $elemMatch: { participant: userId2 } }],
+      },
       conversationType: 'dm',
     }).lean();
 
+    // Retrieve the second user's information
     const user2 = await AccountModel.findById(userId2, {
       _id: 1,
       username: 1,
@@ -40,9 +46,15 @@ export class DMSocketService {
         data: { ...existingDm, participants: [user2] },
       });
     } else {
+      // Prepare participants array
+      const participants = [
+        { participant: session.user._id, role: 'member' }, // Assign 'member' role to the initiator
+        { participant: userId2, role: 'member' }, // Assign 'member' role to the other user
+      ];
+
       // If no DM session exists, create a new one
       const newDm: any = new DmModel({
-        participants: [session.user._id, userId2],
+        participants,
         createdBy: session.user._id,
         conversationType: 'dm',
         lastMessageAt: new Date(),
@@ -53,13 +65,17 @@ export class DMSocketService {
 
       // Emit the event to notify the client
       socket.emit(SocketEvent.createAndStart, {
-        message: 'Created new DM',
+        msg: 'Created new DM',
         data: { ...newDm._doc, participants: [user2] },
       });
     }
   }
 
-  async sendMessage({ socket, req, session }: { socket: any; req: any; session: any }) {
+  async sendMessage({ socket, req, session, blockList }: { socket: any; req: any; session: any; blockList: any }) {
+    if (!socket || !req || !session) {
+      return;
+    }
+
     const userId = session.user._id;
     const state: any = {
       conversation: req.dmId,
@@ -67,27 +83,41 @@ export class DMSocketService {
       isRead: false,
       content: req.content,
       msgType: req.type,
-    };
-    // console.log(state)
-    console.log(req);
+    }; 
     if (state.msgType == 'gif') {
       state.mediaUrls = [
         {
           url: req.gif, // Assuming req.gif contains the URL of the uploaded GIF
           type: 'gif',
-          mimeType: 'image/gif', // MIME type for GIF 
+          mimeType: 'image/gif', // MIME type for GIF
         },
       ];
     }
     const newMsg: any = await MessageModel.create(state);
     socket.emit(SocketEvent.sendMessage, { ...newMsg?._doc, author: 'me' });
     const dm = await DmModel.findById(req.dmId);
-    let ids = dm.participants.filter(d => d.toString() != userId.toString());
-    const socketsUsers = await this.getOnlineSocketsUsers(session, ids);
-    socketsUsers.forEach(su => {
-      // su.socketIds is assumed to be an array of socket IDs for this user
-      if (su.socketIds && su.socketIds.length > 0) {
-        // Emitting the message to all socket IDs for this user
+    let ids = dm.participants.reduce((acc, current) => {
+      const { participant } = current;
+      if (participant && participant.toString() !== userId.toString()) {
+        return [...acc, participant];
+      }
+      return acc;
+    }, []);
+     
+    let socketsUsers = await this.getOnlineSocketsUsers(session, ids);
+    socketsUsers = socketsUsers.filter(user => {
+      return !blockList.some(blocked => {
+        if (blocked.reportedBy) {
+          return blocked.reportedBy.toString() === user._id.toString();
+        }
+
+        if (blocked.reportedUser) {
+          return blocked.reportedUser.toString() === user._id.toString();
+        }
+      });
+    });
+    socketsUsers.forEach(su => { 
+      if (su.socketIds && su.socketIds.length > 0) { 
         socket.in(su.socketIds).emit(SocketEvent.sendMessage, { ...newMsg?._doc, author: 'other' });
       }
     });
@@ -102,5 +132,16 @@ export class DMSocketService {
       }
       return user;
     });
+  }
+
+  // Helper method to check for blocked users in a specific conversation (DM or group)
+  async getBlockedUsersForConversation(conversationId: string): Promise<any[]> {
+    // Explicit return type of UserReport[]
+    const blocked = await UserReportModel.find({
+      conversation: conversationId,
+      resolved: false, // Ensure the block is unresolved
+    }).lean();
+
+    return blocked;
   }
 }

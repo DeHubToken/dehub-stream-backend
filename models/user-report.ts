@@ -19,16 +19,19 @@ export class UserReport extends Document {
   @Prop({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Account',
-    required: true,
   })
   reportedBy: mongoose.Schema.Types.ObjectId; // User or admin initiating the action
 
   @Prop({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Account',
-    required: true,
   })
-  reportedUser: mongoose.Schema.Types.ObjectId; // User being reported or blocked
+  reportedUser: mongoose.Schema.Types.ObjectId;
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Account',
+  })
+  userReportedBy: mongoose.Schema.Types.ObjectId; // User being reported or blocked
 
   @Prop({
     type: String,
@@ -68,6 +71,12 @@ export class UserReport extends Document {
     default: false,
   })
   isGlobal: boolean; // Indicates if the block is platform-wide (e.g., admin-global block)
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Message',
+    required: false,
+  })
+  lastMessage: mongoose.Schema.Types.ObjectId; // Specific group or conversation where the action occurred
 }
 
 export const UserReportSchema = SchemaFactory.createForClass(UserReport);

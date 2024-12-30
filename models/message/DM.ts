@@ -4,9 +4,26 @@ import mongoose, { Document, Model } from 'mongoose';
 @Schema({ timestamps: true })
 export class DM extends Document {
   @Prop({
-    type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Account', required: true }],
+    type: [
+      {
+        participant: { type: mongoose.Schema.Types.ObjectId, ref: 'Account', required: true },
+        role: { type: String, enum: ['admin', 'member'], default: 'member' },
+      },
+    ],
+    required: true,
+    validate: {
+      validator: function (
+        this: DM,
+        participants: Array<{ participant: mongoose.Schema.Types.ObjectId; role: string }>,
+      ) {
+        if (this.conversationType == 'group') {
+          return participants.some(p => p.role === 'admin');
+        }
+      },
+      message: 'At least one participant must have the role "admin".',
+    },
   })
-  participants: mongoose.Schema.Types.ObjectId[];
+  participants: Array<{ participant: mongoose.Schema.Types.ObjectId; role: string }>;
 
   @Prop({
     type: String,
@@ -45,10 +62,28 @@ export class DM extends Document {
 
   @Prop({
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    ref: 'Account',
     required: true,
   })
   createdBy: mongoose.Schema.Types.ObjectId;
+
+  @Prop({
+    type: Map,
+    of: String,
+    default: function (this: DM) {
+      const roles = new Map();
+      // Assign 'admin' role to the creator
+      roles.set(this.createdBy.toString(), 'admin');
+      // Assign 'member' role to all other participants by default
+      this.participants?.forEach(participant => {
+        if (participant.toString() !== this.createdBy.toString()) {
+          roles.set(participant.toString(), 'member');
+        }
+      });
+      return roles;
+    },
+  })
+  roles: Map<string, string>;
 
   @Prop({ type: Date, default: Date.now })
   lastMessageAt: Date;

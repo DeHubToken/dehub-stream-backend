@@ -46,6 +46,66 @@ export class DMService {
       });
     }
   }
+  async createGroupChat(req: Request, res: Response) {
+    try {
+      // Parse input data
+      const groupName = reqParam(req, 'groupName');
+      const plans = reqParam(req, 'plans');
+      const users = reqParam(req, 'users');
+      const createdBy = reqParam(req, 'address');
+
+      // Basic validation
+      if (!groupName || !users || users.length < 2) {
+        return res.status(400).json({ success: false, message: 'Group name and at least 2 members are required.' });
+      }
+
+      // Optional: Validate the `createdBy` user
+      const creatorExists = await AccountModel.findOne({ address: createdBy }, { _id: 1 });
+      if (!creatorExists) {
+        return res.status(400).json({ success: false, message: 'Creator does not exist.' });
+      }
+
+      // Optional: Validate `plans` (if you want to ensure they are valid plan IDs)
+      const validPlans = await PlansModel.find({ id: { $in: plans } }, { _id: 1 });
+      if (validPlans.length !== plans.length) {
+        return res.status(400).json({ success: false, message: 'One or more plans are invalid.' });
+      }
+
+      // Prepare participants array
+      const participants = users.map(userId => ({
+        participant: userId,
+        role: 'member', // Default role for other members
+      }));
+
+      // Add the creator as an admin
+      participants.push({
+        participant: creatorExists._id,
+        role: 'admin',
+      });
+
+      // Create the group chat in the database
+      const newGroupChat = await DmModel.create({
+        groupName,
+        description: reqParam(req, 'description') || '', // Optional description
+        participants: participants,
+        conversationType: 'group',
+        plans: [...validPlans], // Assuming only one plan can be associated with a group
+        createdBy: creatorExists._id,
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: 'Group chat created successfully!',
+        data: newGroupChat,
+      });
+    } catch (error) {
+      console.error('Error creating group chat:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'An error occurred while creating the group chat.',
+      });
+    }
+  }
 
   async getMessagesDm(req: Request, res: Response) {
     try {
@@ -122,16 +182,22 @@ export class DMService {
     // Define your aggregation pipeline
     const pipeline: any = [
       // Match messages where the session user is part of the conversation
-      { $match: { participants: { $in: [user._id] } } }, // Match documents based on session user
-      { $sort: { createdAt: -1 } }, // Sort messages by creation time in descending order
+      {
+        $match: {
+          'participants.participant': user._id,
+        },
+      },
+
+      // Sort messages by creation time in descending order
+      { $sort: { createdAt: -1 } },
 
       // Lookup messages based on the conversation
       {
         $lookup: {
-          from: 'messages', // Collection name for messages
-          localField: '_id', // Field in DM model
-          foreignField: 'conversation', // Field in Message model
-          as: 'messages', // Alias for the result of the lookup
+          from: 'messages',
+          localField: '_id',
+          foreignField: 'conversation',
+          as: 'messages',
         },
       },
 
@@ -143,13 +209,13 @@ export class DMService {
         },
       },
 
-      // Lookup participants' details from the Account collection
+      // Lookup participants' details from the Account collection and include role
       {
         $lookup: {
-          from: 'accounts', // Collection name for participants (Account model)
-          localField: 'participants', // Field in DM model (participant ObjectId)
-          foreignField: '_id', // Field in Account model (_id is the reference for participant)
-          as: 'participantDetails', // Alias for the participants' details
+          from: 'accounts',
+          localField: 'participants.participant', // Use participant._id
+          foreignField: '_id',
+          as: 'participantDetails',
         },
       },
 
@@ -161,20 +227,41 @@ export class DMService {
         },
       },
 
-      // Filter out the session user from participantDetails
+      // Add a field to determine whether the user should be included based on conversation type
       {
-        $match: {
-          'participantDetails._id': { $ne: user._id },
+        $addFields: {
+          includeParticipant: {
+            $cond: {
+              if: { $eq: ['$conversationType', 'dm'] },
+              then: { $ne: ['$participantDetails._id', user._id] }, // Exclude the session user in dm
+              else: true, // Include all participants in group
+            },
+          },
         },
       },
 
+      // Match only participants who should be included
+      {
+        $match: {
+          includeParticipant: true,
+        },
+      },
       // Regroup the data to include only the relevant fields
       {
         $group: {
           _id: '$_id',
           conversationType: { $first: '$conversationType' },
           groupName: { $first: '$groupName' },
-          participants: { $addToSet: '$participantDetails' },
+          participants: {
+            $addToSet: {
+              participant: {
+                _id: '$participantDetails._id',
+                username: '$participantDetails.username',
+                address: '$participantDetails.address',
+              },
+              role: '$participants.role', // Include role along with participant details
+            },
+          },
           lastMessageAt: { $first: '$lastMessageAt' },
           createdAt: { $first: '$createdAt' },
           updatedAt: { $first: '$updatedAt' },
@@ -182,7 +269,7 @@ export class DMService {
         },
       },
 
-      // Map messages to include an "author" field
+      // Map messages to include an "author" field based on the sender
       {
         $addFields: {
           messages: {
@@ -207,11 +294,12 @@ export class DMService {
           },
         },
       },
-      //include blocked users to disable chat.
+
+      // Include blocked users to disable chat
       {
         $lookup: {
-          from: 'userreports', // Collection name for user reports
-          let: { conversationId: '$_id' }, // Pass the _id of the current document
+          from: 'userreports',
+          let: { conversationId: '$_id' },
           localField: '_id',
           foreignField: 'conversation',
           pipeline: [
@@ -219,9 +307,9 @@ export class DMService {
               $match: {
                 $expr: {
                   $and: [
-                    { $eq: ['$conversation', '$$conversationId'] }, // Match the conversation ID
-                    { $ne: ['$action', 'unblock'] }, // Exclude unblocked users
-                    { $ne: ['$resolved', true] }, // Exclude resolved reports
+                    { $eq: ['$conversation', '$$conversationId'] },
+                    { $ne: ['$action', 'unblock'] },
+                    { $ne: ['$resolved', true] },
                   ],
                 },
               },
@@ -250,7 +338,7 @@ export class DMService {
             },
             {
               $project: {
-                _id:  '$firstReport._id',
+                _id: '$firstReport._id',
                 conversation: '$firstReport.conversation',
                 reportedBy: '$firstReport.reportedBy',
                 action: '$firstReport.action',
@@ -260,7 +348,6 @@ export class DMService {
                 reportedUser: '$firstReport.reportedUser',
                 resolved: '$firstReport.resolved',
                 updatedAt: '$firstReport.updatedAt',
-                // Flatten the arrays and select only the required fields
                 reportedUserDetails: {
                   _id: { $arrayElemAt: ['$reportedUserDetails._id', 0] },
                   address: { $arrayElemAt: ['$reportedUserDetails.address', 0] },
@@ -272,24 +359,17 @@ export class DMService {
               },
             },
           ],
-          as: 'blockList', // Alias for the user reports
+          as: 'blockList',
         },
       },
-      // Project relevant fields
+
+      // Project relevant fields, including last 20 messages
       {
         $project: {
           _id: 1,
           conversationType: 1,
           groupName: 1,
-          participants: {
-            _id: 1,
-            displayName: 1,
-            username: 1,
-            avatarImageUrl: 1,
-            online: 1,
-            updatedAt: 1,
-            address: 1,
-          },
+          participants: 1, // Now includes participant details and role
           lastMessageAt: 1,
           createdAt: 1,
           updatedAt: 1,
@@ -302,54 +382,6 @@ export class DMService {
     // Execute aggregation using DmModel
     const dms = await DmModel.aggregate(pipeline);
     res.status(200).json(dms);
-  }
-
-  async createGroupChat(req: Request, res: Response) {
-    try {
-      // Parse input data
-      const groupName = reqParam(req, 'groupName');
-      const plans = reqParam(req, 'plans');
-      const users = reqParam(req, 'users');
-      const createdBy = reqParam(req, 'address');
-
-      // Basic validation
-      if (!groupName || !users || users.length < 2) {
-        return res.status(400).json({ success: false, message: 'Group name and at least 2 members are required.' });
-      }
-
-      // Optional: Validate the `createdBy` user
-      const creatorExists = await AccountModel.findOne({ address: createdBy }, { _id: 1 });
-      if (!creatorExists) {
-        return res.status(400).json({ success: false, message: 'Creator does not exist.' });
-      }
-
-      // Optional: Validate `plans` (if you want to ensure they are valid plan IDs)
-      const validPlans = await PlansModel.find({ id: { $in: plans } }, { _id: 1 });
-      if (validPlans.length !== plans.length) {
-        return res.status(400).json({ success: false, message: 'One or more plans are invalid.' });
-      }
-      // Create the group chat in the database
-      const newGroupChat = await DmModel.create({
-        groupName,
-        description: reqParam(req, 'description') || '', // Optional description
-        participants: [...users, creatorExists._id],
-        conversationType: 'group',
-        plans: [...validPlans], // Assuming only one plan can be associated with a group
-        createdBy: creatorExists._id,
-      });
-
-      return res.status(201).json({
-        success: true,
-        message: 'Group chat created successfully!',
-        data: newGroupChat,
-      });
-    } catch (error) {
-      console.error('Error creating group chat:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'An error occurred while creating the group chat.',
-      });
-    }
   }
 
   async uploadDm(req: Request, res: Response, files: { files: Express.Multer.File[] }) {
@@ -416,7 +448,14 @@ export class DMService {
           error: 'You have already blocked this conversation or user.',
         });
       }
-
+      const lastMessage = await MessageModel.findOne(
+        {
+          conversation: conversationId,
+        },
+        { _id: 1 },
+      )
+        .sort({ createdAt: -1 }) // Assuming messages have a `createdAt` field
+        .lean();
       // If conversation type is group, block the group
       if (conversation.conversationType === 'group') {
         const updatedReport = await UserReportModel.findOneAndUpdate(
@@ -432,6 +471,7 @@ export class DMService {
               isGlobal: false,
               reportedUser: null, // No specific user for group blocks
               conversation: conversationId,
+              lastMessage: lastMessage?._id,
             },
           },
           { new: true, upsert: true }, // Create a new document if one doesn't exist
@@ -469,6 +509,7 @@ export class DMService {
             isGlobal: false,
             reportedUser: reportedUserId, // Block the other participant in the DM
             conversation: conversationId,
+            lastMessage: lastMessage._id,
           },
         },
         { new: true, upsert: true }, // Create a new document if one doesn't exist
@@ -488,13 +529,114 @@ export class DMService {
       });
     }
   }
-  async getVideoStream(req: Request, res: Response) {
-    res.status(400).json({ success: false, message: 'getVideoStream  not completed yat.' });
+  async blockGroupUser(req: Request, res: Response) {
+    try {
+      // Extract request parameters
+      const conversationId = reqParam(req, 'conversationId');
+      const reason = reqParam(req, 'reason') || 'No reason provided';
+      const address = reqParam(req, 'address');
+      const userAddress = reqParam(req, 'userAddress');
+
+      // Fetch the reporter and reported user accounts
+      const [reportedBy, reportedUser] = await Promise.all([
+        AccountModel.findOne({ address: address.toLowerCase() }, { _id: 1 }),
+        AccountModel.findOne({ address: userAddress.toLowerCase() }, { _id: 1 }),
+      ]);
+
+      if (!reportedBy || !reportedUser) {
+        return res.status(404).json({
+          error: !reportedBy ? 'User not found' : 'Reported User not found',
+        });
+      }
+
+      // Fetch the conversation and validate admin access
+      const conversation = await DmModel.findById(conversationId);
+      if (!conversation) {
+        return res.status(404).json({ error: 'Conversation not found' });
+      }
+
+      const isAdmin = conversation.participants.some(
+        p => p.role === 'admin' && p.participant.toString() === reportedBy._id.toString(),
+      );
+
+      if (!isAdmin) {
+        return res.status(403).json({
+          message: "You don't have access to block the user.",
+          blocked: false,
+          conversationId,
+          success: false,
+        });
+      }
+
+      // Check for existing block entry
+      const existingBlock = await UserReportModel.findOne({
+        conversation: conversationId,
+        userReportedBy: reportedBy._id,
+        reportedUser: reportedUser._id,
+        action: 'block',
+      });
+
+      if (existingBlock) {
+        return res.status(400).json({
+          error: 'You have already blocked this conversation or user.',
+        });
+      }
+
+      // Fetch the last message in the conversation
+      const lastMessage = await MessageModel.findOne({ conversation: conversationId }, { _id: 1 })
+        .sort({ createdAt: -1 })
+        .lean();
+
+      // Handle group block
+      if (conversation.conversationType === 'group') {
+        const updatedReport = await UserReportModel.findOneAndUpdate(
+          {
+            conversation: conversationId,
+            userReportedBy: reportedBy._id,
+          },
+          {
+            $set: {
+              action: 'block',
+              reason,
+              resolved: false,
+              isGlobal: false,
+              reportedUser: reportedUser._id,
+              conversation: conversationId,
+              lastMessage: lastMessage?._id || null, // Handle potential null value
+            },
+          },
+          { new: true, upsert: true }, // Create a new document if it doesn't exist
+        );
+
+        return res.status(200).json({
+          message: 'Group successfully blocked.',
+          blocked: true,
+          conversationId,
+          reportId: updatedReport._id,
+          success: true,
+        });
+      }
+
+      // Invalid request for non-group conversations
+      return res.status(400).json({
+        message: 'Invalid Request',
+        blocked: false,
+        conversationId,
+        success: false,
+      });
+    } catch (error) {
+      console.error('Error in blockGroupUser:', error);
+      return res.status(500).json({
+        error: 'An error occurred while processing your request.',
+      });
+    }
   }
   async unBlockDm(req: Request, res: Response) {
     try {
       const conversationId = reqParam(req, 'conversationId'); // Get conversation ID from request
       const address = reqParam(req, 'address'); // Get user's address from request
+      const reportId = reqParam(req, 'reportId'); // Get user's address from request
+
       console.log('object', { conversationId, address });
       const user = await AccountModel.findOne({ address: address.toLowerCase() });
       if (!user) {
@@ -508,9 +650,16 @@ export class DMService {
 
       // Check if a block entry exists
       const existingBlock = await UserReportModel.findOne({
-        conversation: conversationId,
-        reportedBy: user._id,
-        action: 'block',
+        $or: [
+          {
+            _id: reportId,
+          },
+          {
+            conversation: conversationId,
+            reportedBy: user._id,
+            action: 'block',
+          },
+        ],
       });
 
       if (!existingBlock) {
@@ -583,4 +732,10 @@ export class DMService {
       });
     }
   }
+
+  async getVideoStream(req: Request, res: Response) {
+    res.status(400).json({ success: false, message: 'getVideoStream  not completed yat.' });
+  }
+
+  async removeUserFromGroup(req: Request, res: Response) {}
 }

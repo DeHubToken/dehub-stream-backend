@@ -15,6 +15,7 @@ interface Session {
 export class DMSocketController {
   private dmNamespace: Namespace;
   private users: Map<string, Session> = new Map(); // Map of user _id to Session object
+  
   private dmSocketService: any;
 
   constructor(private readonly io: Server) {
@@ -24,13 +25,14 @@ export class DMSocketController {
 
   private bootstrap() {
     this.dmSocketService = new DMSocketService(this.dmNamespace);
-
+ 
     // Namespace for personal DMs
     this.dmNamespace.on(SocketEvent.connection, async socket => {
       const userAddress = socket.handshake.query.address;
       console.log('SocketEvent.connection userAddress', userAddress, socket.handshake);
 
       if (!userAddress == undefined || !userAddress) {
+        
         console.log('need to reconnect...');
         socket.emit(SocketEvent.reConnect, { msg: 'connecting....' });
       }
@@ -38,8 +40,6 @@ export class DMSocketController {
         return;
       }
       await this.sessionSet(socket, userAddress);
-      socket.emit(SocketEvent.error, { msg: 'Unable to get user address.' });
-
       console.log(`Client connected to /dm: ${socket.id}`);
       // Handle socket events
       socket.on(SocketEvent.ping, data => {
@@ -53,7 +53,8 @@ export class DMSocketController {
 
       socket.on(
         SocketEvent.sendMessage,
-        async data => await this.dmSocketService.sendMessage(await this.withSession(socket, data)),
+        async data =>
+          await this.dmSocketService.sendMessage(await this.withRestrictedZone(await this.withSession(socket, data))),
       );
 
       socket.on(SocketEvent.disconnect, async () => {
@@ -68,8 +69,7 @@ export class DMSocketController {
     const user: any = await AccountModel.findOne(
       { address: userAddress?.toLowerCase() },
       { username: 1, _id: 1, address: 1 },
-    ).lean();
-    console.log('findOne', user);
+    ).lean(); 
     // If user already exists in the users map, update their socketIds
     let session = this.users.get(userAddress?.toLowerCase());
 
@@ -99,9 +99,24 @@ export class DMSocketController {
 
   async withSession(socket, req) {
     // Find the user in the map
-    const userAddress = socket.handshake.query.address;
-    console.log('userAddress', userAddress);
+    const userAddress = socket.handshake.query.address; 
     const session = await this.users.get(userAddress?.toLowerCase());
     return { req, socket, session: { user: session, users: this.users } };
+  }
+
+  async withRestrictedZone({ req, socket, session }) {
+    const blockList = await this.dmSocketService.getBlockedUsersForConversation(req.dmId);
+    const userId = session.user._id; 
+    let next = true;
+    blockList.find(list => { 
+      if (list.reportedBy == userId.toString() || list.reportedUser == userId.toString()) {
+        socket.emit(SocketEvent.error, { msg: 'this chat was blocked' });
+        next = false;
+      }
+    });
+    if (!next) {
+      return { req: null, socket: null, session: null, blockList: null };
+    }
+    return { req, socket, session, blockList };
   }
 }

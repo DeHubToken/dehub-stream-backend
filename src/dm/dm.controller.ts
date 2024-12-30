@@ -92,6 +92,17 @@ export class DMController {
       });
     }
   }
+  @Post('/dm/group-user-block')
+  async blockGroupUser(@Req() req: Request, @Res() res: Response) {
+    try {
+      return await this.dmServices.blockGroupUser(req, res);
+    } catch (error) {
+      return res.status(500).json({
+        message: 'Failed to search users or groups',
+        error: error.message,
+      });
+    }
+  }
   @Get('/dm/un-block/:conversationId')
   async unBlock(@Req() req: Request, @Res() res: Response) {
     try {
