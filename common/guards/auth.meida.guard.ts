@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { ethers } from 'ethers'; 
+import { ethers } from 'ethers';
 import { config } from '../../config/index';
 @Injectable()
 export class MediaAuthGuard implements CanActivate {
@@ -18,7 +18,6 @@ export class MediaAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
-   
 
     const token = this.extractTokenFromHeader(request);
 
@@ -33,13 +32,15 @@ export class MediaAuthGuard implements CanActivate {
       } catch (error) {
         throw new UnauthorizedException('Invalid authorization token');
       }
-    } 
+    }
 
     const { address, rawSig, timestamp } = this.extractParams(request);
-
+ 
     if (address && rawSig && timestamp) {
       // Token is absent; extract parameters from the request
       if (!rawSig || !address || !timestamp) {
+        console.log('fffff', request);
+
         throw new BadRequestException('Signature, address, and timestamp are required');
       }
 
@@ -53,31 +54,34 @@ export class MediaAuthGuard implements CanActivate {
       request.params.address = address.toLowerCase();
       request.params.rawSig = rawSig;
       request.params.timestamp = timestamp;
-      request.generatedToken = generatedToken;
-
+      request.generatedToken = generatedToken; 
       return true;
-    }
+    } 
+    return true;
+ 
   }
   private extractFromCookie = req => {
     const cookieKey = config.isDevMode ? 'data_dev' : 'data_v2';
+    console.log('cookieKey', cookieKey);
     try {
       const cookie = req.cookies[cookieKey];
-
+      console.log('cookie', cookie);
       if (cookie) {
         const parsedCookie = JSON.parse(cookie);
         console.log('Parsed cookie:', parsedCookie);
         // Extract dynamic address
-        const address = Object.keys(parsedCookie).find(address=>{ 
-        return  parsedCookie[address].isActive==true 
-        }); // Get the dynamic address key 
+        const address = Object.keys(parsedCookie).find(address => {
+          return parsedCookie[address].isActive == true;
+        }); // Get the dynamic address key
         const { timestamp, sig } = parsedCookie[address];
-        console.log({address, timestamp, sig } )
+        console.log({ address, timestamp, sig });
         req.params.address = address.toLowerCase();
         req.params.timestamp = timestamp;
         req.params.rawSig = sig;
         req.params.isActive = sig;
         return { address: address.toLowerCase(), timestamp, rawSig: sig };
-      }
+      } 
+   
     } catch (error) {
       console.error('Error parsing cookie:', error.message);
     }
@@ -98,7 +102,6 @@ export class MediaAuthGuard implements CanActivate {
       if (cookieParams) {
         return cookieParams; // Return the parameters from cookie
       }
-      throw new BadRequestException('Address, signature, and timestamp are required');
     }
 
     return { address, rawSig, timestamp: Number(timestamp) };
