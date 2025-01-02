@@ -1,5 +1,5 @@
 import { Injectable, UploadedFile } from '@nestjs/common';
-import { reqParam } from 'common/util/auth';
+import { addProperty, reqParam } from 'common/util/auth';
 import { AccountModel } from 'models/Account';
 import { Request, Response } from 'express';
 import { MessageModel } from 'models/message/dm-messages';
@@ -106,6 +106,34 @@ export class DMService {
       });
     }
   }
+  async joinGroup(req: Request, res: Response) {
+    try {
+      // Parse input data
+      const groupId = reqParam(req, 'groupId');
+      const address = reqParam(req, 'address');
+      const userAddress = reqParam(req, 'userAddress');
+      const admin = await AccountModel.findOne({ address: address?.toLowerCase() }, { _id: 1 });
+      const user = await AccountModel.findOne({ address: userAddress?.toLowerCase() }, { _id: 1 });
+      const group = await DmModel.findById(groupId); 
+      const isAdmin = group.participants.find(p => {
+        const key2 = p.participant.toString();
+        const key = admin._id.toString();
+        const role = p.role;
+        return key == key2 && role == 'admin';
+      })?.role==="admin";
+      
+   
+      
+
+
+    } catch (error) {
+      console.error('Error creating group chat:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'An error occurred while creating the group chat.',
+      });
+    }
+  }
 
   async getMessagesDm(req: Request, res: Response) {
     try {
@@ -176,7 +204,7 @@ export class DMService {
     }
   }
 
-  async getContacts(req: Request, res: Response) {
+  async getContactsByAddress(req: Request, res: Response) {
     const address = reqParam(req, 'address').toLowerCase();
     const user = await AccountModel.findOne({ address: address }, { _id: 1 });
     // Define your aggregation pipeline
@@ -735,6 +763,77 @@ export class DMService {
 
   async getVideoStream(req: Request, res: Response) {
     res.status(400).json({ success: false, message: 'getVideoStream  not completed yat.' });
+  }
+  async getContact(req: Request, res: Response) {
+    const filters: any = {};
+
+    addProperty(req, filters, 'id');
+    addProperty(req, filters, 'conversationType');
+    addProperty(req, filters, 'groupName');
+    addProperty(req, filters, 'participant');
+    addProperty(req, filters, 'role');
+    addProperty(req, filters, 'lastMessageAtFrom');
+    addProperty(req, filters, 'lastMessageAtTo');
+    addProperty(req, filters, 'planId');
+    const query: any = {};
+    // Apply filters dynamically
+    if (filters.conversationType) {
+      query.conversationType = filters.conversationType;
+    }
+
+    if (filters.groupName) {
+      query.groupName = { $regex: filters.groupName, $options: 'i' }; // Case-insensitive search
+    }
+    if (filters.createdBy) {
+      query.createdBy = filters.createdBy;
+    }
+    if (filters.participant) {
+      query['participants.participant'] = filters.participant;
+    }
+    if (filters.role) {
+      query['participants.role'] = filters.role;
+    }
+    if (filters.lastMessageAtFrom || filters.lastMessageAtTo) {
+      query.lastMessageAt = {};
+      if (filters.lastMessageAtFrom) {
+        query.lastMessageAt.$gte = new Date(filters.lastMessageAtFrom);
+      }
+      if (filters.lastMessageAtTo) {
+        query.lastMessageAt.$lte = new Date(filters.lastMessageAtTo);
+      }
+    }
+    return res.status(200).json({ data: DmModel.find(query) });
+  }
+  async getContactByPlanId(req: Request, res: Response) {
+    try {
+      const planId = reqParam(req, 'planId');
+      const plan: any & { _id: any } = await PlansModel.findOne({ id: planId }, { _id: 1 });
+      if (!plan) {
+        return res.status(404).json({ message: 'Plan not Found.' });
+      }
+      const dm = await DmModel.aggregate([
+        {
+          $match: {
+            plans: { $in: [plan?._id] },
+          },
+        },
+        {
+          $project: {
+            _id: 1,
+            groupName: 1,
+            sendParticipantCount: { $size: '$participants' }, // Replace "participants" with the actual field name
+          },
+        },
+      ]);
+      if (!dm) {
+        return res.status(404).json({ message: 'DM not found for the given Plan ID' });
+      }
+
+      return res.status(200).json(dm);
+    } catch (error) {
+      console.error('Error fetching DM by Plan ID:', error);
+      return res.status(500).json({ message: 'Internal Server Error' });
+    }
   }
 
   async removeUserFromGroup(req: Request, res: Response) {}

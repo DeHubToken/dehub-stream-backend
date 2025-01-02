@@ -29,11 +29,33 @@ export class DMController {
       });
     }
   }
+  @Get('/dm/:id')
+  async getContact(@Req() req: Request, @Res() res: Response) {
+    try {
+      return await this.dmServices.getContact(req, res);
+    } catch (error) {
+      return res.status(500).json({
+        message: 'Failed to fetch messages for the specified user or group',
+        error: error.message,
+      });
+    }
+  }
+  @Get('/dm/plan/:planId')
+  async getContactByPlanId(@Req() req: Request, @Res() res: Response) {
+    try {
+      return await this.dmServices.getContactByPlanId(req, res);
+    } catch (error) {
+      return res.status(500).json({
+        message: 'Failed to fetch messages for the specified user or group',
+        error: error.message,
+      });
+    }
+  }
 
   @Get('/dm/contacts/:address')
-  async getContacts(@Req() req: Request, @Res() res: Response) {
+  async getContactsByAddress(@Req() req: Request, @Res() res: Response) {
     try {
-      return await this.dmServices.getContacts(req, res);
+      return await this.dmServices.getContactsByAddress(req, res);
     } catch (error) {
       return res.status(500).json({
         message: 'Failed to fetch contacts for the specified address',
@@ -45,6 +67,17 @@ export class DMController {
   async createGroupChat(@Req() req: Request, @Res() res: Response) {
     try {
       return await this.dmServices.createGroupChat(req, res);
+    } catch (error) {
+      return res.status(500).json({
+        message: 'Failed to create the group chat',
+        error: error.message,
+      });
+    }
+  }
+  @Post('/dm/group/join')
+  async joinGroup(@Req() req: Request, @Res() res: Response) {
+    try {
+      return await this.dmServices.joinGroup(req, res);
     } catch (error) {
       return res.status(500).json({
         message: 'Failed to create the group chat',
