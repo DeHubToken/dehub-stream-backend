@@ -6,6 +6,7 @@ import { MessageModel } from 'models/message/dm-messages';
 import mongoose from 'mongoose';
 import { DmModel } from 'models/message/DM';
 import { PlansModel } from 'models/Plans';
+import { SubscriptionModel } from 'models/subscription';
 import { CdnService } from 'src/cdn/cdn.service';
 import { JobService } from 'src/job/job.service';
 import { UserReportModel } from 'models/user-report';
@@ -14,7 +15,20 @@ export class DMService {
   constructor(
     private readonly cdnService: CdnService,
     private readonly jobService: JobService,
-  ) {}
+  ) { }
+
+  private checkIsAdmin(participants, adminId) {
+    return participants.some(p => {
+      const key2 = p.participant.toString();
+      const key = adminId.toString();
+      const role = p.role;
+      return key === key2 && role === 'admin';
+    });
+  }
+
+  private isUserInGroup(participants, userId) {
+    return participants.some(p => p.participant.toString() === userId.toString());
+  }
 
   async searchUserOrGroup(req: Request, res: Response) {
     try {
@@ -114,18 +128,60 @@ export class DMService {
       const userAddress = reqParam(req, 'userAddress');
       const admin = await AccountModel.findOne({ address: address?.toLowerCase() }, { _id: 1 });
       const user = await AccountModel.findOne({ address: userAddress?.toLowerCase() }, { _id: 1 });
-      const group = await DmModel.findById(groupId); 
-      const isAdmin = group.participants.find(p => {
-        const key2 = p.participant.toString();
-        const key = admin._id.toString();
-        const role = p.role;
-        return key == key2 && role == 'admin';
-      })?.role==="admin";
-      
-   
-      
+      const group = await DmModel.findById(groupId);
+      const subs = await SubscriptionModel.findOne({ active: true, userId: user._id, planId: { $in: group.plans }, })
 
+      const isAdmin = this.checkIsAdmin(group.participants, admin._id)
 
+      if (!group) {
+        return res.status(404).json({ success: false, message: 'Group not found.' });
+      }
+      if (isAdmin) {
+        const isAlreadyJoined = this.isUserInGroup(group.participants, admin._id)
+        if (isAlreadyJoined)
+          return res.status(400).json({ success: false, message: 'Already in the group.' });
+
+        await DmModel.findOneAndUpdate(
+          { _id: groupId },
+          {
+            $push: {
+              participants: {
+                role: 'member', // Assign default role as 'member'
+                participant: user._id // Add the user to the participants array
+              }
+            }
+          },
+          { new: true } // Optionally returns the updated document
+        );
+        
+
+        return res.status(400).json({ success: false, message: 'You are admin' });
+      }
+
+      if (!isAdmin && subs != null) {
+        const isAlreadyJoined = this.isUserInGroup(group.participants, user._id)
+
+        if (isAlreadyJoined)
+          return res.status(400).json({ success: false, message: 'Already in the group.' });
+
+        await DmModel.findOneAndUpdate(
+          { _id: groupId },
+          {
+            $push: {
+              participants: {
+                role: 'member', // Assign default role as 'member'
+                participant: user._id // Add the user to the participants array
+              }
+            }
+          },
+          { new: true } // Optionally returns the updated document
+        );
+        return res.status(200).json({
+          success: true,
+          message: 'User successfully joined the group.',
+        });
+
+      }
     } catch (error) {
       console.error('Error creating group chat:', error);
       return res.status(500).json({
@@ -835,6 +891,5 @@ export class DMService {
       return res.status(500).json({ message: 'Internal Server Error' });
     }
   }
-
-  async removeUserFromGroup(req: Request, res: Response) {}
+  async removeUserFromGroup(req: Request, res: Response) { }
 }
