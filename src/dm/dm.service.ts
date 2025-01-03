@@ -271,10 +271,10 @@ export class DMService {
           'participants.participant': user._id,
         },
       },
-
+    
       // Sort messages by creation time in descending order
       { $sort: { createdAt: -1 } },
-
+    
       // Lookup messages based on the conversation
       {
         $lookup: {
@@ -284,25 +284,25 @@ export class DMService {
           as: 'messages',
         },
       },
-
+    
       // Unwind the participants array to join details for each participant
       {
         $unwind: {
           path: '$participants',
-          preserveNullAndEmptyArrays: true, // Keep DM documents with no participants
+          preserveNullAndEmptyArrays: true,
         },
       },
-
+    
       // Lookup participants' details from the Account collection and include role
       {
         $lookup: {
           from: 'accounts',
-          localField: 'participants.participant', // Use participant._id
+          localField: 'participants.participant',
           foreignField: '_id',
           as: 'participantDetails',
         },
       },
-
+    
       // Unwind participantDetails to access details as an object
       {
         $unwind: {
@@ -310,26 +310,27 @@ export class DMService {
           preserveNullAndEmptyArrays: true,
         },
       },
-
+    
       // Add a field to determine whether the user should be included based on conversation type
       {
         $addFields: {
           includeParticipant: {
             $cond: {
               if: { $eq: ['$conversationType', 'dm'] },
-              then: { $ne: ['$participantDetails._id', user._id] }, // Exclude the session user in dm
-              else: true, // Include all participants in group
+              then: { $ne: ['$participantDetails._id', user._id] },
+              else: true,
             },
           },
         },
       },
-
+    
       // Match only participants who should be included
       {
         $match: {
           includeParticipant: true,
         },
       },
+    
       // Regroup the data to include only the relevant fields
       {
         $group: {
@@ -343,7 +344,7 @@ export class DMService {
                 username: '$participantDetails.username',
                 address: '$participantDetails.address',
               },
-              role: '$participants.role', // Include role along with participant details
+              role: '$participants.role',
             },
           },
           lastMessageAt: { $first: '$lastMessageAt' },
@@ -352,8 +353,28 @@ export class DMService {
           messages: { $first: '$messages' },
         },
       },
-
-      // Map messages to include an "author" field based on the sender
+    
+      // Lookup sender details for each message
+      {
+        $lookup: {
+          from: 'accounts',
+          localField: 'messages.sender',
+          foreignField: '_id',
+          as: 'senderDetails',
+          pipeline: [
+            {
+              $project: {
+                _id: 1,
+                address: 1,
+                displayName: 1,
+                username: 1,
+              },
+            },
+          ],
+        },
+      },
+    
+      // Map messages to include filtered sender details
       {
         $addFields: {
           messages: {
@@ -364,12 +385,17 @@ export class DMService {
                 $mergeObjects: [
                   '$$message',
                   {
-                    author: {
-                      $cond: {
-                        if: { $eq: ['$$message.sender', user._id] },
-                        then: 'me',
-                        else: 'other',
-                      },
+                    sender: {
+                      $arrayElemAt: [
+                        {
+                          $filter: {
+                            input: '$senderDetails',
+                            as: 'sender',
+                            cond: { $eq: ['$$sender._id', '$$message.sender'] },
+                          },
+                        },
+                        0,
+                      ],
                     },
                   },
                 ],
@@ -378,7 +404,7 @@ export class DMService {
           },
         },
       },
-
+    
       // Include blocked users to disable chat
       {
         $lookup: {
@@ -446,22 +472,23 @@ export class DMService {
           as: 'blockList',
         },
       },
-
+    
       // Project relevant fields, including last 20 messages
       {
         $project: {
           _id: 1,
           conversationType: 1,
           groupName: 1,
-          participants: 1, // Now includes participant details and role
+          participants: 1,
           lastMessageAt: 1,
           createdAt: 1,
           updatedAt: 1,
           blockList: 1,
-          messages: { $slice: ['$messages', 20] }, // Last 20 messages
+          messages: { $slice: ['$messages', 20] },
         },
       },
     ];
+    
 
     // Execute aggregation using DmModel
     const dms = await DmModel.aggregate(pipeline);
@@ -471,17 +498,24 @@ export class DMService {
   async uploadDm(req: Request, res: Response, files: { files: Express.Multer.File[] }) {
     const conversationId = reqParam(req, 'conversationId');
     const senderId = reqParam(req, 'senderId');
-    const amount = reqParam(req, 'amount');
-    const token = reqParam(req, 'token');
+    const purchaseOptions = reqParam(req, 'purchaseOptions');
     const isPaid = reqParam(req, 'isPaid');
+    console.log('purchaseOptions', purchaseOptions);
+
     const user = await AccountModel.findOne({ address: senderId.toLowerCase() }, { _id: 1 });
-    const msg = await MessageModel.create({
+    const obj: any = {
       sender: user._id,
       conversation: conversationId,
       msgType: 'media',
       uploadStatus: 'pending',
       isRead: false,
-    });
+    };
+
+    if (isPaid && purchaseOptions) {
+      obj.isPaid = true;
+      obj.purchaseOptions = JSON.parse(purchaseOptions);
+    }
+    const msg = await MessageModel.create(obj);
 
     const { files: data } = files;
     // Map files to MediaJobPayload[]

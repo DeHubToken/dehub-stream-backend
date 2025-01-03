@@ -45,6 +45,7 @@ export class NftService {
     const skip = req.body.skip || req.query.skip || 0;
     const limit = req.body.limit || req.query.limit || 1000;
     const postType = req.body.postType || req.query.postType || 'video';
+    console.log("getAllNfts",postType)
     const filter = { status: 'minted', postType };
     const totalCount = await TokenModel.countDocuments(filter, tokenTemplate);
     const address = reqParam(req, 'address');
@@ -207,7 +208,7 @@ export class NftService {
     const user: any = await AccountModel.findOne({ address: subscriber?.toLowerCase() });
 
     try {
-      console.log('myfilter', filter);
+      console.log('myfilter', JSON.stringify(filter));
       const query = [
         {
           $match: filter,
@@ -415,18 +416,19 @@ export class NftService {
         postFilter['$or'] = [{ postType: 'feed-simple' }, { postType: 'feed-images' }];
       } else {
         postFilter['postType'] = postType;
-        postFilter['transcodingStatus'] = 'done';
+        // postFilter['transcodingStatus'] = 'done';
       }
-
+ 
       console.log('sortMode', { sortMode, postType, searchQuery });
       let sortRule: any = { createdAt: -1 };
       searchQuery['$match'] = {
         $and: [
           { status: 'minted' },
           { $or: [{ isHidden: false }, { isHidden: { $exists: false } }] },
+          postFilter
         ],
       };
-
+console.log("searchQuery",JSON.stringify(searchQuery))
       console.log('Range - sotMode - unit - page - search', range, sortMode, unit, page, search)
       switch (sortMode) {
         case 'trends':

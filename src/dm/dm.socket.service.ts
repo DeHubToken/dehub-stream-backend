@@ -38,12 +38,13 @@ export class DMSocketService {
       displayName: 1,
       address: 1,
     }).lean();
+    
 
     if (existingDm) {
       // If a DM session exists, send it back to the client
       socket.emit(SocketEvent.createAndStart, {
         msg: 'DM session exists',
-        data: { ...existingDm, participants: [user2] },
+        data: { ...existingDm, participants:  [{ participant: user2, role: 'member' }] },
       });
     } else {
       // Prepare participants array
@@ -66,7 +67,7 @@ export class DMSocketService {
       // Emit the event to notify the client
       socket.emit(SocketEvent.createAndStart, {
         msg: 'Created new DM',
-        data: { ...newDm._doc, participants: [user2] },
+        data: { ...newDm._doc, participants: [{ participant: user2, role: 'member' }] },
       });
     }
   }
@@ -83,7 +84,7 @@ export class DMSocketService {
       isRead: false,
       content: req.content,
       msgType: req.type,
-    }; 
+    };
     if (state.msgType == 'gif') {
       state.mediaUrls = [
         {
@@ -103,7 +104,7 @@ export class DMSocketService {
       }
       return acc;
     }, []);
-     
+
     let socketsUsers = await this.getOnlineSocketsUsers(session, ids);
     socketsUsers = socketsUsers.filter(user => {
       return !blockList.some(blocked => {
@@ -116,8 +117,8 @@ export class DMSocketService {
         }
       });
     });
-    socketsUsers.forEach(su => { 
-      if (su.socketIds && su.socketIds.length > 0) { 
+    socketsUsers.forEach(su => {
+      if (su.socketIds && su.socketIds.length > 0) {
         socket.in(su.socketIds).emit(SocketEvent.sendMessage, { ...newMsg?._doc, author: 'other' });
       }
     });

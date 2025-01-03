@@ -15,16 +15,32 @@ export class Message extends Document {
   @Prop({
     type: [
       {
+        isLocked: { type: Boolean, required: true },
+        amount: { type: String, required: true },
+        address: { type: String, required: true },
+        chainId: { type: Number, required: true },
+      },
+    ],
+  })
+  purchaseOptions: {
+    isLocked: boolean;
+    amount: string;
+    address: string;
+    chainId: number;
+  }[];
+  @Prop({
+    type: [
+      {
         url: { type: String, required: true }, // URL of the media
         type: { type: String, required: true }, // Type of the media (e.g., 'image', 'video', etc.)
-        mimeType: { type: String, required: true }, // MIME type of the file (e.g., 'image/jpeg', 'video/mp4', etc.) 
+        mimeType: { type: String, required: true }, // MIME type of the file (e.g., 'image/jpeg', 'video/mp4', etc.)
       },
     ],
   })
   mediaUrls: {
     url: string;
     type: string;
-    mimeType: string; 
+    mimeType: string;
   }[]; // Array of media objects with additional details
 
   @Prop({
@@ -43,6 +59,8 @@ export class Message extends Document {
 
   @Prop({ type: Boolean, default: false })
   isRead: boolean;
+  @Prop({ type: Boolean, default: false })
+  isPaid: boolean;
 
   @Prop({ type: String, default: null })
   failureReason: string; // Field to store error details in case of failure
