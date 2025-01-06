@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Req, Res, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Post, Put, Req, Res, UploadedFiles, UseInterceptors } from '@nestjs/common';
 import { DMService } from './dm.service';
 import { Request, Response } from 'express';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
@@ -140,6 +140,17 @@ export class DMController {
   async addTnx(@Req() req: Request, @Res() res: Response) {
     try {
       return await this.dmServices.addTnx(req, res);
+    } catch (error) {
+      return res.status(500).json({
+        message: 'Failed add tnx.',
+        error: error.message,
+      });
+    }
+  }
+  @Put('/dm/tnx')
+  async updateTnx(@Req() req: Request, @Res() res: Response) {
+    try {
+      return await this.dmServices.updateTnx(req, res);
     } catch (error) {
       return res.status(500).json({
         message: 'Failed add tnx.',

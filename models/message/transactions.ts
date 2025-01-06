@@ -2,14 +2,14 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { Document, Model } from 'mongoose';
 
 @Schema({ timestamps: true })
-export class Message extends Document {
+export class MessageTransaction extends Document {
   // Unique identifier for the message within a conversation
   @Prop({ type: mongoose.Schema.Types.ObjectId, required: false })
   messageId: mongoose.Schema.Types.ObjectId;
 
   // Optional hash of the message content for verification
   @Prop({ type: String, trim: true, required: false })
-  messageHash: string;
+  transactionHash: string;
 
   // Address of the sender
   @Prop({ type: String, trim: true, required: false })
@@ -33,12 +33,15 @@ export class Message extends Document {
 }
 
 // Create the schema
-export const MessageSchema = SchemaFactory.createForClass(Message);
+export const MessageTransactionSchema = SchemaFactory.createForClass(MessageTransaction);
 
 // Add indexes for frequently queried fields
-MessageSchema.index({ sender: 1 });
-MessageSchema.index({ conversation: 1 });
-MessageSchema.index({ messageId: 1 });
+MessageTransactionSchema.index({ sender: 1 });
+MessageTransactionSchema.index({ conversation: 1 });
+MessageTransactionSchema.index({ messageId: 1 });
 
 // Export the model
-export const MessageTransactions: Model<Message> = mongoose.model<Message>('MessageTransactions', MessageSchema);
+export const MessageTransactions: Model<MessageTransaction> = mongoose.model<MessageTransaction>(
+  'MessageTransactions',
+  MessageTransactionSchema,
+);

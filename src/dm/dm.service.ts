@@ -371,7 +371,7 @@ export class DMService {
         },
       },
 
-      // Map messages to include filtered sender details
+      // Map messages to include filtered sender details and add author field
       {
         $addFields: {
           messages: {
@@ -392,6 +392,14 @@ export class DMService {
                           },
                         },
                         0,
+                      ],
+                    },
+                    // Add 'author' field to each message
+                    author: {
+                      $cond: [
+                        { $eq: [user._id, '$$message.sender'] }, // Check if sender is the user
+                        'me', // If the user is the sender, label it as 'me'
+                        'other', // Otherwise, use the sender's ID
                       ],
                     },
                   },
@@ -845,7 +853,8 @@ export class DMService {
         error: 'An error occurred while processing your request.',
       });
     }
-  } 
+  }
+
   async getVideoStream(req: Request, res: Response) {
     res.status(400).json({ success: false, message: 'getVideoStream  not completed yat.' });
   }
@@ -921,13 +930,13 @@ export class DMService {
     }
   }
   async addTnx(req: Request, res: Response) {
-    const { messageId, senderAddress, receiverAddress, messageHash, status, type, chainId } = req.body;
+    const { messageId, senderAddress, receiverAddress, transactionHash, status, type, chainId } = req.body;
 
     // Validate the required fields
-    if (!senderAddress || !receiverAddress || !messageHash) {
+    if (!senderAddress || !receiverAddress || !transactionHash) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: senderAddress, receiverAddress, or messageHash.',
+        message: 'Missing required fields: senderAddress, receiverAddress, or transactionHash.',
       });
     }
 
@@ -936,7 +945,7 @@ export class DMService {
       messageId,
       senderAddress,
       receiverAddress,
-      messageHash,
+      transactionHash,
       chainId,
       type,
       status: status || 'init', // Default status
@@ -960,8 +969,8 @@ export class DMService {
       });
     }
   }
-  async updateTnxStatus(req: Request, res: Response) {
-    const { tnxId, status } = req.body;
+  async updateTnx(req: Request, res: Response) {
+    const { tnxId, status, tnxHash } = req.body;
 
     // Validate the required fields
     if (!tnxId || !status) {
@@ -974,11 +983,15 @@ export class DMService {
     try {
       // Find the message by its ID and update the status
       const updatedMessage = await MessageTransactions.findOneAndUpdate(
-        { _id: tnxId },
+        { $or: [{ _id: tnxId, transactionHash: tnxHash }, { transactionHash: tnxHash }] },
         { status },
         { new: true }, // Return the updated document
       );
 
+
+      MessageModel.findByIdAndUpdate(updatedMessage.messageId,{
+      
+      })
       // If the message does not exist, respond with an error
       if (!updatedMessage) {
         return res.status(404).json({
@@ -1000,6 +1013,6 @@ export class DMService {
         error: error.message,
       });
     }
-  } 
+  }
   async removeUserFromGroup(req: Request, res: Response) {}
 }
