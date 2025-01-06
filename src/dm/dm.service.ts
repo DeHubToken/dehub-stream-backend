@@ -497,8 +497,7 @@ export class DMService {
     // Execute aggregation using DmModel
     const dms = await DmModel.aggregate(pipeline);
     res.status(200).json(dms);
-  }
-
+  } 
   async uploadDm(req: Request, res: Response, files: { files: Express.Multer.File[] }) {
     const conversationId = reqParam(req, 'conversationId');
     const senderId = reqParam(req, 'senderId');
@@ -853,8 +852,7 @@ export class DMService {
         error: 'An error occurred while processing your request.',
       });
     }
-  }
-
+  } 
   async getVideoStream(req: Request, res: Response) {
     res.status(400).json({ success: false, message: 'getVideoStream  not completed yat.' });
   }
@@ -988,10 +986,9 @@ export class DMService {
         { new: true }, // Return the updated document
       );
 
-
-      MessageModel.findByIdAndUpdate(updatedMessage.messageId,{
-      
-      })
+      await MessageModel.findByIdAndUpdate(updatedMessage.messageId, {
+        isUnLocked: true,
+      });
       // If the message does not exist, respond with an error
       if (!updatedMessage) {
         return res.status(404).json({
@@ -1003,7 +1000,11 @@ export class DMService {
       // Respond with the updated message
       return res.status(200).json({
         success: true,
-        data: updatedMessage,
+        data: {
+          tnxId,
+          messageId: updatedMessage.messageId,
+          isUnLocked: true,
+        },
       });
     } catch (error) {
       // Handle errors

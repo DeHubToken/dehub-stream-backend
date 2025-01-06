@@ -38,13 +38,12 @@ export class DMSocketService {
       displayName: 1,
       address: 1,
     }).lean();
-    
 
     if (existingDm) {
       // If a DM session exists, send it back to the client
       socket.emit(SocketEvent.createAndStart, {
         msg: 'DM session exists',
-        data: { ...existingDm, participants:  [{ participant: user2, role: 'member' }] },
+        data: { ...existingDm, participants: [{ participant: user2, role: 'member' }] },
       });
     } else {
       // Prepare participants array
@@ -123,7 +122,129 @@ export class DMSocketService {
       }
     });
   }
+  async reValidateMessage({
+    socket,
+    req,
+    session,
+    blockList,
+  }: {
+    socket: any;
+    req: any;
+    session: any;
+    blockList: any;
+  }) {
+    const userId = session.user._id;
+    console.log('userId', userId);
+    const messageId = req.messageId;
+    const singleMessagePipeline = [
+      // Match the specific message by _id
+      {
+        $match: {
+          _id: new Types.ObjectId(messageId),
+        },
+      },
 
+      // Lookup sender details
+      {
+        $lookup: {
+          from: 'accounts',
+          localField: 'sender',
+          foreignField: '_id',
+          as: 'senderDetails',
+          pipeline: [
+            {
+              $project: {
+                _id: 1,
+                username: 1,
+                address: 1,
+                displayName: 1,
+              },
+            },
+          ],
+        },
+      },
+      // Lookup purchase options details
+      {
+        $unwind: {
+          path: '$purchaseOptions',
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $lookup: {
+          from: 'purchaseoptions',
+          localField: 'purchaseOptions._id',
+          foreignField: '_id',
+          as: 'purchaseOptionDetails',
+        },
+      },
+      {
+        $addFields: {
+          purchaseOptions: {
+            $mergeObjects: ['$purchaseOptions', { details: { $arrayElemAt: ['$purchaseOptionDetails', 0] } }],
+          },
+        },
+      },
+      // Re-group purchase options
+      {
+        $group: {
+          _id: '$_id',
+          sender: { $first: '$sender' },
+          author: { $first: '$author' },
+          conversation: { $first: '$conversation' },
+          uploadStatus: { $first: '$uploadStatus' },
+          msgType: { $first: '$msgType' },
+          isRead: { $first: '$isRead' },
+          isPaid: { $first: '$isPaid' },
+          failureReason: { $first: '$failureReason' },
+          mediaUrls: { $first: '$mediaUrls' },
+          isUnlocked: { $first: '$isUnlocked' },
+          purchaseOptions: { $push: '$purchaseOptions' },
+          createdAt: { $first: '$createdAt' },
+          updatedAt: { $first: '$updatedAt' },
+        },
+      },
+    ];
+
+    const validatedMessages = await MessageModel.aggregate(singleMessagePipeline); 
+    const message = validatedMessages[0];
+    if (message.sender.toString() == userId.toString()) {
+      message.author = 'me';
+    }
+    socket.emit(SocketEvent.ReValidateMessage, {
+      dmId: req.dmId,
+      message: message,
+    });
+    const dm = await DmModel.findById(req.dmId);
+    let ids = dm.participants.reduce((acc, current) => {
+      const { participant } = current;
+      if (participant && participant.toString() !== userId.toString()) {
+        return [...acc, participant];
+      }
+      return acc;
+    }, []);
+    let socketsUsers = await this.getOnlineSocketsUsers(session, ids);
+    message.author = 'other';
+    socketsUsers = socketsUsers.filter(user => {
+      return !blockList.some(blocked => {
+        if (blocked.reportedBy) {
+          return blocked.reportedBy.toString() === user._id.toString();
+        }
+
+        if (blocked.reportedUser) {
+          return blocked.reportedUser.toString() === user._id.toString();
+        }
+      });
+    });
+    socketsUsers.forEach(su => {
+      if (su.socketIds && su.socketIds.length > 0) {
+        socket.in(su.socketIds).emit(SocketEvent.ReValidateMessage, {
+          dmId: req.dmId,
+          message: message,
+        });
+      }
+    });
+  }
   async getOnlineSocketsUsers(session, ids) {
     const users = await AccountModel.find({ $or: [{ _id: { $in: ids } }] }, { address: 1 }).lean();
     return users.map(user => {
@@ -134,7 +255,6 @@ export class DMSocketService {
       return user;
     });
   }
-
   // Helper method to check for blocked users in a specific conversation (DM or group)
   async getBlockedUsersForConversation(conversationId: string): Promise<any[]> {
     // Explicit return type of UserReport[]

@@ -10,4 +10,5 @@ export const SocketEvent = {
   sendMessage: 'sendMessage', 
   error: 'error',
   reConnect: 'reConnect',
+  ReValidateMessage:'ReValidateMessage'
 };

@@ -44,10 +44,10 @@ export class Message extends Document {
 
   @Prop({
     type: String,
-    enum: ['pending', 'success', 'failure'],
-    default: 'pending',
+    enum: ['simple','pending', 'success', 'failure'],
+    default: 'simple',
   })
-  uploadStatus: 'pending' | 'success' | 'failure';
+  uploadStatus: 'simple'|'pending' | 'success' | 'failure';
 
   @Prop({
     type: String,
@@ -60,7 +60,7 @@ export class Message extends Document {
   isRead: boolean;
   @Prop({ type: Boolean, default: false })
   isPaid: boolean;
-  @Prop({ type: Boolean, default: false })
+  @Prop({ type: Boolean, default: true })
   isUnLocked: boolean;
   @Prop({ type: String, default: null })
   failureReason: string; // Field to store error details in case of failure

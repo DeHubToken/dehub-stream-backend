@@ -2,8 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Server, Namespace } from 'socket.io';
 import { DMSocketService } from './dm.socket.service';
 import { SocketEvent } from './types';
-import { AccountModel } from 'models/Account';
-
+import { AccountModel } from 'models/Account'; 
 interface Session {
   username: string;
   socketIds: string[]; // Store multiple socket IDs for each user
@@ -15,7 +14,7 @@ interface Session {
 export class DMSocketController {
   private dmNamespace: Namespace;
   private users: Map<string, Session> = new Map(); // Map of user _id to Session object
-  
+
   private dmSocketService: any;
 
   constructor(private readonly io: Server) {
@@ -25,14 +24,13 @@ export class DMSocketController {
 
   private bootstrap() {
     this.dmSocketService = new DMSocketService(this.dmNamespace);
- 
+
     // Namespace for personal DMs
     this.dmNamespace.on(SocketEvent.connection, async socket => {
       const userAddress = socket.handshake.query.address;
       console.log('SocketEvent.connection userAddress', userAddress, socket.handshake);
 
       if (!userAddress == undefined || !userAddress) {
-        
         console.log('need to reconnect...');
         socket.emit(SocketEvent.reConnect, { msg: 'connecting....' });
       }
@@ -56,7 +54,13 @@ export class DMSocketController {
         async data =>
           await this.dmSocketService.sendMessage(await this.withRestrictedZone(await this.withSession(socket, data))),
       );
-
+      socket.on(
+        SocketEvent.ReValidateMessage,
+        async data =>
+          await this.dmSocketService.reValidateMessage(
+            await this.withRestrictedZone(await this.withSession(socket, data)),
+          ),
+      );
       socket.on(SocketEvent.disconnect, async () => {
         console.log(`Client disconnected from /dm: ${socket.id}`);
         await this.unset(socket, userAddress);
@@ -69,7 +73,7 @@ export class DMSocketController {
     const user: any = await AccountModel.findOne(
       { address: userAddress?.toLowerCase() },
       { username: 1, _id: 1, address: 1 },
-    ).lean(); 
+    ).lean();
     // If user already exists in the users map, update their socketIds
     let session = this.users.get(userAddress?.toLowerCase());
 
@@ -99,16 +103,16 @@ export class DMSocketController {
 
   async withSession(socket, req) {
     // Find the user in the map
-    const userAddress = socket.handshake.query.address; 
+    const userAddress = socket.handshake.query.address;
     const session = await this.users.get(userAddress?.toLowerCase());
     return { req, socket, session: { user: session, users: this.users } };
   }
 
   async withRestrictedZone({ req, socket, session }) {
     const blockList = await this.dmSocketService.getBlockedUsersForConversation(req.dmId);
-    const userId = session.user._id; 
+    const userId = session.user._id;
     let next = true;
-    blockList.find(list => { 
+    blockList.find(list => {
       if (list.reportedBy == userId.toString() || list.reportedUser == userId.toString()) {
         socket.emit(SocketEvent.error, { msg: 'this chat was blocked' });
         next = false;

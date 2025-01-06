@@ -122,8 +122,7 @@ export class VideoQueueProcessor {
 
     return url;
   }
-}
-
+} 
 @Processor('dm-uploads')
 export class DmQueueProcessor {
   constructor(
