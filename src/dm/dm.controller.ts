@@ -136,6 +136,17 @@ export class DMController {
       });
     }
   }
+  @Post('/dm/tnx')
+  async addTnx(@Req() req: Request, @Res() res: Response) {
+    try {
+      return await this.dmServices.addTnx(req, res);
+    } catch (error) {
+      return res.status(500).json({
+        message: 'Failed add tnx.',
+        error: error.message,
+      });
+    }
+  }
   @Get('/dm/un-block/:conversationId')
   async unBlock(@Req() req: Request, @Res() res: Response) {
     try {

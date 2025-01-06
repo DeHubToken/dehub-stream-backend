@@ -10,12 +10,13 @@ import { SubscriptionModel } from 'models/subscription';
 import { CdnService } from 'src/cdn/cdn.service';
 import { JobService } from 'src/job/job.service';
 import { UserReportModel } from 'models/user-report';
+import { MessageTransactions } from 'models/message/transactions';
 @Injectable()
 export class DMService {
   constructor(
     private readonly cdnService: CdnService,
     private readonly jobService: JobService,
-  ) { }
+  ) {}
 
   private checkIsAdmin(participants, adminId) {
     return participants.some(p => {
@@ -129,17 +130,16 @@ export class DMService {
       const admin = await AccountModel.findOne({ address: address?.toLowerCase() }, { _id: 1 });
       const user = await AccountModel.findOne({ address: userAddress?.toLowerCase() }, { _id: 1 });
       const group = await DmModel.findById(groupId);
-      const subs = await SubscriptionModel.findOne({ active: true, userId: user._id, planId: { $in: group.plans }, })
+      const subs = await SubscriptionModel.findOne({ active: true, userId: user._id, planId: { $in: group.plans } });
 
-      const isAdmin = this.checkIsAdmin(group.participants, admin._id)
+      const isAdmin = this.checkIsAdmin(group.participants, admin._id);
 
       if (!group) {
         return res.status(404).json({ success: false, message: 'Group not found.' });
       }
       if (isAdmin) {
-        const isAlreadyJoined = this.isUserInGroup(group.participants, admin._id)
-        if (isAlreadyJoined)
-          return res.status(400).json({ success: false, message: 'Already in the group.' });
+        const isAlreadyJoined = this.isUserInGroup(group.participants, admin._id);
+        if (isAlreadyJoined) return res.status(400).json({ success: false, message: 'Already in the group.' });
 
         await DmModel.findOneAndUpdate(
           { _id: groupId },
@@ -147,22 +147,20 @@ export class DMService {
             $push: {
               participants: {
                 role: 'member', // Assign default role as 'member'
-                participant: user._id // Add the user to the participants array
-              }
-            }
+                participant: user._id, // Add the user to the participants array
+              },
+            },
           },
-          { new: true } // Optionally returns the updated document
+          { new: true }, // Optionally returns the updated document
         );
-        
 
         return res.status(400).json({ success: false, message: 'You are admin' });
       }
 
       if (!isAdmin && subs != null) {
-        const isAlreadyJoined = this.isUserInGroup(group.participants, user._id)
+        const isAlreadyJoined = this.isUserInGroup(group.participants, user._id);
 
-        if (isAlreadyJoined)
-          return res.status(400).json({ success: false, message: 'Already in the group.' });
+        if (isAlreadyJoined) return res.status(400).json({ success: false, message: 'Already in the group.' });
 
         await DmModel.findOneAndUpdate(
           { _id: groupId },
@@ -170,17 +168,16 @@ export class DMService {
             $push: {
               participants: {
                 role: 'member', // Assign default role as 'member'
-                participant: user._id // Add the user to the participants array
-              }
-            }
+                participant: user._id, // Add the user to the participants array
+              },
+            },
           },
-          { new: true } // Optionally returns the updated document
+          { new: true }, // Optionally returns the updated document
         );
         return res.status(200).json({
           success: true,
           message: 'User successfully joined the group.',
         });
-
       }
     } catch (error) {
       console.error('Error creating group chat:', error);
@@ -271,10 +268,10 @@ export class DMService {
           'participants.participant': user._id,
         },
       },
-    
+
       // Sort messages by creation time in descending order
       { $sort: { createdAt: -1 } },
-    
+
       // Lookup messages based on the conversation
       {
         $lookup: {
@@ -284,7 +281,7 @@ export class DMService {
           as: 'messages',
         },
       },
-    
+
       // Unwind the participants array to join details for each participant
       {
         $unwind: {
@@ -292,7 +289,7 @@ export class DMService {
           preserveNullAndEmptyArrays: true,
         },
       },
-    
+
       // Lookup participants' details from the Account collection and include role
       {
         $lookup: {
@@ -302,7 +299,7 @@ export class DMService {
           as: 'participantDetails',
         },
       },
-    
+
       // Unwind participantDetails to access details as an object
       {
         $unwind: {
@@ -310,7 +307,7 @@ export class DMService {
           preserveNullAndEmptyArrays: true,
         },
       },
-    
+
       // Add a field to determine whether the user should be included based on conversation type
       {
         $addFields: {
@@ -323,14 +320,14 @@ export class DMService {
           },
         },
       },
-    
+
       // Match only participants who should be included
       {
         $match: {
           includeParticipant: true,
         },
       },
-    
+
       // Regroup the data to include only the relevant fields
       {
         $group: {
@@ -353,7 +350,7 @@ export class DMService {
           messages: { $first: '$messages' },
         },
       },
-    
+
       // Lookup sender details for each message
       {
         $lookup: {
@@ -373,7 +370,7 @@ export class DMService {
           ],
         },
       },
-    
+
       // Map messages to include filtered sender details
       {
         $addFields: {
@@ -404,7 +401,7 @@ export class DMService {
           },
         },
       },
-    
+
       // Include blocked users to disable chat
       {
         $lookup: {
@@ -472,7 +469,7 @@ export class DMService {
           as: 'blockList',
         },
       },
-    
+
       // Project relevant fields, including last 20 messages
       {
         $project: {
@@ -488,7 +485,6 @@ export class DMService {
         },
       },
     ];
-    
 
     // Execute aggregation using DmModel
     const dms = await DmModel.aggregate(pipeline);
@@ -849,8 +845,7 @@ export class DMService {
         error: 'An error occurred while processing your request.',
       });
     }
-  }
-
+  } 
   async getVideoStream(req: Request, res: Response) {
     res.status(400).json({ success: false, message: 'getVideoStream  not completed yat.' });
   }
@@ -925,5 +920,86 @@ export class DMService {
       return res.status(500).json({ message: 'Internal Server Error' });
     }
   }
-  async removeUserFromGroup(req: Request, res: Response) { }
+  async addTnx(req: Request, res: Response) {
+    const { messageId, senderAddress, receiverAddress, messageHash, status, type, chainId } = req.body;
+
+    // Validate the required fields
+    if (!senderAddress || !receiverAddress || !messageHash) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: senderAddress, receiverAddress, or messageHash.',
+      });
+    }
+
+    // Create a new message transaction
+    const newMessage = new MessageTransactions({
+      messageId,
+      senderAddress,
+      receiverAddress,
+      messageHash,
+      chainId,
+      type,
+      status: status || 'init', // Default status
+    });
+
+    try {
+      // Save to database
+      const savedMessage = await newMessage.save();
+
+      // Respond with success
+      return res.status(201).json({
+        success: true,
+        data: savedMessage,
+      });
+    } catch (error) {
+      // Handle potential errors during save
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to save the transaction.',
+        error: error.message,
+      });
+    }
+  }
+  async updateTnxStatus(req: Request, res: Response) {
+    const { tnxId, status } = req.body;
+
+    // Validate the required fields
+    if (!tnxId || !status) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: messageId and status.',
+      });
+    }
+
+    try {
+      // Find the message by its ID and update the status
+      const updatedMessage = await MessageTransactions.findOneAndUpdate(
+        { _id: tnxId },
+        { status },
+        { new: true }, // Return the updated document
+      );
+
+      // If the message does not exist, respond with an error
+      if (!updatedMessage) {
+        return res.status(404).json({
+          success: false,
+          message: 'Message not found with the provided messageId.',
+        });
+      }
+
+      // Respond with the updated message
+      return res.status(200).json({
+        success: true,
+        data: updatedMessage,
+      });
+    } catch (error) {
+      // Handle errors
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to update the status.',
+        error: error.message,
+      });
+    }
+  } 
+  async removeUserFromGroup(req: Request, res: Response) {}
 }
