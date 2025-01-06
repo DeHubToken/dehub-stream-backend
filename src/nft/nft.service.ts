@@ -565,12 +565,16 @@ export class NftService {
       );
       // Include userLike logic
       for (let nft of ret) {
-        const userLike = await VoteModel.findOne({
-          tokenId: nft.tokenId,
-          address,
-        });
+        const userLike = await VoteModel.findOne({ tokenId: nft.tokenId, address:address.toLowerCase() });
         nft.isLiked = Boolean(userLike);
       }
+
+      const userSavedPromises = ret.map(async (nft) => {
+        const userSaved = await SavedPost.findOne({ tokenId: nft.tokenId, address: address.toLowerCase() });
+        nft.isSaved = Boolean(userSaved);
+      });
+      await Promise.all(userSavedPromises);
+
       res.send({ result: ret });
     } catch (e) {
       console.log('   ...', new Date(), ' -- index/tokens-search err: ', e);
@@ -833,11 +837,11 @@ export class NftService {
       }
 
       // Check if the post is already saved by the user
-      const existingPost = await SavedPost.findOne({ tokenId: tokenId, userId: user._id });
+      const existingPost = await SavedPost.findOne({ tokenId: tokenId, userId: user._id, address: address?.toLowerCase() });
 
       if (existingPost) {
         // If the post exists, remove it and return response that feed is unsaved
-        await SavedPost.deleteOne({ tokenId: tokenId, userId: user._id });
+        await SavedPost.deleteOne({ tokenId: tokenId, userId: user._id, address: address?.toLowerCase() });
 
         console.log("Feed unsaved successfully");
         return { status: 'success', message: 'Feed unsaved' };
@@ -846,6 +850,7 @@ export class NftService {
         const newPost = new SavedPost({
           tokenId: tokenId,
           userId: user._id,
+          address: address?.toLowerCase()
         });
 
         await newPost.save();
