@@ -3,10 +3,11 @@ import { Request, Response } from 'express';
 import { AuthGuard } from 'common/guards/auth.guard';
 import { NftService } from './nft.service';
 import { MediaAuthGuard } from 'common/guards/auth.meida.guard';
+import { reqParam } from './nft.imports';
 
 @Controller()
 export class NFTController {
-  constructor(private readonly nftServices: NftService) {}
+  constructor(private readonly nftServices: NftService) { }
 
   @Get('getServerTime')
   getServerTime(@Res() res: Response) {
@@ -77,7 +78,7 @@ export class NFTController {
     if (postType != 'feed-simple' && (!files || files.length === 0)) {
       return res.status(400).json({ message: 'No files provided for minting' });
     }
-    const { address, name, description, streamInfo, chainId, category,plans=null } = req.body;
+    const { address, name, description, streamInfo, chainId, category, plans = null } = req.body;
 
     try {
       const nft = await this.nftServices.mintNFT(
@@ -87,7 +88,7 @@ export class NFTController {
         address,
         chainId,
         category,
-        postType,JSON.parse(plans),
+        postType, JSON.parse(plans),
         files,
       );
       return res.json(nft);
@@ -112,7 +113,7 @@ export class NFTController {
     }
   }
 
-  @Get('/nfts/images/:id')  
+  @Get('/nfts/images/:id')
   @UseGuards(MediaAuthGuard)
 
   async nftImage(@Req() req: Request, @Res() res: Response) {
@@ -137,5 +138,25 @@ export class NFTController {
     const watcherAddress = req.params.address;
     return this.nftServices.recordVideoView(watcherAddress, tokenId)
   }
-  
+
+  @Post('/savePost')
+  @UseGuards(AuthGuard)
+  async savePost(@Req() req: Request, @Res() res: Response) {
+    const { tokenId } = req.body;
+    const address = reqParam(req, 'address');
+    if (!tokenId) {
+      return res.status(400).json({ message: 'Missing tokenId or userId in request body.' });
+    }
+    try {
+      const savePost = await this.nftServices.savePost(tokenId,address)
+      console.log('savePost:', savePost)
+      res.json(savePost)
+    } catch (error) {
+      return res.status(500).json({
+        message: 'Something went wrong while saving the post.',
+        error: error.message,
+      });
+    }
+  }
+
 }

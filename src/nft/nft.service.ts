@@ -4,6 +4,7 @@ import { ethers, solidityPackedKeccak256 } from 'ethers'; // Import ethers
 import { arrayify, splitSignature } from '@ethersproject/bytes';
 import { CdnService } from '../cdn/cdn.service';
 import { TokenModel } from 'models/Token';
+import SavedPost from 'models/SavedPost'
 import { normalizeAddress } from 'common/util/format';
 import { paramNames, streamCollectionAddresses, streamInfoKeys, tokenTemplate } from 'config/constants';
 import {
@@ -39,13 +40,13 @@ export class NftService {
   constructor(
     private readonly cdnService: CdnService,
     private readonly jobService: JobService,
-  ) {}
+  ) { }
 
   async getAllNfts(req: Request, res: Response) {
     const skip = req.body.skip || req.query.skip || 0;
     const limit = req.body.limit || req.query.limit || 1000;
     const postType = req.body.postType || req.query.postType || 'video';
-    console.log("getAllNfts",postType)
+    console.log("getAllNfts", postType)
     const filter = { status: 'minted', postType };
     const totalCount = await TokenModel.countDocuments(filter, tokenTemplate);
     const address = reqParam(req, 'address');
@@ -240,7 +241,7 @@ export class NftService {
                 $match: {
                   $expr: {
                     $and: [
-                      { $eq: ['$userId',user?._id?user?._id:null] }, // Match the userId
+                      { $eq: ['$userId', user?._id ? user?._id : null] }, // Match the userId
                       { $eq: ['$active', true] }, // Check if the subscription is active
                       {
                         $and: [
@@ -372,8 +373,8 @@ export class NftService {
           $sort: sortOption
             ? sortOption
             : {
-                createdAt: -1,
-              },
+              createdAt: -1,
+            },
         },
         {
           $skip: skip,
@@ -418,7 +419,7 @@ export class NftService {
         postFilter['postType'] = postType;
         // postFilter['transcodingStatus'] = 'done';
       }
- 
+
       console.log('sortMode', { sortMode, postType, searchQuery });
       let sortRule: any = { createdAt: -1 };
       searchQuery['$match'] = {
@@ -428,7 +429,7 @@ export class NftService {
           postFilter
         ],
       };
-console.log("searchQuery",JSON.stringify(searchQuery))
+      console.log("searchQuery", JSON.stringify(searchQuery))
       console.log('Range - sotMode - unit - page - search', range, sortMode, unit, page, search)
       switch (sortMode) {
         case 'trends':
@@ -820,6 +821,44 @@ console.log("searchQuery",JSON.stringify(searchQuery))
     console.log('updated video info', tokenId);
   }
 
+  async savePost(tokenId: number, address: string) {
+    try {
+      // Find the user by their address (case-insensitive)
+      const user = await AccountModel.findOne({ address: address?.toLowerCase() }, { _id: 1, address: 1 });
+
+      // Check if the user exists
+      if (!user) {
+        console.log('User not found');
+        return { status: 'error', message: 'User not found' };
+      }
+
+      // Check if the post is already saved by the user
+      const existingPost = await SavedPost.findOne({ tokenId: tokenId, userId: user._id });
+
+      if (existingPost) {
+        // If the post exists, remove it and return response that feed is unsaved
+        await SavedPost.deleteOne({ tokenId: tokenId, userId: user._id });
+
+        console.log("Feed unsaved successfully");
+        return { status: 'success', message: 'Feed unsaved' };
+      } else {
+        // If the post doesn't exist, save the new post and return response that feed is saved
+        const newPost = new SavedPost({
+          tokenId: tokenId,
+          userId: user._id,
+        });
+
+        await newPost.save();
+
+        console.log("Feed saved successfully");
+        return { status: 'success', message: 'Feed saved' };
+      }
+    } catch (error) {
+      console.log("Error:", error);
+      return { status: 'error', message: 'An error occurred', error: error.message };
+    }
+  }
+
   async getSignForClaimBounty(req: Request, res: Response) {
     const address = reqParam(req, paramNames.address);
     const tokenId = reqParam(req, 'tokenId');
@@ -908,7 +947,7 @@ console.log("searchQuery",JSON.stringify(searchQuery))
       // Function to determine whether blur should be applied
       const shouldApplyBlur = () => {
         console.log({
-          isOwner , isFree , isUnlockedLocked , isSubscribed ,  
+          isOwner, isFree, isUnlockedLocked, isSubscribed,
         })
         const result = isOwner || isFree || isUnlockedLocked || isSubscribed;
         // const result = !(isFree || (isUnlockedPPV && !isSubscribed) || (isUnlockedLocked && !isSubscribed));
@@ -919,13 +958,13 @@ console.log("searchQuery",JSON.stringify(searchQuery))
       // Apply blur and compression if necessary
       let sendImage = imageBuffer;
       if (shouldApplyBlur()) {
-      //   console.log('Applying blur and compression');
-      const compressedImage = await makeBlurAndCompress(imageBuffer, { blur: 30, compress: 0 });
-      sendImage = compressedImage;
+        //   console.log('Applying blur and compression');
+        const compressedImage = await makeBlurAndCompress(imageBuffer, { blur: 30, compress: 0 });
+        sendImage = compressedImage;
       }
 
       // Send the image (compressed or not) as the response
-      console.log('Sending image as response'); 
+      console.log('Sending image as response');
       res.set('Content-Type', 'image/jpg');
       res.send(sendImage);
     } catch (error) {
@@ -946,14 +985,14 @@ console.log("searchQuery",JSON.stringify(searchQuery))
     return { v, r, s };
   }
 
-  async recordVideoView(watcherAddress, tokenId){
+  async recordVideoView(watcherAddress, tokenId) {
     try {
       const existingEntry = await WatchHistoryModel.findOne({
         watcherAddress,
         tokenId,
         status: 'confirmed',
       });
-  
+
       if (!existingEntry) {
         await new WatchHistoryModel({
           tokenId,
@@ -961,7 +1000,7 @@ console.log("searchQuery",JSON.stringify(searchQuery))
           status: 'confirmed',
           watchedAt: new Date(),
         }).save();
-  
+
         const tokenFilter = { tokenId };
         await TokenModel.updateOne(tokenFilter, { $inc: { views: 1 } });
         return { success: true }
