@@ -6,6 +6,7 @@ import { DmModel } from 'models/message/DM';
 import { AccountModel } from 'models/Account';
 import { Types } from 'mongoose';
 import { ACTION_TYPE, UserReportModel } from 'models/user-report';
+import { singleMessagePipeline } from './pipline';
 
 @Injectable()
 export class DMSocketService {
@@ -70,7 +71,6 @@ export class DMSocketService {
       });
     }
   }
-
   async sendMessage({ socket, req, session, blockList }: { socket: any; req: any; session: any; blockList: any }) {
     if (!socket || !req || !session) {
       return;
@@ -134,83 +134,17 @@ export class DMSocketService {
     blockList: any;
   }) {
     const userId = session.user._id;
-    console.log('userId', userId);
+    console.log('reValidateMessage called', { userId, req });
     const messageId = req.messageId;
-    const singleMessagePipeline = [
-      // Match the specific message by _id
-      {
-        $match: {
-          _id: new Types.ObjectId(messageId),
-        },
-      },
+    const pipeline = [...singleMessagePipeline(messageId)];
 
-      // Lookup sender details
-      {
-        $lookup: {
-          from: 'accounts',
-          localField: 'sender',
-          foreignField: '_id',
-          as: 'senderDetails',
-          pipeline: [
-            {
-              $project: {
-                _id: 1,
-                username: 1,
-                address: 1,
-                displayName: 1,
-              },
-            },
-          ],
-        },
-      },
-      // Lookup purchase options details
-      {
-        $unwind: {
-          path: '$purchaseOptions',
-          preserveNullAndEmptyArrays: true,
-        },
-      },
-      {
-        $lookup: {
-          from: 'purchaseoptions',
-          localField: 'purchaseOptions._id',
-          foreignField: '_id',
-          as: 'purchaseOptionDetails',
-        },
-      },
-      {
-        $addFields: {
-          purchaseOptions: {
-            $mergeObjects: ['$purchaseOptions', { details: { $arrayElemAt: ['$purchaseOptionDetails', 0] } }],
-          },
-        },
-      },
-      // Re-group purchase options
-      {
-        $group: {
-          _id: '$_id',
-          sender: { $first: '$sender' },
-          author: { $first: '$author' },
-          conversation: { $first: '$conversation' },
-          uploadStatus: { $first: '$uploadStatus' },
-          msgType: { $first: '$msgType' },
-          isRead: { $first: '$isRead' },
-          isPaid: { $first: '$isPaid' },
-          failureReason: { $first: '$failureReason' },
-          mediaUrls: { $first: '$mediaUrls' },
-          isUnlocked: { $first: '$isUnlocked' },
-          purchaseOptions: { $push: '$purchaseOptions' },
-          createdAt: { $first: '$createdAt' },
-          updatedAt: { $first: '$updatedAt' },
-        },
-      },
-    ];
-
-    const validatedMessages = await MessageModel.aggregate(singleMessagePipeline); 
+    const validatedMessages = await MessageModel.aggregate(pipeline);
     const message = validatedMessages[0];
-    if (message.sender.toString() == userId.toString()) {
+
+    if (message.sender._id.toString() == userId.toString()) {
       message.author = 'me';
     }
+    console.log('message', message);
     socket.emit(SocketEvent.ReValidateMessage, {
       dmId: req.dmId,
       message: message,

@@ -8,6 +8,7 @@ import { CdnService } from 'src/cdn/cdn.service';
 import { JobGateway } from './job.socket';
 import { Message, MessageModel } from 'models/message/dm-messages';
 import { config } from '../../config/index';
+import { singleMessagePipeline } from 'src/dm/pipline';
 
 @Processor('dm-uploads')
 export class DmQueueProcessor {
@@ -55,15 +56,14 @@ export class DmQueueProcessor {
         },
       ];
       message.msgType = 'media';
-      const updatedMessage = await message.save();
-
+      await message.save();
+      const updatedMessage = await MessageModel.aggregate(singleMessagePipeline(message._id));
       // Emit success progress to the socket gateway
       this.socketGateway.emitDmUploadProgress({
-        dmId:updatedMessage.conversation,
-        message:updatedMessage,
+        dmId: updatedMessage[0].conversation,
+        message: updatedMessage[0],
         status: 'success',
       });
-      console.log('Media processed and uploaded:', url);
     } catch (error) {
       // Handle upload failure
       console.error('Error processing media:', error);
@@ -72,8 +72,8 @@ export class DmQueueProcessor {
       message.failureReason = error.message; // Store the failure reason
       const updatedMessage = await message.save();
       this.socketGateway.emitDmUploadProgress({
-        dmId:updatedMessage.conversation, 
-        message:updatedMessage,
+        dmId: updatedMessage.conversation,
+        message: updatedMessage,
         status: 'success',
       });
       throw error; // Optionally re-throw to retry the job
