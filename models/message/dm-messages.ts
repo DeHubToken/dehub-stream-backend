@@ -60,7 +60,7 @@ export class Message extends Document {
   isRead: boolean;
   @Prop({ type: Boolean, default: false })
   isPaid: boolean;
-  @Prop({ type: Boolean, default: true })
+  @Prop({ type: Boolean, default: false })
   isUnLocked: boolean;
   @Prop({ type: String, default: null })
   failureReason: string; // Field to store error details in case of failure

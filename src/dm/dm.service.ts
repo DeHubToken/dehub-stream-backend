@@ -497,7 +497,7 @@ export class DMService {
     // Execute aggregation using DmModel
     const dms = await DmModel.aggregate(pipeline);
     res.status(200).json(dms);
-  } 
+  }
   async uploadDm(req: Request, res: Response, files: { files: Express.Multer.File[] }) {
     const conversationId = reqParam(req, 'conversationId');
     const senderId = reqParam(req, 'senderId');
@@ -516,8 +516,10 @@ export class DMService {
 
     if (isPaid && purchaseOptions) {
       obj.isPaid = true;
+      obj.isUnlocked = false;
       obj.purchaseOptions = JSON.parse(purchaseOptions);
     }
+    console.log("isPaid && purchaseOptions",obj)
     const msg = await MessageModel.create(obj);
 
     const { files: data } = files;
@@ -852,7 +854,7 @@ export class DMService {
         error: 'An error occurred while processing your request.',
       });
     }
-  } 
+  }
   async getVideoStream(req: Request, res: Response) {
     res.status(400).json({ success: false, message: 'getVideoStream  not completed yat.' });
   }

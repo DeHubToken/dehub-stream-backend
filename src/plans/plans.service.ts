@@ -43,7 +43,7 @@ export class PlansService {
     try {
       const obj = {};
       addProperty(req, obj, 'address');
-      console.log(obj)
+      console.log(obj);
       const plans = await PlansModel.find(obj, planTemplate);
       return res.status(200).json({ plans });
     } catch (error) {
@@ -63,7 +63,11 @@ export class PlansService {
     addProperty(req, obj, 'chains');
 
     // Check if a plan with the same tier and duration already exists
-    const isExist = await PlansModel.findOne({ address:obj.address.toLowerCase(),tier: obj.tier, duration: obj.duration });
+    const isExist = await PlansModel.findOne({
+      address: obj.address.toLowerCase(),
+      tier: obj.tier,
+      duration: obj.duration,
+    });
     if (isExist) {
       return res.status(409).json({ error: 'Plan Already Exist!', msg: 'Plan Already Exist!' });
     }
@@ -192,7 +196,7 @@ export class PlansService {
     } catch (error) {
       return res.status(500).json({ error: 'Error deleting plan', details: error });
     }
-  } 
+  }
   async getSubscription(req: Request, res: Response) {
     const obj = {};
     addProperty(req, obj, 'id');
@@ -202,7 +206,7 @@ export class PlansService {
       id: 0,
     });
     return res.status(200).json({ subscription });
-  } 
+  }
   async getMySubscription(req: Request, res: Response) {
     const obj: any = {};
     // addProperty(req, obj, 'account', 'address');
