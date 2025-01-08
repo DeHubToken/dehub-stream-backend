@@ -302,12 +302,8 @@ export const singleMessagePipeline = messageId => {
 //   },
 // ];
 
-
-export const conversationPipeline = (user) => [
-  // Match conversations where the user is a participant
-  { $match: { 'participants.participant': user._id } },
-
-  // Sort conversations by creation time in descending order
+export const conversationPipeline = user => [
+  // Sort messages by creation time in descending order
   { $sort: { createdAt: -1 } },
 
   // Lookup messages based on the conversation
@@ -320,49 +316,6 @@ export const conversationPipeline = (user) => [
     },
   },
 
-  // Lookup user reports for the conversation
-  {
-    $lookup: {
-      from: 'userreports',
-      localField: '_id',
-      foreignField: 'conversation',
-      as: 'reportDetails',
-    },
-  },
-
-  // Add fields to filter messages based on user reports
-  {
-    $addFields: {
-      filteredMessages: {
-        $map: {
-          input: '$messages',
-          as: 'message',
-          in: {
-            $cond: [
-              {
-                $anyElementTrue: {
-                  $map: {
-                    input: '$reportDetails',
-                    as: 'report',
-                    in: {
-                      $and: [
-                        { $eq: ['$$report.reportedUser', '$$message.sender'] }, // Check if the sender is the reported user
-                        { $ne: ['$$report.action', 'unblock'] }, // Exclude 'unblock' actions
-                        { $lt: ['$$message._id', '$$report.lastMessage'] }, // Check if the message is before the lastMessage
-                      ],
-                    },
-                  },
-                },
-              },
-              null, // Exclude this message if the conditions are met
-              '$$message', // Otherwise include the message
-            ],
-          },
-        },
-      },
-    },
-  },
-
   // Unwind the participants array to join details for each participant
   {
     $unwind: {
@@ -371,7 +324,7 @@ export const conversationPipeline = (user) => [
     },
   },
 
-  // Lookup participant details from the accounts collection
+  // Lookup participants' details from the Account collection and include role
   {
     $lookup: {
       from: 'accounts',
@@ -381,7 +334,7 @@ export const conversationPipeline = (user) => [
     },
   },
 
-  // Unwind participant details
+  // Unwind participantDetails to access details as an object
   {
     $unwind: {
       path: '$participantDetails',
@@ -389,7 +342,7 @@ export const conversationPipeline = (user) => [
     },
   },
 
-  // Add fields to determine whether to include the participant
+  // Add a field to determine whether the user should be included based on conversation type
   {
     $addFields: {
       includeParticipant: {
@@ -421,6 +374,7 @@ export const conversationPipeline = (user) => [
             _id: '$participantDetails._id',
             username: '$participantDetails.username',
             address: '$participantDetails.address',
+            avatarImageUrl:'$participantDetails.avatarImageUrl'
           },
           role: '$participants.role',
         },
@@ -428,7 +382,7 @@ export const conversationPipeline = (user) => [
       lastMessageAt: { $first: '$lastMessageAt' },
       createdAt: { $first: '$createdAt' },
       updatedAt: { $first: '$updatedAt' },
-      messages: { $first: '$filteredMessages' },
+      messages: { $first: '$messages' },
     },
   },
 
@@ -446,13 +400,14 @@ export const conversationPipeline = (user) => [
             address: 1,
             displayName: 1,
             username: 1,
+            avatarImageUrl:1
           },
         },
       ],
     },
   },
 
-  // Add sender details to messages and include author information
+  // Map messages to include filtered sender details and add author field
   {
     $addFields: {
       messages: {
@@ -475,11 +430,12 @@ export const conversationPipeline = (user) => [
                     0,
                   ],
                 },
+                // Add 'author' field to each message
                 author: {
                   $cond: [
-                    { $eq: [user._id, '$$message.sender'] },
-                    'me',
-                    'other',
+                    { $eq: [user._id, '$$message.sender'] }, // Check if sender is the user
+                    'me', // If the user is the sender, label it as 'me'
+                    'other', // Otherwise, use the sender's ID
                   ],
                 },
               },
@@ -558,7 +514,7 @@ export const conversationPipeline = (user) => [
     },
   },
 
-  // Project relevant fields, including the last 20 messages
+  // Project relevant fields, including last 20 messages
   {
     $project: {
       _id: 1,
@@ -569,9 +525,7 @@ export const conversationPipeline = (user) => [
       createdAt: 1,
       updatedAt: 1,
       blockList: 1,
-      messages: { $slice: ['$messages', -20] }, // Limit to the last 20 messages
+      messages: { $slice: ['$messages', -20] },
     },
   },
 ];
-
-

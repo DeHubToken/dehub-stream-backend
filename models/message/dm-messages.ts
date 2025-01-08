@@ -44,10 +44,10 @@ export class Message extends Document {
 
   @Prop({
     type: String,
-    enum: ['simple','pending', 'success', 'failure'],
+    enum: ['simple', 'pending', 'success', 'failure'],
     default: 'simple',
   })
-  uploadStatus: 'simple'|'pending' | 'success' | 'failure';
+  uploadStatus: 'simple' | 'pending' | 'success' | 'failure';
 
   @Prop({
     type: String,

@@ -12,6 +12,7 @@ export enum ACTION_TYPE {
   REPORT = 'report',
   BLOCK = 'block',
   BLOCKED = 'blocked', // Admin-initiated block
+  UNBLOCKED = 'unblocked', // Admin-initiated block
 }
 
 @Schema({ timestamps: true })

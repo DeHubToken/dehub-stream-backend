@@ -4,13 +4,13 @@ import mongoose, { Document, Model } from 'mongoose';
 @Schema({ timestamps: true })
 export class MessageTransaction extends Document {
   // Unique identifier for the message within a conversation
-  @Prop({ type: mongoose.Schema.Types.ObjectId, required: false })
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Message', required: true })
   messageId: mongoose.Schema.Types.ObjectId;
-
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'DM', required: true })
+  conversation: mongoose.Schema.Types.ObjectId; 
   // Optional hash of the message content for verification
   @Prop({ type: String, trim: true, required: false })
-  transactionHash: string;
-
+  transactionHash: string; 
   // Address of the sender
   @Prop({ type: String, trim: true, required: false })
   senderAddress: string;
