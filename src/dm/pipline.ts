@@ -330,26 +330,35 @@ export const conversationPipeline = (user) => [
     },
   },
 
-  // Add fields to calculate whether to limit messages
+  // Add fields to filter messages based on user reports
   {
     $addFields: {
       filteredMessages: {
-        $cond: [
-          {
-            $gt: [{ $size: '$reportDetails' }, 0], // Check if there are any reports
-          },
-          {
-            // If there are reports, filter messages up to the lastMessage ID
-            $filter: {
-              input: '$messages',
-              as: 'message',
-              cond: {
-                $lt: ['$$message._id', { $arrayElemAt: ['$reportDetails.lastMessage', 0] }],
+        $map: {
+          input: '$messages',
+          as: 'message',
+          in: {
+            $cond: [
+              {
+                $anyElementTrue: {
+                  $map: {
+                    input: '$reportDetails',
+                    as: 'report',
+                    in: {
+                      $and: [
+                        { $eq: ['$$report.reportedUser', '$$message.sender'] }, // Check if the sender is the reported user
+                        { $ne: ['$$report.action', 'unblock'] }, // Exclude 'unblock' actions
+                        { $lt: ['$$message._id', '$$report.lastMessage'] }, // Check if the message is before the lastMessage
+                      ],
+                    },
+                  },
+                },
               },
-            },
+              null, // Exclude this message if the conditions are met
+              '$$message', // Otherwise include the message
+            ],
           },
-          '$messages', // If no reports, include all messages
-        ],
+        },
       },
     },
   },
@@ -564,4 +573,5 @@ export const conversationPipeline = (user) => [
     },
   },
 ];
+
 
