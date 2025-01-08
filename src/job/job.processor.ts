@@ -64,6 +64,8 @@ export class DmQueueProcessor {
         message: updatedMessage[0],
         status: 'success',
       });
+
+      console.log('updatedMessage[0]:',updatedMessage[0])
     } catch (error) {
       // Handle upload failure
       console.error('Error processing media:', error);

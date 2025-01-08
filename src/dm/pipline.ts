@@ -67,7 +67,7 @@ export const singleMessagePipeline = messageId => {
         isPaid: { $first: '$isPaid' },
         failureReason: { $first: '$failureReason' },
         mediaUrls: { $first: '$mediaUrls' },
-        isUnlocked: { $first: '$isUnlocked' },
+        isUnLocked: { $first: '$isUnLocked' },
         purchaseOptions: { $push: '$purchaseOptions' }, // Push the restructured purchaseOptions array
         createdAt: { $first: '$createdAt' },
         updatedAt: { $first: '$updatedAt' },

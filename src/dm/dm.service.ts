@@ -121,7 +121,7 @@ export class DMService {
         },
         ...conversationPipeline(creatorExists),
       ];
-  
+
       // Execute aggregation using DmModel
       const dms = await DmModel.aggregate(pipeline);
       return res.status(201).json({
@@ -303,14 +303,18 @@ export class DMService {
       msgType: 'media',
       uploadStatus: 'pending',
       isRead: false,
+      isPaid:false,
+      isUnLocked:true
     };
-
+    
+    console.log('isPaid:',isPaid,obj)
     if (isPaid && purchaseOptions) {
       obj.isPaid = true;
       obj.isUnLocked = false;
       obj.purchaseOptions = JSON.parse(purchaseOptions);
     }
-    console.log('isPaid && purchaseOptions', obj);
+    // console.log('isPaid && purchaseOptions', obj);
+    console.log('obj:',obj)
     const msg = await MessageModel.create(obj);
 
     const { files: data } = files;
