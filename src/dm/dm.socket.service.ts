@@ -82,8 +82,122 @@ export class DMSocketService {
       sender: userId,
       isRead: false,
       content: req.content,
-      isPaid:false,
-      isUnLocked:true,
+      isPaid: false,
+      isUnLocked: true,
+      msgType: req.type,
+    };
+    if (state.msgType == 'gif') {
+      state.mediaUrls = [
+        {
+          url: req.gif, // Assuming req.gif contains the URL of the uploaded GIF
+          type: 'gif',
+          mimeType: 'image/gif', // MIME type for GIF
+        },
+      ];
+    }
+    const newMsg: any = await MessageModel.create(state);
+    socket.emit(SocketEvent.sendMessage, { ...newMsg?._doc, author: 'me' });
+    const dm = await DmModel.findById(req.dmId);
+    let ids = dm.participants.reduce((acc, current) => {
+      const { participant } = current;
+      if (participant && participant.toString() !== userId.toString()) {
+        return [...acc, participant];
+      }
+      return acc;
+    }, []);
+
+    let socketsUsers = await this.getOnlineSocketsUsers(session, ids);
+    socketsUsers = socketsUsers.filter(user => {
+      return !blockList.some(blocked => {
+        if (blocked.reportedBy) {
+          return blocked.reportedBy.toString() === user._id.toString();
+        }
+
+        if (blocked.reportedUser) {
+          return blocked.reportedUser.toString() === user._id.toString();
+        }
+      });
+    });
+    socketsUsers.forEach(su => {
+      if (su.socketIds && su.socketIds.length > 0) {
+        socket.in(su.socketIds).emit(SocketEvent.sendMessage, { ...newMsg?._doc, author: 'other' });
+      }
+    });
+  }
+  async deleteMessage({ socket, req, session, blockList }: { socket: any; req: any; session: any; blockList: any }) {
+    
+    if (!socket || !req || !session) {
+      return;
+    } 
+    const userId = session.user._id;
+    const messageId = req.messageId; 
+    const dmId = req.dmId; 
+
+     
+    // Validate message existence and user permissions
+    const message = await MessageModel.findById(messageId);
+    if (!message) {
+      socket.emit(SocketEvent.error, { message: 'Message not found' });
+      return;
+    } 
+    if (message.sender.toString() !== userId.toString()) {
+      socket.emit(SocketEvent.error, { message: 'You are not authorized to delete this message' });
+      return;
+    } 
+    // Delete the message
+    await MessageModel.findByIdAndDelete(messageId);
+
+    // Fetch the conversation (DM or group chat) associated with the message
+    const dm = await DmModel.findById(req.dmId);
+    if (!dm) {
+      socket.emit(SocketEvent.error, { message: 'Conversation not found' });
+      return;
+    }
+
+    // Get participants excluding the message deleter
+    const ids = dm.participants.reduce((acc, current) => {
+      const { participant } = current;
+      if (participant && participant.toString() !== userId.toString()) {
+        return [...acc, participant];
+      }
+      return acc;
+    }, []);
+
+    // Get online users, excluding those in the block list
+    let socketsUsers = await this.getOnlineSocketsUsers(session, ids);
+    socketsUsers = socketsUsers.filter(user => {
+      return !blockList.some(blocked => {
+        if (blocked.reportedBy) {
+          return blocked.reportedBy.toString() === user._id.toString();
+        }
+
+        if (blocked.reportedUser) {
+          return blocked.reportedUser.toString() === user._id.toString();
+        }
+      });
+    });
+
+    // Notify all relevant users about the deleted message
+    socketsUsers.forEach(su => {
+      if (su.socketIds && su.socketIds.length > 0) {
+        socket.in(su.socketIds).emit(SocketEvent.deleteMessage, { dmId,messageId });
+      }
+    });
+ console.log(SocketEvent.deleteMessage, { messageId,dmId })
+    socket.emit(SocketEvent.deleteMessage, { messageId,dmId });
+  } 
+  async deleteAllMessage({ socket, req, session, blockList }: { socket: any; req: any; session: any; blockList: any }) {
+    if (!socket || !req || !session) {
+      return;
+    }
+    const userId = session.user._id;
+    const state: any = {
+      conversation: req.dmId,
+      sender: userId,
+      isRead: false,
+      content: req.content,
+      isPaid: false,
+      isUnLocked: true,
       msgType: req.type,
     };
     if (state.msgType == 'gif') {
@@ -190,8 +304,7 @@ export class DMSocketService {
       }
       return user;
     });
-  }
-  // Helper method to check for blocked users in a specific conversation (DM or group)
+  } 
   async getBlockedUsersForConversation(conversationId: string): Promise<any[]> {
     // Explicit return type of UserReport[]
     const blocked = await UserReportModel.find({

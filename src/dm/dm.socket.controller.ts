@@ -53,6 +53,10 @@ export class DMSocketController {
         SocketEvent.sendMessage,
         async data =>
           await this.dmSocketService.sendMessage(await this.withRestrictedZone(await this.withSession(socket, data))),
+      );  socket.on(
+        SocketEvent.deleteMessage,
+        async data =>
+          await this.dmSocketService.deleteMessage(await this.withRestrictedZone(await this.withSession(socket, data))),
       );
       socket.on(
         SocketEvent.ReValidateMessage,

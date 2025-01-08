@@ -22,11 +22,13 @@ export class MessageTransaction extends Document {
   receiverAddress: string;
   // Address of the receiver
   @Prop({ type: String, trim: true, required: false })
-  status: string;
-
+  status: string; 
   // Address of the receiver
   @Prop({ type: String, trim: true, required: false })
   chainId: string;
+  // Address of the receiver
+  @Prop({ type: String, trim: true, required: false })
+  amount: string;
   // Address of the receiver
   @Prop({ type: String, trim: true, required: false })
   type: string;
@@ -34,11 +36,7 @@ export class MessageTransaction extends Document {
 
 // Create the schema
 export const MessageTransactionSchema = SchemaFactory.createForClass(MessageTransaction);
-
-// Add indexes for frequently queried fields
-MessageTransactionSchema.index({ sender: 1 });
-MessageTransactionSchema.index({ conversation: 1 });
-MessageTransactionSchema.index({ messageId: 1 });
+ 
 
 // Export the model
 export const MessageTransactions: Model<MessageTransaction> = mongoose.model<MessageTransaction>(

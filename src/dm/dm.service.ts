@@ -10,7 +10,7 @@ import { SubscriptionModel } from 'models/subscription';
 import { CdnService } from 'src/cdn/cdn.service';
 import { JobService } from 'src/job/job.service';
 import { UserReportModel } from 'models/user-report';
-import { MessageTransactions } from 'models/message/transactions';
+import { MessageTransactions } from 'models/message/tip-and-transactions';
 import { conversationPipeline } from './pipline';
 @Injectable()
 export class DMService {
@@ -725,7 +725,7 @@ export class DMService {
     }
   }
   async addTnx(req: Request, res: Response) {
-    const { messageId, senderAddress, receiverAddress, transactionHash, status, type, chainId } = req.body;
+    const { messageId, senderAddress, receiverAddress, transactionHash, status,amount, type, chainId } = req.body;
 
     // Validate the required fields
     if (!senderAddress || !receiverAddress || !transactionHash) {
@@ -741,6 +741,7 @@ export class DMService {
       senderAddress,
       receiverAddress,
       transactionHash,
+      amount,
       chainId,
       type,
       status: status || 'init', // Default status
