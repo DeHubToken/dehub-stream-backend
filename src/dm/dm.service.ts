@@ -17,7 +17,7 @@ export class DMService {
   constructor(
     private readonly cdnService: CdnService,
     private readonly jobService: JobService,
-  ) {}
+  ) { }
 
   private checkIsAdmin(participants, adminId) {
     return participants.some(p => {
@@ -271,12 +271,16 @@ export class DMService {
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
+
   async getContactsByAddress(req: Request, res: Response) {
     const address = reqParam(req, 'address').toLowerCase();
-    const user = await AccountModel.findOne({ address: address }, { _id: 1 });
-    // Define your aggregation pipeline
+    const user = await AccountModel.findOne({ address }, { _id: 1 });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
     const pipeline: any = [
-      // Match messages where the session user is part of the conversation
       {
         $match: {
           'participants.participant': user._id,
@@ -285,10 +289,11 @@ export class DMService {
       ...conversationPipeline(user),
     ];
 
-    // Execute aggregation using DmModel
     const dms = await DmModel.aggregate(pipeline);
     res.status(200).json(dms);
+    // return dms;
   }
+
   async uploadDm(req: Request, res: Response, files: { files: Express.Multer.File[] }) {
     const conversationId = reqParam(req, 'conversationId');
     const senderId = reqParam(req, 'senderId');
@@ -303,18 +308,18 @@ export class DMService {
       msgType: 'media',
       uploadStatus: 'pending',
       isRead: false,
-      isPaid:false,
-      isUnLocked:true
+      isPaid: false,
+      isUnLocked: true
     };
-    
-    console.log('isPaid:',isPaid,obj)
+
+    console.log('isPaid:', isPaid, obj)
     if (isPaid && purchaseOptions) {
       obj.isPaid = true;
       obj.isUnLocked = false;
       obj.purchaseOptions = JSON.parse(purchaseOptions);
     }
     // console.log('isPaid && purchaseOptions', obj);
-    console.log('obj:',obj)
+    console.log('obj:', obj)
     const msg = await MessageModel.create(obj);
 
     const { files: data } = files;
@@ -555,13 +560,15 @@ export class DMService {
       const address = reqParam(req, 'address'); // Get user's address from request
       const reportId = reqParam(req, 'reportId'); // Get user's address from request
 
-      console.log('object', { conversationId, address });
+      console.log('object', { conversationId, address, reportId });
       const user = await AccountModel.findOne({ address: address.toLowerCase() });
+
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
 
       const conversation = await DmModel.findById(conversationId);
+
       if (!conversation) {
         return res.status(404).json({ error: 'Conversation not found' });
       }
@@ -579,7 +586,6 @@ export class DMService {
           },
         ],
       });
-
       if (!existingBlock) {
         return res.status(400).json({
           error: 'This conversation or user is not currently blocked.',
@@ -588,10 +594,11 @@ export class DMService {
 
       // If conversation type is group, unblock the group
       if (conversation.conversationType === 'group') {
+
         const updatedReport = await UserReportModel.findOneAndUpdate(
           {
             conversation: conversationId,
-            reportedBy: user._id,
+            userReportedBy: user._id,
           },
           {
             $set: {
@@ -601,6 +608,7 @@ export class DMService {
           },
           { new: true },
         );
+
         const out = {
           message: 'Group successfully unblocked.',
           unblocked: true,
@@ -813,5 +821,5 @@ export class DMService {
       });
     }
   }
-  async removeUserFromGroup(req: Request, res: Response) {}
+  async removeUserFromGroup(req: Request, res: Response) { }
 }
