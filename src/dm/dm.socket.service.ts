@@ -82,6 +82,8 @@ export class DMSocketService {
       sender: userId,
       isRead: false,
       content: req.content,
+      isPaid:false,
+      isUnLocked:true,
       msgType: req.type,
     };
     if (state.msgType == 'gif') {

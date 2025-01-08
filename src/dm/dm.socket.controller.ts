@@ -111,6 +111,7 @@ export class DMSocketController {
   async withRestrictedZone({ req, socket, session }) {
     const blockList = await this.dmSocketService.getBlockedUsersForConversation(req.dmId);
     const userId = session.user._id;
+    console.log('blockList:',blockList)
     let next = true;
     blockList.find(list => {
       if (list.reportedBy == userId.toString() || list.reportedUser == userId.toString()) {

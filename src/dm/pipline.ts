@@ -297,7 +297,7 @@ export const conversationPipeline = user => [
       createdAt: 1,
       updatedAt: 1,
       blockList: 1,
-      messages: { $slice: ['$messages', 20] },
+      messages: { $slice: ['$messages', -20] },
     },
   },
 ];
