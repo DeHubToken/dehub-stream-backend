@@ -2,18 +2,21 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { Document, Model } from 'mongoose';
 
 @Schema({ timestamps: true })
-export class MessageTransaction extends Document {
+export class TipAndDmTnx extends Document {
   // Unique identifier for the message within a conversation
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Message', required: true })
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Message' })
   messageId: mongoose.Schema.Types.ObjectId;
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'DM', required: true })
-  conversation: mongoose.Schema.Types.ObjectId; 
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'DmTips' })
+  tipId: mongoose.Schema.Types.ObjectId;
   // Optional hash of the message content for verification
   @Prop({ type: String, trim: true, required: false })
-  transactionHash: string; 
+  transactionHash: string;
   // Address of the sender
   @Prop({ type: String, trim: true, required: false })
   senderAddress: string;
+  // Address of the sender
+  @Prop({ type: String, trim: true, required: false })
+  tokenAddress: string;
   // Address of the sender
   @Prop({ type: String, trim: true, required: false })
   description: string;
@@ -22,24 +25,20 @@ export class MessageTransaction extends Document {
   receiverAddress: string;
   // Address of the receiver
   @Prop({ type: String, trim: true, required: false })
-  status: string; 
+  status: string;
   // Address of the receiver
-  @Prop({ type: String, trim: true, required: false })
+  @Prop({ type: Number, required: false })
   chainId: string;
   // Address of the receiver
   @Prop({ type: String, trim: true, required: false })
-  amount: string;
+  amount: number;
   // Address of the receiver
   @Prop({ type: String, trim: true, required: false })
   type: string;
 }
 
 // Create the schema
-export const MessageTransactionSchema = SchemaFactory.createForClass(MessageTransaction);
- 
+export const TipAndDmTnxSchema = SchemaFactory.createForClass(TipAndDmTnx);
 
 // Export the model
-export const MessageTransactions: Model<MessageTransaction> = mongoose.model<MessageTransaction>(
-  'MessageTransactions',
-  MessageTransactionSchema,
-);
+export const TipAndDmTnxModal: Model<TipAndDmTnx> = mongoose.model<TipAndDmTnx>('tip-and-dm-tnx', TipAndDmTnxSchema);

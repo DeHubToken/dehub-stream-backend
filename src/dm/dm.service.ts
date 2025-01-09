@@ -10,14 +10,16 @@ import { SubscriptionModel } from 'models/subscription';
 import { CdnService } from 'src/cdn/cdn.service';
 import { JobService } from 'src/job/job.service';
 import { UserReportModel } from 'models/user-report';
-import { MessageTransactions } from 'models/message/tip-and-transactions';
+import { TipAndDmTnxModal } from 'models/message/tip-and-dm-tnx';
 import { conversationPipeline } from './pipline';
+import { DmTips } from 'models/message/tips';
+import { supportedTokens } from 'config/constants';
 @Injectable()
 export class DMService {
   constructor(
     private readonly cdnService: CdnService,
     private readonly jobService: JobService,
-  ) { }
+  ) {}
 
   private checkIsAdmin(participants, adminId) {
     return participants.some(p => {
@@ -309,17 +311,17 @@ export class DMService {
       uploadStatus: 'pending',
       isRead: false,
       isPaid: false,
-      isUnLocked: true
+      isUnLocked: true,
     };
 
-    console.log('isPaid:', isPaid, obj)
+    console.log('isPaid:', isPaid, obj);
     if (isPaid && purchaseOptions) {
       obj.isPaid = true;
       obj.isUnLocked = false;
       obj.purchaseOptions = JSON.parse(purchaseOptions);
     }
     // console.log('isPaid && purchaseOptions', obj);
-    console.log('obj:', obj)
+    console.log('obj:', obj);
     const msg = await MessageModel.create(obj);
 
     const { files: data } = files;
@@ -594,7 +596,6 @@ export class DMService {
 
       // If conversation type is group, unblock the group
       if (conversation.conversationType === 'group') {
-
         const updatedReport = await UserReportModel.findOneAndUpdate(
           {
             conversation: conversationId,
@@ -733,29 +734,66 @@ export class DMService {
     }
   }
   async addTnx(req: Request, res: Response) {
-    const { messageId, senderAddress, receiverAddress, transactionHash, status,amount, type, chainId } = req.body;
+    const {
+      messageId,
+      dmId,
+      senderAddress,
+      receiverAddress,
+      tokenAddress,
+      transactionHash,
+      status,
+      amount,
+      type,
+      chainId,
+    } = req.body;
 
     // Validate the required fields
-    if (!senderAddress || !receiverAddress || !transactionHash) {
+    if (!senderAddress || !receiverAddress || !transactionHash || !type) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: senderAddress, receiverAddress, or transactionHash.',
+        message: 'Missing required fields: senderAddress, receiverAddress, transactionHash, or type.',
       });
     }
 
-    // Create a new message transaction
-    const newMessage = new MessageTransactions({
+    const obj: any = {
       messageId,
+      dmId,
       senderAddress,
       receiverAddress,
       transactionHash,
+      tokenAddress,
       amount,
       chainId,
       type,
       status: status || 'init', // Default status
-    });
+    };
 
     try {
+      if (type === 'tip') {
+        const sender = await AccountModel.findOne({ address: senderAddress.toLowerCase() }, { _id: 1 });
+        if (!sender) {
+          return res.status(404).json({
+            success: false,
+            message: 'Sender account not found.',
+          });
+        }
+
+        const token = supportedTokens.find(t => t.address == tokenAddress);
+        const tip = await DmTips.create({
+          conversation: dmId,
+          tipBy: sender._id,
+          tokenAddress,
+          symbol: token.symbol,
+          chainId: token.chainId,
+          amount: amount,
+          status: 'init',
+        }); 
+        obj.tipId = tip._id;
+      }
+
+      // Create a new message transaction
+      const newMessage = new TipAndDmTnxModal(obj);
+
       // Save to database
       const savedMessage = await newMessage.save();
 
@@ -773,53 +811,80 @@ export class DMService {
       });
     }
   }
+
   async updateTnx(req: Request, res: Response) {
-    const { tnxId, status, tnxHash } = req.body;
+    const { tnxId, dmId, status, tnxHash } = req.body;
 
     // Validate the required fields
-    if (!tnxId || !status) {
+    if (!tnxId && !tnxHash) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: messageId and status.',
+        message: 'Missing required fields: tnxId or tnxHash.',
+      });
+    }
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required field: status.',
       });
     }
 
     try {
-      // Find the message by its ID and update the status
-      const updatedMessage = await MessageTransactions.findOneAndUpdate(
-        { $or: [{ _id: tnxId, transactionHash: tnxHash }, { transactionHash: tnxHash }] },
+      // Find the transaction by ID or transactionHash and update the status
+      const updatedMessage = await TipAndDmTnxModal.findOneAndUpdate(
+        {
+          $or: [
+            { _id: tnxId, transactionHash: tnxHash },
+            { transactionHash: tnxHash, dmId },
+          ],
+        },
         { status },
         { new: true }, // Return the updated document
       );
 
-      await MessageModel.findByIdAndUpdate(updatedMessage.messageId, {
-        isUnLocked: true,
-      });
-      // If the message does not exist, respond with an error
       if (!updatedMessage) {
+        // If the transaction does not exist, respond with an error
         return res.status(404).json({
           success: false,
-          message: 'Message not found with the provided messageId.',
+          message: 'Transaction not found with the provided identifiers.',
         });
       }
 
-      // Respond with the updated message
-      return res.status(200).json({
-        success: true,
-        data: {
-          tnxId,
-          messageId: updatedMessage.messageId,
+      // Handle specific actions based on transaction type
+      if (updatedMessage.type === 'paid-dm') {
+        await MessageModel.findByIdAndUpdate(updatedMessage.messageId, {
           isUnLocked: true,
-        },
-      });
+        });
+        // Respond with the updated message
+        return res.status(200).json({
+          success: true,
+          data: {
+            tnxId: updatedMessage._id,
+            messageId: updatedMessage.messageId,
+            isUnLocked: updatedMessage.type === 'paid-dm', // Unlock status for paid-dm
+          },
+        });
+      }
+
+      if (updatedMessage.type === 'tip') {
+        await DmTips.findByIdAndUpdate(updatedMessage.tipId, {
+          status: 'success',
+        });
+        // Respond with the updated message
+        return res.status(200).json({
+          success: true,
+          message: 'Tip Sent Confirmed.',
+        });
+      }
     } catch (error) {
       // Handle errors
       return res.status(500).json({
         success: false,
-        message: 'Failed to update the status.',
+        message: 'Failed to update the transaction status.',
         error: error.message,
       });
     }
   }
-  async removeUserFromGroup(req: Request, res: Response) { }
+
+  async removeUserFromGroup(req: Request, res: Response) {}
 }

@@ -6,8 +6,9 @@ export class Tip extends Document {
   // Unique identifier for the message within a conversation
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'DM', required: true })
   conversation: mongoose.Schema.Types.ObjectId;
-  @Prop({ type: Number, default: false })
-  isRead: number;
+  // Unique identifier for the message within a conversation
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Account', required: true })
+  tipBy: mongoose.Schema.Types.ObjectId;
   @Prop({ type: Number, default: false })
   chainId: number;
   @Prop({ type: Number, default: false })
@@ -16,6 +17,8 @@ export class Tip extends Document {
   tokenAddress: string;
   @Prop({ type: String, default: false })
   symbol: string;
+  @Prop({ type: String, default: 'Pending' })
+  status: string;
 }
 
 // Create the schema
