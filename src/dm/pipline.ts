@@ -304,17 +304,89 @@ export const singleMessagePipeline = messageId => {
 
 export const conversationPipeline = user => [
   // Sort messages by creation time in descending order
-  { $sort: { createdAt: -1 } },
 
-  // Lookup messages based on the conversation
-  {
-    $lookup: {
-      from: 'messages',
-      localField: '_id',
-      foreignField: 'conversation',
-      as: 'messages',
+  // {
+  //   $match: {
+  //     _id: new Types.ObjectId('677e6a9a23e90232ccea15aa'),
+  //   },
+  // },
+  { $sort: { createdAt: -1 } },
+ 
+// Lookup reports related to the conversation
+{
+  $lookup: {
+    from: 'userreports',
+    localField: '_id',
+    foreignField: 'conversation',
+    as: 'report',
+    pipeline: [
+      {
+        $match: {
+          $or: [
+            { reportedUser: user._id }, // Matching if the user is reported
+          ],
+        },
+      },
+      {
+        $match: {
+          $or: [
+            { action: 'block' }, // Action "block"
+            { action: 'blocked' }, // Action "blocked" (admin-initiated)
+          ],
+        },
+      },
+    ],
+  },
+},
+
+// Add the block timestamp as the lastReportedMessageDate
+{
+  $addFields: {
+    lastReportedMessageDate: {
+      $ifNull: [
+        {
+          $arrayElemAt: [
+            { $map: { input: '$report', as: 'r', in: '$$r.updatedAt' } }, 
+            0,
+          ],
+        },
+        null, // Default to null if no report exists
+      ],
     },
   },
+},
+
+// Lookup messages based on the conversation and handle the case where lastReportedMessageDate is undefined
+{
+  $lookup: {
+    from: 'messages',
+    localField: '_id',
+    foreignField: 'conversation',
+    as: 'messages',
+    let: { lastReportedMessageDate: '$lastReportedMessageDate' }, // Pass the field to the messages pipeline
+    pipeline: [
+      {
+        $match: {
+          $expr: {
+            $or: [
+              { $lte: ['$createdAt', '$$lastReportedMessageDate'] }, // Fetch messages created before the block timestamp
+              { $eq: ['$$lastReportedMessageDate', null] }, // Fetch all messages if no block timestamp exists
+            ],
+          },
+        },
+      }, // Sort the messages by creation time (newest first)
+    ],
+  },
+},
+
+  // {
+  //   $lookup: {
+  //     from: 'messages',
+  //     localField: '_id',
+  //     foreignField: 'conversation',
+  //     as: 'messages',
+  //   },
+  // },
 
   // Unwind the participants array to join details for each participant
   {
@@ -374,7 +446,7 @@ export const conversationPipeline = user => [
             _id: '$participantDetails._id',
             username: '$participantDetails.username',
             address: '$participantDetails.address',
-            avatarImageUrl:'$participantDetails.avatarImageUrl'
+            avatarImageUrl: '$participantDetails.avatarImageUrl',
           },
           role: '$participants.role',
         },
@@ -400,7 +472,7 @@ export const conversationPipeline = user => [
             address: 1,
             displayName: 1,
             username: 1,
-            avatarImageUrl:1
+            avatarImageUrl: 1,
           },
         },
       ],
