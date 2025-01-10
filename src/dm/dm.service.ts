@@ -14,12 +14,13 @@ import { TipAndDmTnxModal } from 'models/message/tip-and-dm-tnx';
 import { conversationPipeline } from './pipline';
 import { DmTips } from 'models/message/tips';
 import { supportedTokens } from 'config/constants';
+
 @Injectable()
 export class DMService {
   constructor(
     private readonly cdnService: CdnService,
     private readonly jobService: JobService,
-  ) {}
+  ) { }
 
   private checkIsAdmin(participants, adminId) {
     return participants.some(p => {
@@ -373,14 +374,8 @@ export class DMService {
           error: 'You have already blocked this conversation or user.',
         });
       }
-      const lastMessage = await MessageModel.findOne(
-        {
-          conversation: conversationId,
-        },
-        { _id: 1 },
-      )
-        .sort({ createdAt: -1 }) // Assuming messages have a `createdAt` field
-        .lean();
+      const lastMessage = await MessageModel.findOne({ conversation: conversationId, }, { _id: 1 }).sort({ createdAt: -1 }).lean();// Assuming messages have a `createdAt` field
+      console.log('lastMessage:',lastMessage)
       // If conversation type is group, block the group
       if (conversation.conversationType === 'group') {
         const updatedReport = await UserReportModel.findOneAndUpdate(
@@ -596,9 +591,10 @@ export class DMService {
 
       // If conversation type is group, unblock the group
       if (conversation.conversationType === 'group') {
+        console.log('conversationId:', new mongoose.Types.ObjectId(conversationId),user._id)
         const updatedReport = await UserReportModel.findOneAndUpdate(
           {
-            conversation: conversationId,
+            conversation: new mongoose.Types.ObjectId(conversationId),
             userReportedBy: user._id,
           },
           {
@@ -609,7 +605,7 @@ export class DMService {
           },
           { new: true },
         );
-
+        console.log('updatedReport:',updatedReport)
         const out = {
           message: 'Group successfully unblocked.',
           unblocked: true,
@@ -787,7 +783,7 @@ export class DMService {
           chainId: token.chainId,
           amount: amount,
           status: 'init',
-        }); 
+        });
         obj.tipId = tip._id;
       }
 
@@ -886,5 +882,5 @@ export class DMService {
     }
   }
 
-  async removeUserFromGroup(req: Request, res: Response) {}
+  async removeUserFromGroup(req: Request, res: Response) { }
 }

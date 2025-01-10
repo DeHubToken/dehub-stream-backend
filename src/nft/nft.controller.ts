@@ -25,6 +25,8 @@ export class NFTController {
   @Get('search_nfts')
   async Filtered(@Req() req: Request, @Res() res: Response) {
     try {
+      console.log('GET NFT');
+      
       return await this.nftServices.getFilteredNfts(req, res);
     } catch (error) {
       return res.status(500).json({ message: 'Failed to fetch NFTs', error: error.message });

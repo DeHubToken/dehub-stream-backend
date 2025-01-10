@@ -574,7 +574,7 @@ export class NftService {
         nft.isSaved = Boolean(userSaved);
       });
       await Promise.all(userSavedPromises);
-
+      console.log('ret:',ret)
       res.send({ result: ret });
     } catch (e) {
       console.log('   ...', new Date(), ' -- index/tokens-search err: ', e);
@@ -890,7 +890,7 @@ export class NftService {
   }
   async getNftImage(req: Request, res: Response) {
     try {
-      console.log('Received request to fetch NFT image');
+      // console.log('Received request to fetch NFT image');
 
       // Retrieve tokenId from query or params
       const tokenId = req.query.id || req.params?.id;
@@ -898,14 +898,14 @@ export class NftService {
         console.log('Token ID is missing in request');
         return res.status(400).json({ error: 'Token ID is required' });
       }
-      console.log(`Token ID retrieved: ${tokenId}`);
+      // console.log(`Token ID retrieved: ${tokenId}`);
 
       const address = reqParam(req, 'address');
-      console.log(`Address retrieved: ${address}`);
+      // console.log(`Address retrieved: ${address}`);
 
       // Extract token base ID (in case it's concatenated with some other string)
       const tk = tokenId.toString().split('-')[0];
-      console.log(`Extracted base token ID: ${tk}`);
+      // console.log(`Extracted base token ID: ${tk}`);
 
       // Retrieve token from the database
       const token = await TokenModel.findOne({ tokenId: tk });
@@ -913,16 +913,16 @@ export class NftService {
         console.log(`Token with ID ${tk} not found in database`);
         return res.status(404).json({ error: 'Token not found' });
       }
-      console.log('Token found:', token);
+      // console.log('Token found:', token);
       const isOwner = token?.owner == address;
       // Extract stream info and check conditions for content
       const { isLockContent = false, isPayPerView = false }: any = token?.streamInfo;
       const { plans = null } = token;
       const isFree = !isLockContent && !isPayPerView && !plans;
-      console.log(`isLockContent: ${isLockContent}, isPayPerView: ${isPayPerView}, isFree: ${isFree}`);
+      // console.log(`isLockContent: ${isLockContent}, isPayPerView: ${isPayPerView}, isFree: ${isFree}`);
 
       const { isSubscribed = false, planRequired = false } = await getIsSubscriptionRequired(token.tokenId, address);
-      console.log(`Subscription status: isSubscribed: ${isSubscribed}, planRequired: ${planRequired}`);
+      // console.log(`Subscription status: isSubscribed: ${isSubscribed}, planRequired: ${planRequired}`);
 
       // Check if PPV content is unlocked or not
       const isUnlockedPPV = isPayPerView ? await isUnlockedPPVStream(token.tokenId.toString(), address) : true;
@@ -930,16 +930,16 @@ export class NftService {
 
       // Check if locked content is unlocked or not
       const isUnlockedLocked = isLockContent ? await isUnlockedLockedContent(token.streamInfo, address) : true;
-      console.log(`Locked content unlocked: ${isUnlockedLocked}`);
+      // console.log(`Locked content unlocked: ${isUnlockedLocked}`);
 
       // Construct the API URL for the token image
       const apiUrl = defaultTokenImagePath(tokenId.toString(), token.minter);
-      console.log(`Constructed API URL for image: ${apiUrl}`);
+      // console.log(`Constructed API URL for image: ${apiUrl}`);
 
       // Fetch the image from the API
       let imageBuffer;
       const response = await axios.get(apiUrl, { responseType: 'arraybuffer' });
-      console.log(`Fetched image from API, status: ${response.status}`);
+      // console.log(`Fetched image from API, status: ${response.status}`);
 
       // Check if the response status is OK
       if (response.status !== 200) {
@@ -947,7 +947,7 @@ export class NftService {
         return res.status(404).json({ error: 'Image not found on the server' });
       }
       imageBuffer = Buffer.from(response.data);
-      console.log('Image data received and converted to buffer');
+      // console.log('Image data received and converted to buffer');
 
       // Function to determine whether blur should be applied
       const shouldApplyBlur = () => {
@@ -956,7 +956,7 @@ export class NftService {
         })
         const result = isOwner || isFree || isUnlockedLocked || isSubscribed;
         // const result = !(isFree || (isUnlockedPPV && !isSubscribed) || (isUnlockedLocked && !isSubscribed));
-        console.log(`Should apply blur: ${!result}`);
+        // console.log(`Should apply blur: ${!result}`);
         return !result;
       };
 
@@ -1047,7 +1047,7 @@ const extractFromCookie = req => {
 
     if (cookie) {
       const parsedCookie = JSON.parse(cookie);
-      console.log('Parsed cookie:', parsedCookie);
+      // console.log('Parsed cookie:', parsedCookie);
       // Extract dynamic address
       const address = Object.keys(parsedCookie)[0]; // Get the dynamic address key
       const data = parsedCookie[address]; // Access the corresponding data for that address
