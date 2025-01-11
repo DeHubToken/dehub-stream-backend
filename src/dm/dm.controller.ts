@@ -147,6 +147,18 @@ export class DMController {
       });
     }
   }
+
+  @Post('/dm/group-user-exit')
+  async exitGroupUser(@Req() req: Request, @Res() res: Response) {
+    try {
+      return await this.dmServices.exitGroupUser(req, res);
+    } catch (error) {
+      return res.status(500).json({
+        message: 'Failed to search users or groups',
+        error: error.message,
+      });
+    }
+  }
   @Put('/dm/tnx')
   async updateTnx(@Req() req: Request, @Res() res: Response) {
     try {

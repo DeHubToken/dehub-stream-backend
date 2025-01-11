@@ -318,7 +318,6 @@ export class DMService {
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
-
   async getContactsByAddress(req: Request, res: Response) {
     const address = reqParam(req, 'address').toLowerCase();
     const user = await AccountModel.findOne({ address }, { _id: 1 });
@@ -340,7 +339,6 @@ export class DMService {
     res.status(200).json(dms);
     // return dms;
   }
-
   async uploadDm(req: Request, res: Response, files: { files: Express.Multer.File[] }) {
     const conversationId = reqParam(req, 'conversationId');
     const senderId = reqParam(req, 'senderId');
@@ -418,10 +416,8 @@ export class DMService {
           error: 'You have already blocked this conversation or user.',
         });
       }
-      const lastMessage = await MessageModel.findOne({ conversation: conversationId }, { _id: 1 })
-        .sort({ createdAt: -1 })
-        .lean(); // Assuming messages have a `createdAt` field
-      console.log('lastMessage:', lastMessage);
+      const lastMessage = await MessageModel.findOne({ conversation: conversationId, }, { _id: 1 }).sort({ createdAt: -1 }).lean();// Assuming messages have a `createdAt` field
+      console.log('lastMessage:', lastMessage)
       // If conversation type is group, block the group
       if (conversation.conversationType === 'group') {
         const updatedReport = await UserReportModel.findOneAndUpdate(
@@ -597,6 +593,83 @@ export class DMService {
       });
     }
   }
+
+  async exitGroupUser(req: Request, res: Response) {
+    const conversationId = reqParam(req, 'conversationId');
+    const userAddress = reqParam(req, 'userAddress');
+    const address = reqParam(req, 'address');
+      console.log('conversationId:',conversationId)
+      console.log('userAddress:',userAddress)
+      console.log('address:',address)
+    try {
+      // Find the conversation
+      const conversation = await DmModel.findById(conversationId);
+      if (!conversation) {
+        return res.status(404).json({ error: 'Conversation not found' });
+      }
+
+      const [admin, user] = await Promise.all([
+        AccountModel.findOne({ address: address.toLowerCase() }, { _id: 1 }),
+        AccountModel.findOne({ address: userAddress.toLowerCase() }, { _id: 1 }),
+      ]);
+
+      // Find the user
+      if (!admin || !user) {
+        return res.status(404).json({
+          error: !user ? 'User not found' : 'Admin not found',
+        });
+      }
+
+      const isAdmin = conversation.participants.some(p => p.role === 'admin' && p.participant.toString() === admin._id.toString());
+      console.log('isAdmin:', isAdmin)
+
+      if (isAdmin) {
+        // Check if user is in participants
+        const isUserInParticipants = conversation.participants.some(
+          (participant: any) => participant.participant.toString() === user._id.toString()
+        );
+
+        if (isUserInParticipants) {
+          // Remove the user from participants
+          await DmModel.findOneAndUpdate(
+            { _id: conversationId },
+            { $pull: { participants: { participant: user._id } } }
+          );
+          return res.status(200).json({ message: 'User removed from group' });
+        } else {
+          // User is already exited
+          return res.status(400).json({ error: 'User already exited the group' });
+        }
+      }
+
+      else if (address.toLowerCase() == userAddress.toLowerCase()) {
+        // Check if user is in participants
+        const isUserInParticipants = conversation.participants.some(
+          (participant: any) => participant.participant.toString() === user._id.toString()
+        );
+
+        if (isUserInParticipants) {
+          // Remove the user from participants
+          await DmModel.findOneAndUpdate(
+            { _id: conversationId },
+            { $pull: { participants: { participant: user._id } } }
+          );
+          return res.status(200).json({ message: 'User removed from group' });
+        } else {
+          // User is already exited
+          return res.status(400).json({ error: 'User already exited the group' });
+        }
+      } else{
+        return res.status(400).json({ error: 'Some thing is wrong' });
+      }
+
+
+    } catch (error) {
+      console.error('Error in exitGroupUser:', error);
+      return res.status(500).json({ error: 'An error occurred' });
+    }
+  }
+
   async unBlockDm(req: Request, res: Response) {
     try {
       const conversationId = reqParam(req, 'conversationId'); // Get conversation ID from request
@@ -637,11 +710,14 @@ export class DMService {
 
       // If conversation type is group, unblock the group
       if (conversation.conversationType === 'group') {
-        console.log('conversationId:', new mongoose.Types.ObjectId(conversationId), user._id);
+        console.log('conversationId:', new mongoose.Types.ObjectId(conversationId), user._id)
         const updatedReport = await UserReportModel.findOneAndUpdate(
           {
             conversation: new mongoose.Types.ObjectId(conversationId),
-            userReportedBy: user._id,
+            $or: [
+              { userReportedBy: user._id },
+              { reportedBy: user._id },
+            ],
           },
           {
             $set: {
@@ -651,7 +727,7 @@ export class DMService {
           },
           { new: true },
         );
-        console.log('updatedReport:', updatedReport);
+        console.log('updatedReport:', updatedReport)
         const out = {
           message: 'Group successfully unblocked.',
           unblocked: true,
