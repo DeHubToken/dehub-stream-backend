@@ -3,7 +3,7 @@ import { addProperty, reqParam } from 'common/util/auth';
 import { AccountModel } from 'models/Account';
 import { Request, Response } from 'express';
 import { MessageModel } from 'models/message/dm-messages';
-import mongoose from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import { DmModel } from 'models/message/DM';
 import { PlansModel } from 'models/Plans';
 import { SubscriptionModel } from 'models/subscription';
@@ -14,13 +14,57 @@ import { TipAndDmTnxModal } from 'models/message/tip-and-dm-tnx';
 import { conversationPipeline } from './pipline';
 import { DmTips } from 'models/message/tips';
 import { supportedTokens } from 'config/constants';
-
+import { EventEmitter, EventManager } from 'src/events/event-manager';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 @Injectable()
 export class DMService {
+  eventEmitter: EventEmitter2;
   constructor(
     private readonly cdnService: CdnService,
     private readonly jobService: JobService,
-  ) { }
+    // Access the shared EventEmitter instance
+  ) {
+    this.eventEmitter = EventManager.getInstance();
+
+    //   const tip = {
+    //     _id: new Types.ObjectId('678208b7e040a1fdd08e5154'),
+    //     conversation: new Types.ObjectId('6780aa443fdb6c8b4b9d40b6'),
+    //     tipBy: new Types.ObjectId('675041a4174b3100bccbb193'),
+    //     chainId: 97,
+    //     amount: 2,
+    //     tokenAddress: '0xeb6ACdcfe1F13187126A504d56f7970bf6f3C5E1',
+    //     symbol: 'DHB',
+    //     status: 'success',
+    //   };
+
+    //   const tipAndDMTnx = {
+    //     _id: new Types.ObjectId('678208b7e040a1fdd08e5156'),
+    //     messageId: null,
+    //     tipId: new Types.ObjectId('678208b7e040a1fdd08e5154'),
+    //     transactionHas: '0x1874a9f5a98514711572540cd91d220400efd045559ee588e1a905b568496ce0',
+    //     senderAddress: '0x35BAa69f84E19B8F0F864E69501Ef9A6b0a53D15',
+    //     tokenAddress: '0xeb6ACdcfe1F13187126A504d56f7970bf6f3C5E1',
+    //     receiverAddress: '0x776216cb5408ea7b43d5eb0d076fa908a70241e7',
+    //     status: 'success',
+    //     chainId: 97,
+    //     amount: '2',
+    //     type: 'tip',
+    //   };
+
+    //   const eventData = {
+    //     tipId: tip._id,
+    //     status: tip.status,
+    //     dmId: tip.conversation,
+    //     amount: tip.amount,
+    //     tipBy: tip.tipBy,
+    //     senderAddress: tipAndDMTnx.senderAddress,
+    //     receiverAddress: tipAndDMTnx.receiverAddress,
+    //   };
+
+    //  setInterval(() => {
+    //   this.eventEmitter.emit(EventEmitter.tipSend, eventData);
+    //  }, 7000);
+  }
 
   private checkIsAdmin(participants, adminId) {
     return participants.some(p => {
@@ -374,8 +418,10 @@ export class DMService {
           error: 'You have already blocked this conversation or user.',
         });
       }
-      const lastMessage = await MessageModel.findOne({ conversation: conversationId, }, { _id: 1 }).sort({ createdAt: -1 }).lean();// Assuming messages have a `createdAt` field
-      console.log('lastMessage:',lastMessage)
+      const lastMessage = await MessageModel.findOne({ conversation: conversationId }, { _id: 1 })
+        .sort({ createdAt: -1 })
+        .lean(); // Assuming messages have a `createdAt` field
+      console.log('lastMessage:', lastMessage);
       // If conversation type is group, block the group
       if (conversation.conversationType === 'group') {
         const updatedReport = await UserReportModel.findOneAndUpdate(
@@ -591,7 +637,7 @@ export class DMService {
 
       // If conversation type is group, unblock the group
       if (conversation.conversationType === 'group') {
-        console.log('conversationId:', new mongoose.Types.ObjectId(conversationId),user._id)
+        console.log('conversationId:', new mongoose.Types.ObjectId(conversationId), user._id);
         const updatedReport = await UserReportModel.findOneAndUpdate(
           {
             conversation: new mongoose.Types.ObjectId(conversationId),
@@ -605,7 +651,7 @@ export class DMService {
           },
           { new: true },
         );
-        console.log('updatedReport:',updatedReport)
+        console.log('updatedReport:', updatedReport);
         const out = {
           message: 'Group successfully unblocked.',
           unblocked: true,
@@ -827,7 +873,7 @@ export class DMService {
 
     try {
       // Find the transaction by ID or transactionHash and update the status
-      const updatedMessage = await TipAndDmTnxModal.findOneAndUpdate(
+      const tipAndDMTnx = await TipAndDmTnxModal.findOneAndUpdate(
         {
           $or: [
             { _id: tnxId, transactionHash: tnxHash },
@@ -838,7 +884,7 @@ export class DMService {
         { new: true }, // Return the updated document
       );
 
-      if (!updatedMessage) {
+      if (!tipAndDMTnx) {
         // If the transaction does not exist, respond with an error
         return res.status(404).json({
           success: false,
@@ -847,26 +893,34 @@ export class DMService {
       }
 
       // Handle specific actions based on transaction type
-      if (updatedMessage.type === 'paid-dm') {
-        await MessageModel.findByIdAndUpdate(updatedMessage.messageId, {
+      if (tipAndDMTnx.type === 'paid-dm') {
+        await MessageModel.findByIdAndUpdate(tipAndDMTnx.messageId, {
           isUnLocked: true,
         });
+
         // Respond with the updated message
         return res.status(200).json({
           success: true,
           data: {
-            tnxId: updatedMessage._id,
-            messageId: updatedMessage.messageId,
-            isUnLocked: updatedMessage.type === 'paid-dm', // Unlock status for paid-dm
+            tnxId: tipAndDMTnx._id,
+            messageId: tipAndDMTnx.messageId,
+            isUnLocked: tipAndDMTnx.type === 'paid-dm', // Unlock status for paid-dm
           },
         });
       }
 
-      if (updatedMessage.type === 'tip') {
-        await DmTips.findByIdAndUpdate(updatedMessage.tipId, {
-          status: 'success',
-        });
-        // Respond with the updated message
+      if (tipAndDMTnx.type === 'tip') {
+        const tip = await DmTips.findByIdAndUpdate(tipAndDMTnx.tipId, { status: 'success' }, { new: true });
+        const eventData = {
+          tipId: tip._id,
+          status: tip.status,
+          dmId: tip.conversation,
+          amount: tip.amount,
+          tipBy: tip.tipBy,
+          senderAddress: tipAndDMTnx.senderAddress,
+          receiverAddress: tipAndDMTnx.receiverAddress,
+        };
+        this.eventEmitter.emit(EventEmitter.tipSend, eventData); 
         return res.status(200).json({
           success: true,
           message: 'Tip Sent Confirmed.',
@@ -882,5 +936,5 @@ export class DMService {
     }
   }
 
-  async removeUserFromGroup(req: Request, res: Response) { }
+  async removeUserFromGroup(req: Request, res: Response) {}
 }

@@ -11,5 +11,6 @@ export const SocketEvent = {
   error: 'error',
   reConnect: 'reConnect',
   ReValidateMessage:'ReValidateMessage',
-  deleteMessage:'deleteMessage'
+  deleteMessage:'deleteMessage',
+  tipUpdate:'tipUpdate'
 };

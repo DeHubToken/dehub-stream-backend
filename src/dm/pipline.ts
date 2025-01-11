@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
 
-export const singleMessagePipeline = messageId => {
+export   const singleMessagePipeline = messageId => {
   return [
     // Match the specific message by _id
     {
@@ -76,7 +76,7 @@ export const singleMessagePipeline = messageId => {
   ];
 };
 
-// export const conversationPipeline = user => [
+//export  export const conversationPipeline = user => [
 //   // Sort messages by creation time in descending order
 //   { $sort: { createdAt: -1 } },
 
@@ -302,7 +302,7 @@ export const singleMessagePipeline = messageId => {
 //   },
 // ];
 
-export const conversationPipeline = user => [
+export   const conversationPipeline = user => [
   // Sort messages by creation time in descending order
   { $sort: { createdAt: -1 } },
   ...dmTips,
@@ -392,7 +392,7 @@ export const conversationPipeline = user => [
   },
 ];
 
-const includeBlockListUser = [
+export const includeBlockListUser = [
   // Include blocked users to disable chat
   {
     $lookup: {
@@ -461,7 +461,7 @@ const includeBlockListUser = [
     },
   },
 ];
-const includeSenderDetailsAndAuthor = user => [
+export const includeSenderDetailsAndAuthor = user => [
   // Lookup sender details for each message
   {
     $lookup: {
@@ -521,7 +521,7 @@ const includeSenderDetailsAndAuthor = user => [
     },
   },
 ];
-const lookMessages = [
+export const lookMessages = [
   // Lookup messages based on the conversation and handle the case where lastReportedMessageDate is undefined
   {
     $lookup: {
@@ -546,7 +546,7 @@ const lookMessages = [
   },
 ];
 
-const lastReportedMessageDate = user => [
+export const lastReportedMessageDate = user => [
   // Lookup reports related to the conversation
   {
     $lookup: {
@@ -587,7 +587,7 @@ const lastReportedMessageDate = user => [
     },
   },
 ];
-const dmTips = [
+export   const dmTips = [
   {
     $lookup: {
       from: 'dmtips',
@@ -595,6 +595,11 @@ const dmTips = [
       foreignField: 'conversation',
       as: 'tips',
       pipeline: [
+        {
+          $match: {
+            status: 'success',
+          },
+        },
         {
           $group: {
             _id: '$tipBy', // Group by the user who tipped

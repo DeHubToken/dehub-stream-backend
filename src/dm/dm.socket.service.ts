@@ -59,11 +59,9 @@ export class DMSocketService {
         createdBy: session.user._id,
         conversationType: 'dm',
         lastMessageAt: new Date(),
-      });
-
+      }); 
       // Save the new DM session to the database
-      await newDm.save();
-
+      await newDm.save(); 
       // Emit the event to notify the client
       socket.emit(SocketEvent.createAndStart, {
         msg: 'Created new DM',

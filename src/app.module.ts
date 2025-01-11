@@ -7,6 +7,7 @@ import { NotificationModule } from './notification/notification.module';
 import { CdnModule } from './cdn/cdn.module';
 import { AuthModule } from './auth/auth.module';
 import { ConfigModule } from '@nestjs/config';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ReqloggerMiddleware } from './reqlogger/reqlogger.middleware';
 import { ReactionModule } from './reaction/reaction.module';
 import { CategoryModule } from './category/category.module';
@@ -29,6 +30,7 @@ import { DmModule } from './dm/dm.module';
         port: 6379,
       },
     }),
+    EventEmitterModule.forRoot(), 
     UserModule, 
     NftModule, NotificationModule, CdnModule, AuthModule, PlansModule,DmModule, ReactionModule, CategoryModule, LeaderboardModule, AssetModule, JobModule, ScheduleModule.forRoot()],
   controllers: [AppController],

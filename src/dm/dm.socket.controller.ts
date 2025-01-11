@@ -2,7 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { Server, Namespace } from 'socket.io';
 import { DMSocketService } from './dm.socket.service';
 import { SocketEvent } from './types';
-import { AccountModel } from 'models/Account'; 
+import { AccountModel } from 'models/Account';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
+import { EventEmitter, EventManager } from 'src/events/event-manager';
+import { Types } from 'mongoose';
+import { DmModel } from 'models/message/DM';
+import { dmTips } from './pipline';
 interface Session {
   username: string;
   socketIds: string[]; // Store multiple socket IDs for each user
@@ -14,12 +19,14 @@ interface Session {
 export class DMSocketController {
   private dmNamespace: Namespace;
   private users: Map<string, Session> = new Map(); // Map of user _id to Session object
-
+  private eventEmitter: EventEmitter2;
   private dmSocketService: any;
 
   constructor(private readonly io: Server) {
     this.dmNamespace = this.io.of('/dm');
+    this.eventEmitter = EventManager.getInstance();
     this.bootstrap();
+    this.listenEvents();
   }
 
   private bootstrap() {
@@ -53,7 +60,8 @@ export class DMSocketController {
         SocketEvent.sendMessage,
         async data =>
           await this.dmSocketService.sendMessage(await this.withRestrictedZone(await this.withSession(socket, data))),
-      );  socket.on(
+      );
+      socket.on(
         SocketEvent.deleteMessage,
         async data =>
           await this.dmSocketService.deleteMessage(await this.withRestrictedZone(await this.withSession(socket, data))),
@@ -115,7 +123,6 @@ export class DMSocketController {
   async withRestrictedZone({ req, socket, session }) {
     const blockList = await this.dmSocketService.getBlockedUsersForConversation(req.dmId);
     const userId = session.user._id;
-    console.log('blockList:',blockList)
     let next = true;
     blockList.find(list => {
       if (list.reportedBy == userId.toString() || list.reportedUser == userId.toString()) {
@@ -127,5 +134,37 @@ export class DMSocketController {
       return { req: null, socket: null, session: null, blockList: null };
     }
     return { req, socket, session, blockList };
+  }
+
+  async listenEvents() {
+    // Add an event listener
+    this.eventEmitter.on(EventEmitter.tipSend, async payload => {
+      const { senderAddress, receiverAddress, dmId } = payload;
+      const senderSession = await this.users.get(senderAddress?.toLowerCase());
+      const receiveSession = await this.users.get(receiverAddress?.toLowerCase());
+      const updatedDM = await DmModel.aggregate([
+        {
+          $match: {
+            _id: dmId,
+          },
+        },
+        ...dmTips,
+        {
+          $project: {
+            dmId: '$_id',
+            tips: 1,
+            _id: 0,
+          },
+        },
+      ]);
+      if (senderSession?.socketIds) {
+        this.dmNamespace.to(senderSession?.socketIds).emit(SocketEvent.tipUpdate, updatedDM[0]);
+      }
+      if (receiveSession?.socketIds) {
+        this.dmNamespace.to(senderSession?.socketIds).emit(SocketEvent.tipUpdate, updatedDM[0]);
+      } 
+      console.log("tip-updates-sent")
+
+    });
   }
 }
