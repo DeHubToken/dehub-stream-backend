@@ -25,45 +25,7 @@ export class DMService {
     // Access the shared EventEmitter instance
   ) {
     this.eventEmitter = EventManager.getInstance();
-
-    //   const tip = {
-    //     _id: new Types.ObjectId('678208b7e040a1fdd08e5154'),
-    //     conversation: new Types.ObjectId('6780aa443fdb6c8b4b9d40b6'),
-    //     tipBy: new Types.ObjectId('675041a4174b3100bccbb193'),
-    //     chainId: 97,
-    //     amount: 2,
-    //     tokenAddress: '0xeb6ACdcfe1F13187126A504d56f7970bf6f3C5E1',
-    //     symbol: 'DHB',
-    //     status: 'success',
-    //   };
-
-    //   const tipAndDMTnx = {
-    //     _id: new Types.ObjectId('678208b7e040a1fdd08e5156'),
-    //     messageId: null,
-    //     tipId: new Types.ObjectId('678208b7e040a1fdd08e5154'),
-    //     transactionHas: '0x1874a9f5a98514711572540cd91d220400efd045559ee588e1a905b568496ce0',
-    //     senderAddress: '0x35BAa69f84E19B8F0F864E69501Ef9A6b0a53D15',
-    //     tokenAddress: '0xeb6ACdcfe1F13187126A504d56f7970bf6f3C5E1',
-    //     receiverAddress: '0x776216cb5408ea7b43d5eb0d076fa908a70241e7',
-    //     status: 'success',
-    //     chainId: 97,
-    //     amount: '2',
-    //     type: 'tip',
-    //   };
-
-    //   const eventData = {
-    //     tipId: tip._id,
-    //     status: tip.status,
-    //     dmId: tip.conversation,
-    //     amount: tip.amount,
-    //     tipBy: tip.tipBy,
-    //     senderAddress: tipAndDMTnx.senderAddress,
-    //     receiverAddress: tipAndDMTnx.receiverAddress,
-    //   };
-
-    //  setInterval(() => {
-    //   this.eventEmitter.emit(EventEmitter.tipSend, eventData);
-    //  }, 7000);
+ 
   }
 
   private checkIsAdmin(participants, adminId) {
@@ -448,14 +410,14 @@ export class DMService {
         });
       }
 
-      // For DM, find the other participant to block
-      const reportedUserId = conversation.participants.find(
-        participantId => participantId.toString() !== user._id.toString(),
-      );
+      // // For DM, find the other participant to block
+      // const reportedUserId = conversation.participants.find(
+      //   participantId => participantId.toString() !== user._id.toString(),
+      // );
 
-      if (!reportedUserId) {
-        return res.status(404).json({ error: 'No other user found in this conversation.' });
-      }
+      // if (!reportedUserId) {
+      //   return res.status(404).json({ error: 'No other user found in this conversation.' });
+      // }
 
       // Update or create a block entry for the DM
       const updatedReport = await UserReportModel.findOneAndUpdate(
@@ -469,7 +431,7 @@ export class DMService {
             reason: reason || 'No reason provided',
             resolved: false,
             isGlobal: false,
-            reportedUser: reportedUserId, // Block the other participant in the DM
+            // reportedUser: reportedUserId, // Block the other participant in the DM
             conversation: conversationId,
             lastMessage: lastMessage._id,
           },

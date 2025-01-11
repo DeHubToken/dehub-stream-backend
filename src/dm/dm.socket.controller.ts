@@ -122,22 +122,32 @@ export class DMSocketController {
 
   async withRestrictedZone({ req, socket, session }) {
     const blockList = await this.dmSocketService.getBlockedUsersForConversation(req.dmId);
+    const dm: any = await DmModel.findById(req.dmId, { _id: 1, conversationType: 1 });
     const userId = session.user._id;
     let next = true;
-    blockList.find(list => {
-      if (list.reportedBy == userId.toString() || list.reportedUser == userId.toString()) {
-        socket.emit(SocketEvent.error, { msg: 'this chat was blocked' });
-        next = false;
-      }
-    });
+
+    if (blockList.length > 0 && dm.conversationType == 'dm') {
+      socket.emit(SocketEvent.error, { msg: 'this chat was blocked' });
+      next = false;
+    }
+
+    if (dm.conversationType == 'group') {
+      blockList.find(list => {
+        console.log(list.reportedBy, list.reportedUser, userId.toString());
+        if (list.reportedBy == userId.toString() || list.reportedUser == userId.toString()) {
+          socket.emit(SocketEvent.error, { msg: 'this chat was blocked' });
+          next = false;
+        }
+      });
+    }
     if (!next) {
       return { req: null, socket: null, session: null, blockList: null };
     }
+ 
     return { req, socket, session, blockList };
   }
 
-  async listenEvents() {
-    // Add an event listener
+  async listenEvents() { 
     this.eventEmitter.on(EventEmitter.tipSend, async payload => {
       const { senderAddress, receiverAddress, dmId } = payload;
       const senderSession = await this.users.get(senderAddress?.toLowerCase());
@@ -162,9 +172,8 @@ export class DMSocketController {
       }
       if (receiveSession?.socketIds) {
         this.dmNamespace.to(senderSession?.socketIds).emit(SocketEvent.tipUpdate, updatedDM[0]);
-      } 
-      console.log("tip-updates-sent")
-
+      }
+      console.log('tip-updates-sent');
     });
   }
 }

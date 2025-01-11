@@ -247,11 +247,10 @@ export class DMSocketService {
     session: any;
     blockList: any;
   }) {
-    const userId = session.user._id;
+    const userId = session?.user?._id;
     console.log('reValidateMessage called', { userId, req });
     const messageId = req.messageId;
-    const pipeline = [...singleMessagePipeline(messageId)];
-
+    const pipeline = [...singleMessagePipeline(messageId)]; 
     const validatedMessages = await MessageModel.aggregate(pipeline);
     const message = validatedMessages[0];
 
