@@ -206,122 +206,62 @@ export class NftService {
   }
 
   async getStreamNfts(filter: any, skip: number, limit: number, sortOption = null, subscriber) {
-    const user: any = await AccountModel.findOne({ address: subscriber?.toLowerCase() });
-
     try {
-      console.log('myfilter', JSON.stringify(filter));
+      const user: any = await AccountModel.findOne({ address: subscriber?.toLowerCase() });
+      if (!user?._id) {
+        return { result: false, error: "User not found or invalid" };
+      }
+  
       const query = [
-        {
-          $match: filter,
-        },
-
+        { $match: filter },
+  
+        // Join plans collection
         {
           $lookup: {
-            from: 'plans',
-            localField: 'plans',
-            foreignField: 'id',
-            as: 'planDetails', // Join the plans collection to the token documents
+            from: "plans",
+            localField: "plans",
+            foreignField: "id",
+            as: "plansDetails",
           },
         },
-
+  
+        // Join subscriptions with date and userId checks
         {
           $lookup: {
-            from: 'plans',
-            localField: 'plans',
-            foreignField: 'id',
-            as: 'planDetails', // Join the plans collection to the token documents
-          },
-        },
-        {
-          $lookup: {
-            from: 'subscriptions',
-            let: { planIds: '$plans' }, // Reference the 'plans' field in Token documents
+            from: "subscriptions",
+            let: { planIds: "$plans" },
             pipeline: [
               {
                 $match: {
                   $expr: {
                     $and: [
-                      { $eq: ['$userId', user?._id ? user?._id : null] }, // Match the userId
-                      { $eq: ['$active', true] }, // Check if the subscription is active
-                      {
-                        $and: [
-                          { $lte: ['$startDate', new Date()] }, // Check if current date is after startDate
-                          { $gte: ['$endDate', new Date()] }, // Check if current date is before endDate
-                        ],
-                      },
+                      { $eq: ["$userId", user._id] },
+                      { $eq: ["$active", true] },
+                      { $lte: ["$startDate", new Date()] },
+                      { $gte: ["$endDate", new Date()] },
                     ],
                   },
                 },
               },
-              {
-                $project: { _id: 1 }, // Only return the _id of matching subscriptions
-              },
+              { $project: { planId: 1 } },
             ],
-            as: 'userSubscriptions',
+            as: "userSubscriptions",
           },
         },
-        {
-          $unwind: {
-            path: '$planDetails',
-            preserveNullAndEmptyArrays: true, // Keep plans without subscriptions
-          },
-        },
-        {
-          $addFields: {
-            'planDetails.alreadySubscribed': {
-              $cond: { if: { $gt: [{ $size: '$userSubscriptions' }, 0] }, then: true, else: false },
-            },
-          },
-        },
-
-        {
-          $lookup: {
-            from: 'plans',
-            localField: 'plans',
-            foreignField: 'id',
-            as: 'plansDetails', // Join the plans collection to the token documents
-          },
-        },
-        {
-          $lookup: {
-            from: 'subscriptions',
-            let: { planIds: '$plans' }, // Reference the 'plans' field in Token documents
-            pipeline: [
-              {
-                $match: {
-                  $expr: {
-                    $and: [
-                      { $eq: ['$userId', user?._id ? user?._id : null] }, // Match the userId
-                      { $eq: ['$active', true] }, // Check if the subscription is active
-                      {
-                        $and: [
-                          { $lte: ['$startDate', new Date()] }, // Check if current date is after startDate
-                          { $gte: ['$endDate', new Date()] }, // Check if current date is before endDate
-                        ],
-                      },
-                    ],
-                  },
-                },
-              },
-              {
-                $project: { planId: 1 }, // Only return the _id of matching subscriptions
-              },
-            ],
-            as: 'userSubscriptions',
-          },
-        },
+  
+        // Add alreadySubscribed to plans
         {
           $addFields: {
             plansDetails: {
               $map: {
-                input: '$plansDetails',
-                as: 'plan',
+                input: "$plansDetails",
+                as: "plan",
                 in: {
                   $mergeObjects: [
-                    '$$plan',
+                    "$$plan",
                     {
                       alreadySubscribed: {
-                        $in: ['$$plan._id', { $map: { input: '$userSubscriptions', as: 'sub', in: '$$sub.planId' } }],
+                        $in: ["$$plan._id", { $map: { input: "$userSubscriptions", as: "sub", in: "$$sub.planId" } }],
                       },
                     },
                   ],
@@ -330,66 +270,55 @@ export class NftService {
             },
           },
         },
+  
+        // Join account and balances collections
         {
           $lookup: {
-            from: 'accounts',
-            localField: 'minter',
-            foreignField: 'address',
-            as: 'account',
+            from: "accounts",
+            localField: "minter",
+            foreignField: "address",
+            as: "account",
           },
         },
         {
           $lookup: {
-            from: 'balances',
-            localField: 'minter',
-            foreignField: 'address',
+            from: "balances",
+            localField: "minter",
+            foreignField: "address",
             pipeline: [
-              {
-                $match: {
-                  tokenAddress: '0x680d3113caf77b61b510f332d5ef4cf5b41a761d',
-                },
-              },
-              {
-                $project: {
-                  staked: 1,
-                  _id: 0,
-                },
-              },
+              { $match: { tokenAddress: "0x680d3113caf77b61b510f332d5ef4cf5b41a761d" } },
+              { $project: { staked: 1, _id: 0 } },
             ],
-            as: 'balance',
+            as: "balance",
           },
         },
+  
+        // Final projection
         {
           $project: {
             ...tokenTemplate,
             plansDetails: 1,
-            mintername: { $first: '$account.username' },
-            minterDisplayName: { $first: '$account.displayName' },
-            minterAvatarUrl: { $first: '$account.avatarImageUrl' },
-            minterStaked: { $first: '$balance.staked' },
+            mintername: { $first: "$account.username" },
+            minterDisplayName: { $first: "$account.displayName" },
+            minterAvatarUrl: { $first: "$account.avatarImageUrl" },
+            minterStaked: { $first: "$balance.staked" },
           },
         },
-        {
-          $sort: sortOption
-            ? sortOption
-            : {
-              createdAt: -1,
-            },
-        },
-        {
-          $skip: skip,
-        },
-        {
-          $limit: limit,
-        },
+  
+        // Sort, skip, and limit
+        { $sort: sortOption || { createdAt: -1 } },
+        { $skip: skip },
+        { $limit: limit },
       ];
+  
       const result = await TokenModel.aggregate(query);
       return result;
     } catch (err) {
-      console.log('-----get stream nfts:', err);
-      return { result: false, error: 'fetching was failed' };
+      console.log("-----get stream nfts:", err);
+      return { result: false, error: "Fetching failed" };
     }
   }
+  
 
   async getFilteredNfts(req: Request, res: Response) {
     try {
