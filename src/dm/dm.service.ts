@@ -598,77 +598,77 @@ export class DMService {
     const conversationId = reqParam(req, 'conversationId');
     const userAddress = reqParam(req, 'userAddress');
     const address = reqParam(req, 'address');
-      console.log('conversationId:',conversationId)
-      console.log('userAddress:',userAddress)
-      console.log('address:',address)
+  
+    console.log('conversationId:', conversationId);
+    console.log('userAddress:', userAddress);
+    console.log('address:', address);
+  
     try {
-      // Find the conversation
+      // Validate required parameters
+      if (!conversationId || !userAddress || !address) {
+        return res.status(400).json({ error: 'Missing required parameters' });
+      }
+  
+      // Fetch the conversation
       const conversation = await DmModel.findById(conversationId);
       if (!conversation) {
         return res.status(404).json({ error: 'Conversation not found' });
       }
-
+  
+      // Fetch the admin and user accounts
       const [admin, user] = await Promise.all([
         AccountModel.findOne({ address: address.toLowerCase() }, { _id: 1 }),
         AccountModel.findOne({ address: userAddress.toLowerCase() }, { _id: 1 }),
       ]);
-
-      // Find the user
+  
       if (!admin || !user) {
         return res.status(404).json({
           error: !user ? 'User not found' : 'Admin not found',
         });
       }
-
-      const isAdmin = conversation.participants.some(p => p.role === 'admin' && p.participant.toString() === admin._id.toString());
-      console.log('isAdmin:', isAdmin)
-
+  
+      // Check if the admin is actually an admin in the group
+      const isAdmin = conversation.participants.some(
+        (p: any) => p.role === 'admin' && p.participant.toString() === admin._id.toString()
+      );
+  
+      console.log('isAdmin:', isAdmin);
+  
+      // Function to remove a user
+      const removeUserFromGroup = async (userId: string) => {
+        const isUserInParticipants = conversation.participants.some(
+          (p: any) => p.participant.toString() === userId
+        );
+  
+        if (isUserInParticipants) {
+         
+          await DmModel.findByIdAndUpdate(conversationId, {
+            $pull: { participants: { participant: userId } },
+          });
+          return res.status(200).json({ message: 'User removed from group' });
+        } else {
+          return res.status(400).json({ error: 'User already exited the group' });
+        }
+      };
+  
       if (isAdmin) {
-        // Check if user is in participants
-        const isUserInParticipants = conversation.participants.some(
-          (participant: any) => participant.participant.toString() === user._id.toString()
-        );
-
-        if (isUserInParticipants) {
-          // Remove the user from participants
-          await DmModel.findOneAndUpdate(
-            { _id: conversationId },
-            { $pull: { participants: { participant: user._id } } }
-          );
-          return res.status(200).json({ message: 'User removed from group' });
-        } else {
-          // User is already exited
-          return res.status(400).json({ error: 'User already exited the group' });
-        }
+        console.log("first")
+        // Admin removing another user
+        return await removeUserFromGroup(user._id.toString());
+      } else if (address.toLowerCase() === userAddress.toLowerCase()) {
+        // User removing themselves
+        console.log("Second")
+        return await removeUserFromGroup(user._id.toString());
+      } else {
+        // Unauthorized action
+        return res.status(403).json({ error: 'Unauthorized action' });
       }
-
-      else if (address.toLowerCase() == userAddress.toLowerCase()) {
-        // Check if user is in participants
-        const isUserInParticipants = conversation.participants.some(
-          (participant: any) => participant.participant.toString() === user._id.toString()
-        );
-
-        if (isUserInParticipants) {
-          // Remove the user from participants
-          await DmModel.findOneAndUpdate(
-            { _id: conversationId },
-            { $pull: { participants: { participant: user._id } } }
-          );
-          return res.status(200).json({ message: 'User removed from group' });
-        } else {
-          // User is already exited
-          return res.status(400).json({ error: 'User already exited the group' });
-        }
-      } else{
-        return res.status(400).json({ error: 'Some thing is wrong' });
-      }
-
-
     } catch (error) {
       console.error('Error in exitGroupUser:', error);
-      return res.status(500).json({ error: 'An error occurred' });
+      return res.status(500).json({ error: 'An internal error occurred' });
     }
   }
+  
 
   async unBlockDm(req: Request, res: Response) {
     try {
@@ -996,7 +996,7 @@ export class DMService {
           senderAddress: tipAndDMTnx.senderAddress,
           receiverAddress: tipAndDMTnx.receiverAddress,
         };
-        this.eventEmitter.emit(EventEmitter.tipSend, eventData); 
+        this.eventEmitter.emit(EventEmitter.tipSend, eventData);
         return res.status(200).json({
           success: true,
           message: 'Tip Sent Confirmed.',
@@ -1012,5 +1012,5 @@ export class DMService {
     }
   }
 
-  async removeUserFromGroup(req: Request, res: Response) {}
+  async removeUserFromGroup(req: Request, res: Response) { }
 }
