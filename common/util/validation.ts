@@ -162,8 +162,7 @@ const getIsSubscriptionRequired = async (
   const token = await TokenModel.findOne({ tokenId });
 
   // If the token has no plans, return planRequired as false and isSubscribed as false
-  if (token.plans == null || token.plans.length === 0) {
-    console.log('ssss');
+  if (token.plans == null || token.plans.length === 0) { 
     return {
       planRequired: false,
       isSubscribed: false,
@@ -175,9 +174,7 @@ const getIsSubscriptionRequired = async (
   const planIds = plans.map(p => p._id);
 
   // Fetch the user based on the provided subscriber address
-  const user = await AccountModel.findOne({ address: subscriber });
-
-  console.log('planIds', planIds);
+  const user = await AccountModel.findOne({ address: subscriber });  
   if (!user?._id) {
     return {
       planRequired: true,

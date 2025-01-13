@@ -574,8 +574,7 @@ export class NftService {
         },
       },
     ];
-    let result = await CommentModel.aggregate(query);
-console.log('result:',result)
+    let result = await CommentModel.aggregate(query); 
     result.forEach(comment => {
       if (comment.account?.[0]) {
         comment.writor = {
@@ -834,67 +833,32 @@ console.log('result:',result)
       if (!token) {
         console.log(`Token with ID ${tk} not found in database`);
         return res.status(404).json({ error: 'Token not found' });
-      }
-      // console.log('Token found:', token);
-      const isOwner = token?.owner == address;
-      // Extract stream info and check conditions for content
+      } 
+      const isOwner = token?.owner?.toLowerCase() == address?.toLowerCase(); 
       const { isLockContent = false, isPayPerView = false }: any = token?.streamInfo;
-      const { plans = null } = token;
-      const isFree = !isLockContent && !isPayPerView && !plans;
-      // console.log(`isLockContent: ${isLockContent}, isPayPerView: ${isPayPerView}, isFree: ${isFree}`);
-
-      const { isSubscribed = false, planRequired = false } = await getIsSubscriptionRequired(token.tokenId, address);
-      // console.log(`Subscription status: isSubscribed: ${isSubscribed}, planRequired: ${planRequired}`);
-
-      // Check if PPV content is unlocked or not
-      const isUnlockedPPV = isPayPerView ? await isUnlockedPPVStream(token.tokenId.toString(), address) : true;
-      console.log(`PPV unlocked: ${isUnlockedPPV}`);
-
-      // Check if locked content is unlocked or not
-      const isUnlockedLocked = isLockContent ? await isUnlockedLockedContent(token.streamInfo, address) : true;
-      // console.log(`Locked content unlocked: ${isUnlockedLocked}`);
-
-      // Construct the API URL for the token image
-      const apiUrl = defaultTokenImagePath(tokenId.toString(), token.minter);
-      // console.log(`Constructed API URL for image: ${apiUrl}`);
-
-      // Fetch the image from the API
+      const { plans = null } = token; 
+      const isFree = !isLockContent && !isPayPerView && !plans; 
+      const { isSubscribed = false, planRequired = false } = await getIsSubscriptionRequired(token.tokenId, address); 
+      const isUnlockedPPV =  await isUnlockedPPVStream(token.tokenId.toString(), address)  
+      const isUnlockedLocked =await isUnlockedLockedContent(token.streamInfo, address)  
+      const apiUrl = defaultTokenImagePath(tokenId.toString(), token.minter); 
       let imageBuffer;
-      const response = await axios.get(apiUrl, { responseType: 'arraybuffer' });
-      // console.log(`Fetched image from API, status: ${response.status}`);
-
-      // Check if the response status is OK
+      const response = await axios.get(apiUrl, { responseType: 'arraybuffer' }); 
       if (response.status !== 200) {
         console.log('Image not found on the server');
         return res.status(404).json({ error: 'Image not found on the server' });
       }
-      imageBuffer = Buffer.from(response.data);
-      // console.log('Image data received and converted to buffer');
-
-      // Function to determine whether blur should be applied
-      const shouldApplyBlur = () => {
-        console.log({
-          isOwner,
-          isFree,
-          isUnlockedLocked,
-          isSubscribed,
-        });
-        const result = isOwner || isFree || isUnlockedLocked || isSubscribed;
-        // const result = !(isFree || (isUnlockedPPV && !isSubscribed) || (isUnlockedLocked && !isSubscribed));
-        // console.log(`Should apply blur: ${!result}`);
+      imageBuffer = Buffer.from(response.data); 
+      const shouldApplyBlur = () => { 
+        const result = isOwner || isFree ||isUnlockedPPV|| isUnlockedLocked || isSubscribed; 
         return !result;
       };
-
-      // Apply blur and compression if necessary
+ 
       let sendImage = imageBuffer;
-      if (shouldApplyBlur()) {
-        //   console.log('Applying blur and compression');
+      if (shouldApplyBlur()) { 
         const compressedImage = await makeBlurAndCompress(imageBuffer, { blur: 30, compress: 0 });
         sendImage = compressedImage;
-      }
-
-      // Send the image (compressed or not) as the response
-      console.log('Sending image as response');
+      }  
       res.set('Content-Type', 'image/jpg');
       res.send(sendImage);
     } catch (error) {
