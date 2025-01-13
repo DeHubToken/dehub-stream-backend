@@ -4,7 +4,7 @@ import { ethers, solidityPackedKeccak256 } from 'ethers'; // Import ethers
 import { arrayify, splitSignature } from '@ethersproject/bytes';
 import { CdnService } from '../cdn/cdn.service';
 import { TokenModel } from 'models/Token';
-import SavedPost from 'models/SavedPost'
+import SavedPost from 'models/SavedPost';
 import { normalizeAddress } from 'common/util/format';
 import { paramNames, streamCollectionAddresses, streamInfoKeys, tokenTemplate } from 'config/constants';
 import {
@@ -40,13 +40,13 @@ export class NftService {
   constructor(
     private readonly cdnService: CdnService,
     private readonly jobService: JobService,
-  ) { }
+  ) {}
 
   async getAllNfts(req: Request, res: Response) {
     const skip = req.body.skip || req.query.skip || 0;
     const limit = req.body.limit || req.query.limit || 1000;
     const postType = req.body.postType || req.query.postType || 'video';
-    console.log("getAllNfts", postType)
+    console.log('getAllNfts', postType);
     const filter = { status: 'minted', postType };
     const totalCount = await TokenModel.countDocuments(filter, tokenTemplate);
     const address = reqParam(req, 'address');
@@ -208,60 +208,60 @@ export class NftService {
   async getStreamNfts(filter: any, skip: number, limit: number, sortOption = null, subscriber) {
     try {
       const user: any = await AccountModel.findOne({ address: subscriber?.toLowerCase() });
-      if (!user?._id) {
-        return { result: false, error: "User not found or invalid" };
-      }
-  
+      // if (!user?._id) {
+      //   return { result: false, error: 'User not found or invalid' };
+      // }
+
       const query = [
         { $match: filter },
-  
+
         // Join plans collection
         {
           $lookup: {
-            from: "plans",
-            localField: "plans",
-            foreignField: "id",
-            as: "plansDetails",
+            from: 'plans',
+            localField: 'plans',
+            foreignField: 'id',
+            as: 'plansDetails',
           },
         },
-  
+
         // Join subscriptions with date and userId checks
         {
           $lookup: {
-            from: "subscriptions",
-            let: { planIds: "$plans" },
+            from: 'subscriptions',
+            let: { planIds: '$plans' },
             pipeline: [
               {
                 $match: {
                   $expr: {
                     $and: [
-                      { $eq: ["$userId", user._id] },
-                      { $eq: ["$active", true] },
-                      { $lte: ["$startDate", new Date()] },
-                      { $gte: ["$endDate", new Date()] },
+                      { $eq: ['$userId', user?._id] },
+                      { $eq: ['$active', true] },
+                      { $lte: ['$startDate', new Date()] },
+                      { $gte: ['$endDate', new Date()] },
                     ],
                   },
                 },
               },
               { $project: { planId: 1 } },
             ],
-            as: "userSubscriptions",
+            as: 'userSubscriptions',
           },
         },
-  
+
         // Add alreadySubscribed to plans
         {
           $addFields: {
             plansDetails: {
               $map: {
-                input: "$plansDetails",
-                as: "plan",
+                input: '$plansDetails',
+                as: 'plan',
                 in: {
                   $mergeObjects: [
-                    "$$plan",
+                    '$$plan',
                     {
                       alreadySubscribed: {
-                        $in: ["$$plan._id", { $map: { input: "$userSubscriptions", as: "sub", in: "$$sub.planId" } }],
+                        $in: ['$$plan._id', { $map: { input: '$userSubscriptions', as: 'sub', in: '$$sub.planId' } }],
                       },
                     },
                   ],
@@ -270,55 +270,54 @@ export class NftService {
             },
           },
         },
-  
+
         // Join account and balances collections
         {
           $lookup: {
-            from: "accounts",
-            localField: "minter",
-            foreignField: "address",
-            as: "account",
+            from: 'accounts',
+            localField: 'minter',
+            foreignField: 'address',
+            as: 'account',
           },
         },
         {
           $lookup: {
-            from: "balances",
-            localField: "minter",
-            foreignField: "address",
+            from: 'balances',
+            localField: 'minter',
+            foreignField: 'address',
             pipeline: [
-              { $match: { tokenAddress: "0x680d3113caf77b61b510f332d5ef4cf5b41a761d" } },
+              { $match: { tokenAddress: '0x680d3113caf77b61b510f332d5ef4cf5b41a761d' } },
               { $project: { staked: 1, _id: 0 } },
             ],
-            as: "balance",
+            as: 'balance',
           },
         },
-  
+
         // Final projection
         {
           $project: {
             ...tokenTemplate,
             plansDetails: 1,
-            mintername: { $first: "$account.username" },
-            minterDisplayName: { $first: "$account.displayName" },
-            minterAvatarUrl: { $first: "$account.avatarImageUrl" },
-            minterStaked: { $first: "$balance.staked" },
+            mintername: { $first: '$account.username' },
+            minterDisplayName: { $first: '$account.displayName' },
+            minterAvatarUrl: { $first: '$account.avatarImageUrl' },
+            minterStaked: { $first: '$balance.staked' },
           },
         },
-  
+
         // Sort, skip, and limit
         { $sort: sortOption || { createdAt: -1 } },
         { $skip: skip },
         { $limit: limit },
       ];
-  
+
       const result = await TokenModel.aggregate(query);
       return result;
     } catch (err) {
-      console.log("-----get stream nfts:", err);
-      return { result: false, error: "Fetching failed" };
+      console.log('-----get stream nfts:', err);
+      return { result: false, error: 'Fetching failed' };
     }
   }
-  
 
   async getFilteredNfts(req: Request, res: Response) {
     try {
@@ -352,14 +351,10 @@ export class NftService {
       console.log('sortMode', { sortMode, postType, searchQuery });
       let sortRule: any = { createdAt: -1 };
       searchQuery['$match'] = {
-        $and: [
-          { status: 'minted' },
-          { $or: [{ isHidden: false }, { isHidden: { $exists: false } }] },
-          postFilter
-        ],
+        $and: [{ status: 'minted' }, { $or: [{ isHidden: false }, { isHidden: { $exists: false } }] }, postFilter],
       };
-      console.log("searchQuery", JSON.stringify(searchQuery))
-      console.log('Range - sotMode - unit - page - search', range, sortMode, unit, page, search)
+      console.log('searchQuery', JSON.stringify(searchQuery));
+      console.log('Range - sotMode - unit - page - search', range, sortMode, unit, page, search);
       switch (sortMode) {
         case 'trends':
           if (range) {
@@ -412,16 +407,13 @@ export class NftService {
           sortRule = { likes: -1 };
           break;
         case 'ppv':
-          searchQuery['$match'][`streamInfo.${streamInfoKeys.isPayPerView}`] =
-            true;
+          searchQuery['$match'][`streamInfo.${streamInfoKeys.isPayPerView}`] = true;
           break;
         case 'bounty':
-          searchQuery['$match'][`streamInfo.${streamInfoKeys.isAddBounty}`] =
-            true;
+          searchQuery['$match'][`streamInfo.${streamInfoKeys.isAddBounty}`] = true;
           break;
         case 'locked':
-          searchQuery['$match'][`streamInfo.${streamInfoKeys.isLockContent}`] =
-            true;
+          searchQuery['$match'][`streamInfo.${streamInfoKeys.isLockContent}`] = true;
           break;
       }
 
@@ -435,26 +427,19 @@ export class NftService {
       if (bulkIdList) {
         let idList = bulkIdList.split('-');
         if (idList.length > 0) {
-          idList = idList.map((e) => '0x' + e);
+          idList = idList.map(e => '0x' + e);
           searchQuery['$match'] = { id: { $in: idList } };
         }
       }
 
-      if (
-        (verifiedOnly + '').toLowerCase() === 'true' ||
-        verifiedOnly === '1'
-      ) {
+      if ((verifiedOnly + '').toLowerCase() === 'true' || verifiedOnly === '1') {
         searchQuery['$match'] = { ...searchQuery['$match'], verified: true };
       }
 
       if (search) {
         if (!isValidSearch(search)) return res.json({ result: [] });
         var re: any = new RegExp(search, 'gi');
-        let orOptions: any = [
-          { name: re },
-          { description: re },
-          { owner: normalizeAddress(re) },
-        ];
+        let orOptions: any = [{ name: re }, { description: re }, { owner: normalizeAddress(re) }];
         if (Number(search) > 0) orOptions.push({ tokenId: Number(search) });
         searchQuery['$match'] = { ...searchQuery['$match'], $or: orOptions };
 
@@ -493,24 +478,26 @@ export class NftService {
         address,
       );
       // Include userLike logic
-      for (let nft of ret) {
-        const userLike = await VoteModel.findOne({ tokenId: nft.tokenId, address:address.toLowerCase() });
-        nft.isLiked = Boolean(userLike);
-      }
 
-      const userSavedPromises = ret.map(async (nft) => {
-        const userSaved = await SavedPost.findOne({ tokenId: nft.tokenId, address: address.toLowerCase() });
-        nft.isSaved = Boolean(userSaved);
-      });
-      await Promise.all(userSavedPromises);
-      console.log('ret:',ret)
+      if (ret.length > 0) {
+        for (let nft of ret) {
+          const userLike = await VoteModel.findOne({ tokenId: nft?.tokenId, address: address?.toLowerCase() });
+          nft.isLiked = Boolean(userLike);
+        }
+        const userSavedPromises = ret?.map(async nft => {
+          const userSaved = await SavedPost?.findOne({ tokenId: nft?.tokenId, address: address?.toLowerCase() });
+          nft.isSaved = Boolean(userSaved);
+        });
+        await Promise.all(userSavedPromises);
+      }
+      console.log("du=00")
+      console.log('retretretret', ret);
       res.send({ result: ret });
     } catch (e) {
       console.log('   ...', new Date(), ' -- index/tokens-search err: ', e);
       res.status(500).send({ error: e.message });
     }
   }
-
 
   async getMyWatchedNfts(req: Request, res: Response) {
     let watcherAddress: any = req.query.watcherAddress || req.query.watcherAddress;
@@ -766,29 +753,33 @@ export class NftService {
       }
 
       // Check if the post is already saved by the user
-      const existingPost = await SavedPost.findOne({ tokenId: tokenId, userId: user._id, address: address?.toLowerCase() });
+      const existingPost = await SavedPost.findOne({
+        tokenId: tokenId,
+        userId: user._id,
+        address: address?.toLowerCase(),
+      });
 
       if (existingPost) {
         // If the post exists, remove it and return response that feed is unsaved
         await SavedPost.deleteOne({ tokenId: tokenId, userId: user._id, address: address?.toLowerCase() });
 
-        console.log("Feed unsaved successfully");
+        console.log('Feed unsaved successfully');
         return { status: 'success', message: 'Feed unsaved' };
       } else {
         // If the post doesn't exist, save the new post and return response that feed is saved
         const newPost = new SavedPost({
           tokenId: tokenId,
           userId: user._id,
-          address: address?.toLowerCase()
+          address: address?.toLowerCase(),
         });
 
         await newPost.save();
 
-        console.log("Feed saved successfully");
+        console.log('Feed saved successfully');
         return { status: 'success', message: 'Feed saved' };
       }
     } catch (error) {
-      console.log("Error:", error);
+      console.log('Error:', error);
       return { status: 'error', message: 'An error occurred', error: error.message };
     }
   }
@@ -881,8 +872,11 @@ export class NftService {
       // Function to determine whether blur should be applied
       const shouldApplyBlur = () => {
         console.log({
-          isOwner, isFree, isUnlockedLocked, isSubscribed,
-        })
+          isOwner,
+          isFree,
+          isUnlockedLocked,
+          isSubscribed,
+        });
         const result = isOwner || isFree || isUnlockedLocked || isSubscribed;
         // const result = !(isFree || (isUnlockedPPV && !isSubscribed) || (isUnlockedLocked && !isSubscribed));
         // console.log(`Should apply blur: ${!result}`);
@@ -937,7 +931,7 @@ export class NftService {
 
         const tokenFilter = { tokenId };
         await TokenModel.updateOne(tokenFilter, { $inc: { views: 1 } });
-        return { success: true }
+        return { success: true };
       }
 
       // Always log the session, even if it's not a unique view
@@ -951,7 +945,7 @@ export class NftService {
       // increment total views for each session
       const tokenFilter = { tokenId };
       await TokenModel.updateOne(tokenFilter, { $inc: { views: 1 } });
-      return { success: true }
+      return { success: true };
     } catch (error) {
       console.error('Error recording video view:', error);
       throw new Error('Could not record video view');
