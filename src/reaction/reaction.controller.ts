@@ -1,8 +1,10 @@
 import {
   Controller,
   Get,
+  Post,
   Req,
   Res,
+  UploadedFiles,
   UseGuards,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
@@ -59,6 +61,17 @@ export class ReactionsController {
       return res.status(500).json({ result: false, error: 'Comment request failed' });
     }
   }
+  @Post('/request_comment')
+  @UseGuards(AuthGuard)
+  async requestCommentImage(@Req() req: Request, @Res() res: Response, @UploadedFiles() files?: Express.Multer.File[]) {
+    try { 
+      return   await this.reactionsService.requestComment(req,res,files);
+    } catch (error) {
+      console.error('-----request comment error', error);
+      return res.status(500).json({ result: false, error: 'Comment request failed' });
+    }
+  }
+
 
   @Get('/request_vote')
   @UseGuards(AuthGuard)

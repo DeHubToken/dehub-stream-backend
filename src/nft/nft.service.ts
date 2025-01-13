@@ -563,6 +563,7 @@ export class NftService {
           _id: 0,
           address: 1,
           content: 1,
+          imageUrl: 1,
           account: 1,
           createdAt: 1,
           updatedAt: 1,
@@ -574,6 +575,7 @@ export class NftService {
       },
     ];
     let result = await CommentModel.aggregate(query);
+console.log('result:',result)
     result.forEach(comment => {
       if (comment.account?.[0]) {
         comment.writor = {
