@@ -74,13 +74,25 @@ export class DMController {
       });
     }
   }
+
+  @Put('/dm/group')
+  async updateGroupChat(@Req() req: Request, @Res() res: Response) {
+    try {
+      return await this.dmServices.updateGroupChat(req, res);
+    } catch (error) {
+      return res.status(500).json({
+        message: 'Failed to create the group chat',
+        error: error.message,
+      });
+    }
+  }
   @Post('/dm/group/join')
   async joinGroup(@Req() req: Request, @Res() res: Response) {
     try {
       return await this.dmServices.joinGroup(req, res);
     } catch (error) {
       return res.status(500).json({
-        message: 'Failed to create the group chat',
+        message: 'Failed to join the group chat',
         error: error.message,
       });
     }
@@ -108,7 +120,7 @@ export class DMController {
       return await this.dmServices.getVideoStream(req, res);
     } catch (error) {
       return res.status(500).json({
-        message: 'Failed to search users or groups',
+        message: 'Failed to get stream',
         error: error.message,
       });
     }
@@ -120,7 +132,7 @@ export class DMController {
       return await this.dmServices.blockDm(req, res);
     } catch (error) {
       return res.status(500).json({
-        message: 'Failed to search users or groups',
+        message: 'Failed to Block ',
         error: error.message,
       });
     }
@@ -131,7 +143,7 @@ export class DMController {
       return await this.dmServices.blockGroupUser(req, res);
     } catch (error) {
       return res.status(500).json({
-        message: 'Failed to search users or groups',
+        message: 'Failed to block Group user.',
         error: error.message,
       });
     }
@@ -154,7 +166,7 @@ export class DMController {
       return await this.dmServices.exitGroupUser(req, res);
     } catch (error) {
       return res.status(500).json({
-        message: 'Failed to search users or groups',
+        message: 'Failed to Exit Group.',
         error: error.message,
       });
     }
@@ -176,7 +188,7 @@ export class DMController {
       return await this.dmServices.unBlockDm(req, res);
     } catch (error) {
       return res.status(500).json({
-        message: 'Failed to search users or groups',
+        message: 'Failed to Un Block',
         error: error.message,
       });
     }

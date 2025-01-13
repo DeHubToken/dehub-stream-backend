@@ -25,9 +25,7 @@ export class DMService {
     // Access the shared EventEmitter instance
   ) {
     this.eventEmitter = EventManager.getInstance();
- 
-  }
-
+  } 
   private checkIsAdmin(participants, adminId) {
     return participants.some(p => {
       const key2 = p.participant.toString();
@@ -145,7 +143,89 @@ export class DMService {
         message: 'An error occurred while creating the group chat.',
       });
     }
-  }
+  } 
+  async updateGroupChat(req: Request, res: Response) {
+    try {
+      // Parse input data
+      const gpId = reqParam(req, 'gpId'); // Group ID to identify the group
+      const groupName = reqParam(req, 'groupName');
+      const plans = reqParam(req, 'plans');
+      const users = reqParam(req, 'users');
+      const createdBy = reqParam(req, 'address');
+      const description = reqParam(req, 'description') || ''; // Optional description
+
+      // Basic validation
+      if (!groupName || !users || users.length < 2) {
+        return res.status(400).json({ success: false, message: 'Group name and at least 2 members are required.' });
+      }
+
+      // Optional: Validate the `createdBy` user
+      const creatorExists = await AccountModel.findOne({ address: createdBy }, { _id: 1 });
+      if (!creatorExists) {
+        return res.status(400).json({ success: false, message: 'Creator does not exist.' });
+      }
+
+      // Optional: Validate `plans` (if you want to ensure they are valid plan IDs)
+      const validPlans = await PlansModel.find({ id: { $in: plans } }, { _id: 1 });
+      if (validPlans.length !== plans.length) {
+        return res.status(400).json({ success: false, message: 'One or more plans are invalid.' });
+      }
+
+      // Find the existing group chat
+      const groupChat = await DmModel.findById(gpId);
+      if (!groupChat) {
+        return res.status(404).json({ success: false, message: 'Group chat not found.' });
+      }
+
+      // Prepare updated participants array (exclude the creator if necessary)
+      const participants = users
+        .filter(userId => userId !== creatorExists._id.toString()) // Exclude the creator from being added as a member
+        .map(userId => ({
+          participant: userId,
+          role: 'member', // Default role for other members
+        }));
+
+      // Add or update the creator as an admin
+      participants.push({
+        participant: creatorExists._id.toString(),
+        role: 'admin',
+      });
+
+      // Update the group chat with new details
+      groupChat.groupName = groupName;
+      groupChat.description = description;
+      groupChat.participants = participants;
+      groupChat.plans = plans;
+
+      // Save the updated group chat
+      await groupChat.save();
+
+      const pipeline: any = [
+        {
+          $match: {
+            _id: groupChat._id,
+            'participants.participant': creatorExists._id,
+          },
+        },
+        ...conversationPipeline(creatorExists),
+      ];
+
+      // Execute aggregation using DmModel to fetch updated chat data
+      const updatedDms = await DmModel.aggregate(pipeline);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Group chat updated successfully!',
+        data: updatedDms[0],
+      });
+    } catch (error) {
+      console.error('Error updating group chat:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'An error occurred while updating the group chat.',
+      });
+    }
+  } 
   async joinGroup(req: Request, res: Response) {
     try {
       // Parse input data
@@ -162,9 +242,10 @@ export class DMService {
       if (!group) {
         return res.status(404).json({ success: false, message: 'Group not found.' });
       }
+      console.log("isAdmin",isAdmin)
       if (isAdmin) {
-        const isAlreadyJoined = this.isUserInGroup(group.participants, admin._id);
-        if (isAlreadyJoined) return res.status(400).json({ success: false, message: 'Already in the group.' });
+        const isAlreadyJoined = this.isUserInGroup(group.participants, user._id);
+        if (isAlreadyJoined) return res.status(200).json({ success: false, message: 'Already in the group.' });
 
         await DmModel.findOneAndUpdate(
           { _id: groupId },
@@ -179,7 +260,7 @@ export class DMService {
           { new: true }, // Optionally returns the updated document
         );
 
-        return res.status(400).json({ success: false, message: 'You are admin' });
+        return res.status(400).json({ success: false, message: 'User Added.' });
       }
 
       if (!isAdmin && subs != null) {
@@ -378,8 +459,10 @@ export class DMService {
           error: 'You have already blocked this conversation or user.',
         });
       }
-      const lastMessage = await MessageModel.findOne({ conversation: conversationId, }, { _id: 1 }).sort({ createdAt: -1 }).lean();// Assuming messages have a `createdAt` field
-      console.log('lastMessage:', lastMessage)
+      const lastMessage = await MessageModel.findOne({ conversation: conversationId }, { _id: 1 })
+        .sort({ createdAt: -1 })
+        .lean(); // Assuming messages have a `createdAt` field
+      console.log('lastMessage:', lastMessage);
       // If conversation type is group, block the group
       if (conversation.conversationType === 'group') {
         const updatedReport = await UserReportModel.findOneAndUpdate(
@@ -554,56 +637,52 @@ export class DMService {
         error: 'An error occurred while processing your request.',
       });
     }
-  }
-
+  } 
   async exitGroupUser(req: Request, res: Response) {
     const conversationId = reqParam(req, 'conversationId');
     const userAddress = reqParam(req, 'userAddress');
     const address = reqParam(req, 'address');
-  
+
     console.log('conversationId:', conversationId);
     console.log('userAddress:', userAddress);
     console.log('address:', address);
-  
+
     try {
       // Validate required parameters
       if (!conversationId || !userAddress || !address) {
         return res.status(400).json({ error: 'Missing required parameters' });
       }
-  
+
       // Fetch the conversation
       const conversation = await DmModel.findById(conversationId);
       if (!conversation) {
         return res.status(404).json({ error: 'Conversation not found' });
       }
-  
+
       // Fetch the admin and user accounts
       const [admin, user] = await Promise.all([
         AccountModel.findOne({ address: address.toLowerCase() }, { _id: 1 }),
         AccountModel.findOne({ address: userAddress.toLowerCase() }, { _id: 1 }),
       ]);
-  
+
       if (!admin || !user) {
         return res.status(404).json({
           error: !user ? 'User not found' : 'Admin not found',
         });
       }
-  
+
       // Check if the admin is actually an admin in the group
       const isAdmin = conversation.participants.some(
-        (p: any) => p.role === 'admin' && p.participant.toString() === admin._id.toString()
+        (p: any) => p.role === 'admin' && p.participant.toString() === admin._id.toString(),
       );
-  
+
       console.log('isAdmin:', isAdmin);
-  
+
       // Function to remove a user
       const removeUserFromGroup = async (userId: string) => {
-        const isUserInParticipants = conversation.participants.some(
-          (p: any) => p.participant.toString() === userId
-        );
-  
+        const isUserInParticipants = conversation.participants.some((p: any) => p.participant.toString() === userId);
+
         if (isUserInParticipants) {
-         
           await DmModel.findByIdAndUpdate(conversationId, {
             $pull: { participants: { participant: userId } },
           });
@@ -612,14 +691,14 @@ export class DMService {
           return res.status(400).json({ error: 'User already exited the group' });
         }
       };
-  
+
       if (isAdmin) {
-        console.log("first")
+        console.log('first');
         // Admin removing another user
         return await removeUserFromGroup(user._id.toString());
       } else if (address.toLowerCase() === userAddress.toLowerCase()) {
         // User removing themselves
-        console.log("Second")
+        console.log('Second');
         return await removeUserFromGroup(user._id.toString());
       } else {
         // Unauthorized action
@@ -629,9 +708,7 @@ export class DMService {
       console.error('Error in exitGroupUser:', error);
       return res.status(500).json({ error: 'An internal error occurred' });
     }
-  }
-  
-
+  } 
   async unBlockDm(req: Request, res: Response) {
     try {
       const conversationId = reqParam(req, 'conversationId'); // Get conversation ID from request
@@ -672,14 +749,11 @@ export class DMService {
 
       // If conversation type is group, unblock the group
       if (conversation.conversationType === 'group') {
-        console.log('conversationId:', new mongoose.Types.ObjectId(conversationId), user._id)
+        console.log('conversationId:', new mongoose.Types.ObjectId(conversationId), user._id);
         const updatedReport = await UserReportModel.findOneAndUpdate(
           {
             conversation: new mongoose.Types.ObjectId(conversationId),
-            $or: [
-              { userReportedBy: user._id },
-              { reportedBy: user._id },
-            ],
+            $or: [{ userReportedBy: user._id }, { reportedBy: user._id }],
           },
           {
             $set: {
@@ -689,7 +763,7 @@ export class DMService {
           },
           { new: true },
         );
-        console.log('updatedReport:', updatedReport)
+        console.log('updatedReport:', updatedReport);
         const out = {
           message: 'Group successfully unblocked.',
           unblocked: true,
@@ -890,8 +964,7 @@ export class DMService {
         error: error.message,
       });
     }
-  }
-
+  }  
   async updateTnx(req: Request, res: Response) {
     const { tnxId, dmId, status, tnxHash } = req.body;
 
@@ -972,7 +1045,5 @@ export class DMService {
         error: error.message,
       });
     }
-  }
-
-  async removeUserFromGroup(req: Request, res: Response) { }
+  }  
 }
