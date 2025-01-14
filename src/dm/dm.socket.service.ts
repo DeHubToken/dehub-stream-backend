@@ -4,15 +4,92 @@ import { MessageModel } from 'models/message/dm-messages';
 import { SocketEvent } from './types';
 import { DmModel } from 'models/message/DM';
 import { AccountModel } from 'models/Account';
-import { Types } from 'mongoose';
-import { ACTION_TYPE, UserReportModel } from 'models/user-report';
+import Redis from 'ioredis'; 
+import {  UserReportModel } from 'models/user-report';
 import { singleMessagePipeline } from './pipline';
 
 @Injectable()
 export class DMSocketService {
   private dmNamespace: Namespace;
+  private redisClient: Redis;
   constructor(dmNamespace) {
     this.dmNamespace = dmNamespace;
+    this.redisClient = new Redis();
+  }
+
+  async getOnlineSocketsUsers(ids: string[]) {
+    const users = await AccountModel.find({ _id: { $in: ids } }, { address: 1 }).lean();
+
+    const onlineUsers = await Promise.all(
+      users.map(async user => {
+        const redisKey = `user:${user.address.toLowerCase()}`;
+        const sessionData = await this.redisClient.get(redisKey);
+        if (sessionData) {
+          return JSON.parse(sessionData); // Return session if found in Redis
+        }
+        return user; // Fallback to user details from DB
+      }),
+    );
+
+    return onlineUsers.filter(Boolean); // Filter out null or undefined entries
+  }
+
+  async sendMessage({ socket, req, session, blockList }: { socket: any; req: any; session: any; blockList: any }) {
+    if (!socket || !req || !session) {
+      return;
+    }
+
+    const userId = session.user._id;
+    const state: any = {
+      conversation: req.dmId,
+      sender: userId,
+      isRead: false,
+      content: req.content,
+      isPaid: false,
+      isUnLocked: true,
+      msgType: req.type,
+    };
+    if (state.msgType == 'gif') {
+      state.mediaUrls = [
+        {
+          url: req.gif, // Assuming req.gif contains the URL of the uploaded GIF
+          type: 'gif',
+          mimeType: 'image/gif', // MIME type for GIF
+        },
+      ];
+    }
+    const newMsg: any = await MessageModel.create(state);
+    socket.emit(SocketEvent.sendMessage, { ...newMsg?._doc, author: 'me' });
+    const dm = await DmModel.findByIdAndUpdate(req.dmId, {
+      $set: {
+        lastMessageAt: new Date(),
+      },
+    });
+    let ids = dm.participants.reduce((acc, current) => {
+      const { participant } = current;
+      if (participant && participant.toString() !== userId.toString()) {
+        return [...acc, participant];
+      }
+      return acc;
+    }, []);
+
+    let socketsUsers = await this.getOnlineSocketsUsers(ids);
+    socketsUsers = socketsUsers.filter(user => {
+      return !blockList.some(blocked => {
+        if (blocked.reportedBy) {
+          return blocked.reportedBy.toString() === user._id.toString();
+        }
+
+        if (blocked.reportedUser) {
+          return blocked.reportedUser.toString() === user._id.toString();
+        }
+      });
+    });
+    socketsUsers.forEach(su => {
+      if (su.socketIds && su.socketIds.length > 0) {
+        socket.in(su.socketIds).emit(SocketEvent.sendMessage, { ...newMsg?._doc, author: 'other' });
+      }
+    });
   }
   async createAndStart({ socket, req, session }: { socket: any; req: any; session: any }) {
     // Extract the second user's ID from the request
@@ -59,9 +136,9 @@ export class DMSocketService {
         createdBy: session.user._id,
         conversationType: 'dm',
         lastMessageAt: new Date(),
-      }); 
+      });
       // Save the new DM session to the database
-      await newDm.save(); 
+      await newDm.save();
       // Emit the event to notify the client
       socket.emit(SocketEvent.createAndStart, {
         msg: 'Created new DM',
@@ -69,79 +146,24 @@ export class DMSocketService {
       });
     }
   }
-  async sendMessage({ socket, req, session, blockList }: { socket: any; req: any; session: any; blockList: any }) {
-    if (!socket || !req || !session) {
-      return;
-    }
-
-    const userId = session.user._id;
-    const state: any = {
-      conversation: req.dmId,
-      sender: userId,
-      isRead: false,
-      content: req.content,
-      isPaid: false,
-      isUnLocked: true,
-      msgType: req.type,
-    };
-    if (state.msgType == 'gif') {
-      state.mediaUrls = [
-        {
-          url: req.gif, // Assuming req.gif contains the URL of the uploaded GIF
-          type: 'gif',
-          mimeType: 'image/gif', // MIME type for GIF
-        },
-      ];
-    }
-    const newMsg: any = await MessageModel.create(state);
-    socket.emit(SocketEvent.sendMessage, { ...newMsg?._doc, author: 'me' });
-    const dm = await DmModel.findById(req.dmId);
-    let ids = dm.participants.reduce((acc, current) => {
-      const { participant } = current;
-      if (participant && participant.toString() !== userId.toString()) {
-        return [...acc, participant];
-      }
-      return acc;
-    }, []);
-
-    let socketsUsers = await this.getOnlineSocketsUsers(session, ids);
-    socketsUsers = socketsUsers.filter(user => {
-      return !blockList.some(blocked => {
-        if (blocked.reportedBy) {
-          return blocked.reportedBy.toString() === user._id.toString();
-        }
-
-        if (blocked.reportedUser) {
-          return blocked.reportedUser.toString() === user._id.toString();
-        }
-      });
-    });
-    socketsUsers.forEach(su => {
-      if (su.socketIds && su.socketIds.length > 0) {
-        socket.in(su.socketIds).emit(SocketEvent.sendMessage, { ...newMsg?._doc, author: 'other' });
-      }
-    });
-  }
   async deleteMessage({ socket, req, session, blockList }: { socket: any; req: any; session: any; blockList: any }) {
-    
     if (!socket || !req || !session) {
       return;
-    } 
+    }
     const userId = session.user._id;
-    const messageId = req.messageId; 
-    const dmId = req.dmId; 
+    const messageId = req.messageId;
+    const dmId = req.dmId;
 
-     
     // Validate message existence and user permissions
     const message = await MessageModel.findById(messageId);
     if (!message) {
       socket.emit(SocketEvent.error, { message: 'Message not found' });
       return;
-    } 
+    }
     if (message.sender.toString() !== userId.toString()) {
       socket.emit(SocketEvent.error, { message: 'You are not authorized to delete this message' });
       return;
-    } 
+    }
     // Delete the message
     await MessageModel.findByIdAndDelete(messageId);
 
@@ -162,7 +184,7 @@ export class DMSocketService {
     }, []);
 
     // Get online users, excluding those in the block list
-    let socketsUsers = await this.getOnlineSocketsUsers(session, ids);
+    let socketsUsers = await this.getOnlineSocketsUsers(ids);
     socketsUsers = socketsUsers.filter(user => {
       return !blockList.some(blocked => {
         if (blocked.reportedBy) {
@@ -178,12 +200,12 @@ export class DMSocketService {
     // Notify all relevant users about the deleted message
     socketsUsers.forEach(su => {
       if (su.socketIds && su.socketIds.length > 0) {
-        socket.in(su.socketIds).emit(SocketEvent.deleteMessage, { dmId,messageId });
+        socket.in(su.socketIds).emit(SocketEvent.deleteMessage, { dmId, messageId });
       }
     });
- console.log(SocketEvent.deleteMessage, { messageId,dmId })
-    socket.emit(SocketEvent.deleteMessage, { messageId,dmId });
-  } 
+    console.log(SocketEvent.deleteMessage, { messageId, dmId });
+    socket.emit(SocketEvent.deleteMessage, { messageId, dmId });
+  }
   async deleteAllMessage({ socket, req, session, blockList }: { socket: any; req: any; session: any; blockList: any }) {
     if (!socket || !req || !session) {
       return;
@@ -218,7 +240,7 @@ export class DMSocketService {
       return acc;
     }, []);
 
-    let socketsUsers = await this.getOnlineSocketsUsers(session, ids);
+    let socketsUsers = await this.getOnlineSocketsUsers(ids);
     socketsUsers = socketsUsers.filter(user => {
       return !blockList.some(blocked => {
         if (blocked.reportedBy) {
@@ -248,16 +270,14 @@ export class DMSocketService {
     blockList: any;
   }) {
     const userId = session?.user?._id;
-    console.log('reValidateMessage called', { userId, req });
     const messageId = req.messageId;
-    const pipeline = [...singleMessagePipeline(messageId)]; 
+    const pipeline = [...singleMessagePipeline(messageId)];
     const validatedMessages = await MessageModel.aggregate(pipeline);
     const message = validatedMessages[0];
 
     if (message.sender._id.toString() == userId.toString()) {
       message.author = 'me';
     }
-    console.log('message', message);
     socket.emit(SocketEvent.ReValidateMessage, {
       dmId: req.dmId,
       message: message,
@@ -270,7 +290,7 @@ export class DMSocketService {
       }
       return acc;
     }, []);
-    let socketsUsers = await this.getOnlineSocketsUsers(session, ids);
+    let socketsUsers = await this.getOnlineSocketsUsers(ids);
     message.author = 'other';
     socketsUsers = socketsUsers.filter(user => {
       return !blockList.some(blocked => {
@@ -292,16 +312,6 @@ export class DMSocketService {
       }
     });
   }
-  async getOnlineSocketsUsers(session, ids) {
-    const users = await AccountModel.find({ $or: [{ _id: { $in: ids } }] }, { address: 1 }).lean();
-    return users.map(user => {
-      const sessionUser = session.users.get(user.address.toLowerCase());
-      if (sessionUser) {
-        return sessionUser;
-      }
-      return user;
-    });
-  } 
   async getBlockedUsersForConversation(conversationId: string): Promise<any[]> {
     // Explicit return type of UserReport[]
     const blocked = await UserReportModel.find({

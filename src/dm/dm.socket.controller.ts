@@ -8,24 +8,27 @@ import { EventEmitter, EventManager } from 'src/events/event-manager';
 import { Types } from 'mongoose';
 import { DmModel } from 'models/message/DM';
 import { dmTips } from './pipline';
-interface Session {
-  username: string;
-  socketIds: string[]; // Store multiple socket IDs for each user
-  address: string;
-  _id: string;
-}
+import Redis from 'ioredis';
+// interface Session {
+//   username: string;
+//   socketIds: string[]; // Store multiple socket IDs for each user
+//   address: string;
+//   _id: string;
+// }
 
 @Injectable()
 export class DMSocketController {
   private dmNamespace: Namespace;
-  private users: Map<string, Session> = new Map(); // Map of user _id to Session object
+  // private users: Map<string, Session> = new Map(); // Map of user _id to Session object
   private eventEmitter: EventEmitter2;
   private dmSocketService: any;
+  private redisClient: Redis;
 
   constructor(private readonly io: Server) {
     this.dmNamespace = this.io.of('/dm');
     this.eventEmitter = EventManager.getInstance();
     this.bootstrap();
+    this.redisClient = new Redis();
     this.listenEvents();
   }
 
@@ -86,39 +89,51 @@ export class DMSocketController {
       { address: userAddress?.toLowerCase() },
       { username: 1, _id: 1, address: 1 },
     ).lean();
-    // If user already exists in the users map, update their socketIds
-    let session = this.users.get(userAddress?.toLowerCase());
 
-    if (session) {
-      // Add the new socketId to the existing user's socketIds array
-      session.socketIds.push(socket.id);
-    } else {
-      // If the user is not in the map, create a new session for them
-      session = { ...user, socketIds: [socket.id] };
-    }
-    // Update the users map with the new session
-    this.users.set(userAddress?.toLowerCase(), session);
+    if (!user) return;
+
+    const redisKey = `user:${userAddress?.toLowerCase()}`;
+    const session = JSON.parse(await this.redisClient.get(redisKey)) || {
+      username: user.username,
+      address: user.address,
+      _id: user._id,
+      socketIds: [],
+    };
+
+    // Add the new socket ID
+    session.socketIds.push(socket.id);
+
+    // Save updated session in Redis
+    await this.redisClient.set(redisKey, JSON.stringify(session));
   }
 
   // Remove the socketId for the user when they disconnect
   async unset(socket: any, userAddress: string) {
-    const session = this.users.get(userAddress?.toLowerCase());
+    const redisKey = `user:${userAddress?.toLowerCase()}`;
+    const session = JSON.parse(await this.redisClient.get(redisKey));
+
     if (session) {
-      // Remove the socketId from the session
+      // Remove the socket ID from the session
       session.socketIds = session.socketIds.filter(id => id !== socket.id);
-      // If there are no more socketIds for this user, remove the user from the map
-      if (session.socketIds.length === 0) {
-        this.users.delete(userAddress?.toLowerCase());
+
+      if (session.socketIds.length > 0) {
+        // Update the session in Redis
+        await this.redisClient.set(redisKey, JSON.stringify(session));
+      } else {
+        // Delete the session from Redis if no socket IDs remain
+        await this.redisClient.del(redisKey);
       }
     }
   }
 
+
   async withSession(socket, req) {
-    // Find the user in the map
     const userAddress = socket.handshake.query.address;
-    const session = await this.users.get(userAddress?.toLowerCase());
-    return { req, socket, session: { user: session, users: this.users } };
+    const redisKey = `user:${userAddress?.toLowerCase()}`;
+    const session = JSON.parse(await this.redisClient.get(redisKey));
+    return { req, socket, session: { user: session, redisClient: this.redisClient } };
   }
+
 
   async withRestrictedZone({ req, socket, session }) {
     const blockList = await this.dmSocketService.getBlockedUsersForConversation(req.dmId);
@@ -147,11 +162,17 @@ export class DMSocketController {
     return { req, socket, session, blockList };
   }
 
-  async listenEvents() { 
+  async listenEvents() {
     this.eventEmitter.on(EventEmitter.tipSend, async payload => {
       const { senderAddress, receiverAddress, dmId } = payload;
-      const senderSession = await this.users.get(senderAddress?.toLowerCase());
-      const receiveSession = await this.users.get(receiverAddress?.toLowerCase());
+
+      const senderSession = JSON.parse(
+        await this.redisClient.get(`user:${senderAddress?.toLowerCase()}`)
+      );
+      const receiverSession = JSON.parse(
+        await this.redisClient.get(`user:${receiverAddress?.toLowerCase()}`)
+      );
+
       const updatedDM = await DmModel.aggregate([
         {
           $match: {
@@ -167,13 +188,16 @@ export class DMSocketController {
           },
         },
       ]);
+
       if (senderSession?.socketIds) {
         this.dmNamespace.to(senderSession?.socketIds).emit(SocketEvent.tipUpdate, updatedDM[0]);
       }
-      if (receiveSession?.socketIds) {
-        this.dmNamespace.to(senderSession?.socketIds).emit(SocketEvent.tipUpdate, updatedDM[0]);
+      if (receiverSession?.socketIds) {
+        this.dmNamespace.to(receiverSession?.socketIds).emit(SocketEvent.tipUpdate, updatedDM[0]);
       }
+
       console.log('tip-updates-sent');
     });
   }
+
 }
