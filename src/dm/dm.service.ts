@@ -485,7 +485,7 @@ export class DMService {
         );
 
         return res.status(200).json({
-          message: 'Group successfully blocked.',
+          message: 'Group User successfully blocked.',
           blocked: true,
           conversationId: conversationId,
           reportId: updatedReport._id,
@@ -616,7 +616,7 @@ export class DMService {
         );
 
         return res.status(200).json({
-          message: 'Group successfully blocked.',
+          message: 'Group User successfully blocked.',
           blocked: true,
           conversationId,
           reportId: updatedReport._id,
