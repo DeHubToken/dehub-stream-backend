@@ -18,8 +18,7 @@ import Redis from 'ioredis';
 
 @Injectable()
 export class DMSocketController {
-  private dmNamespace: Namespace;
-  // private users: Map<string, Session> = new Map(); // Map of user _id to Session object
+  private dmNamespace: Namespace; 
   private eventEmitter: EventEmitter2;
   private dmSocketService: any;
   private redisClient: Redis;
