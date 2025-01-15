@@ -66,7 +66,7 @@ export class ReactionService {
     }
   }
 
-  async requestComment(req, res, files=[]) {
+  async requestComment(req, res, files = []) {
     const address = reqParam(req, paramNames.address);
     let content = reqParam(req, 'content');
     let commentId = reqParam(req, 'commentId');
@@ -80,22 +80,23 @@ export class ReactionService {
       }
 
       const timestamp = Date.now(); // Get the current timestamp
-      const uniqueFilename = 'tk-' + streamTokenId + '-' + timestamp + '.jpg'; // Uses the timestamp as the filename  
-    
-        const imageUrl =files.length > 0? await this.cdnService.uploadFile(files[0].buffer, 'comments', uniqueFilename):null;
-   
+      const uniqueFilename = 'tk-' + streamTokenId + '-' + timestamp + '.jpg'; // Uses the timestamp as the filename
+
+      const imageUrl =
+        files.length > 0 ? await this.cdnService.uploadFile(files[0].buffer, 'comments', uniqueFilename) : null;
+
       streamTokenId = parseInt(streamTokenId, 10);
       commentId = commentId ? parseInt(commentId, 10) : undefined;
       const owner = await TokenModel.findOne({ tokenId: streamTokenId }, {}).lean();
-      const result = await this.requestCommentFunc(address, streamTokenId, content, commentId,imageUrl);
+      const result = await this.requestCommentFunc(address, streamTokenId, content, commentId, imageUrl);
       // notify owner
-      if(owner.owner){
-           await this.notificationService.createNotificationfunc(normalizeAddress(owner?.owner), 'comment', {
-        tokenId: streamTokenId,
-        senderAddress: normalizeAddress(address),
-      });
+      if (owner.owner) {
+        await this.notificationService.createNotificationfunc(normalizeAddress(owner?.owner), 'comment', {
+          tokenId: streamTokenId,
+          senderAddress: normalizeAddress(address),
+        });
       }
-   
+
       return res.json(result);
     } catch (err) {
       console.log('-----request comment error', err);
@@ -115,14 +116,16 @@ export class ReactionService {
       await this.requestVoteFunc(address, streamTokenId, vote.toString());
       // notify owner
       console.log(owner.owner, address);
-      await this.notificationService.createNotificationfunc(
-        normalizeAddress(owner.owner),
-        vote === 'true' ? 'like' : 'dislike',
-        {
-          tokenId: streamTokenId,
-          senderAddress: normalizeAddress(address),
-        },
-      );
+      if (owner?.owner) {
+        await this.notificationService.createNotificationfunc(
+          normalizeAddress(owner.owner),
+          vote === 'true' ? 'like' : 'dislike',
+          {
+            tokenId: streamTokenId,
+            senderAddress: normalizeAddress(address),
+          },
+        );
+      }
       // Add to liked videos
       if (vote === 'true') {
         const payload = new LikedVideos({
@@ -269,7 +272,7 @@ export class ReactionService {
     return { result: true };
   }
 
-  async requestCommentFunc(account, tokenId, content, commentId,imageUrl=null) {
+  async requestCommentFunc(account, tokenId, content, commentId, imageUrl = null) {
     const nftStreamItem = await TokenModel.findOne({ tokenId }, {}).lean();
     if (!nftStreamItem) return { result: false, error: 'This stream no exist' };
     account = normalizeAddress(account);
@@ -277,11 +280,17 @@ export class ReactionService {
       // reply
       const commentItem = await CommentModel.findOne({ id: commentId }, { tokenId: 1 }).lean();
       if (commentItem?.tokenId != tokenId) return { result: false, error: 'invalid comment' };
-      console.log("imageUrl",imageUrl)
-      const createdComment = await CommentModel.create({ tokenId, address: account, content, parentId: commentId ,imageUrl});
+      console.log('imageUrl', imageUrl);
+      const createdComment = await CommentModel.create({
+        tokenId,
+        address: account,
+        content,
+        parentId: commentId,
+        imageUrl,
+      });
       await CommentModel.updateOne({ id: commentId }, { $push: { replyIds: createdComment.id } });
     } else {
-      await CommentModel.create({ tokenId, address: account, content,imageUrl });
+      await CommentModel.create({ tokenId, address: account, content, imageUrl });
     }
     // claim on chain
     // await payBounty(account, tokenId, RewardType.BountyForCommentor);
