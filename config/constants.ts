@@ -450,7 +450,7 @@ const mainNetworks = [
   {
     chainId: ChainId.BASE_MAINNET,
     shortName: `base`,
-    rpcUrls: [`https://base-sepolia.infura.io/v3/${process.env.INFURA_API_KEY}`],
+    rpcUrls: [`https://base-mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`],
     startBlockNumber: 14205375,
     graphUrl: process.env.BASE_GRAPH_API_ENDPOINT,
     eventRpc: [`https://endpoints.omniatech.io/v1/base/mainnet/public`],
@@ -542,8 +542,8 @@ export const durations = [
 ];
 const subscriptionCollectionAddress = {
   [ChainId.BSC_TESTNET]: '0xEbCea2213AE6c69c74F6f648fcFF6A27842c78F1',
-  [ChainId.BSC_MAINNET]: '0xEbCea2213AE6c69c74F6f648fcFF6A27842c78F1',
-  [ChainId.BASE_MAINNET]: '0xEbCea2213AE6c69c74F6f648fcFF6A27842c78F1',
+  [ChainId.BSC_MAINNET]: '0x64eD1cEf5ba5655DAe565Ee592b6eb229e8CB05C',
+  [ChainId.BASE_MAINNET]: '0x91Cb5e924285484Ec666fF969D3941414fcE15d1',
 };
 
 export {
