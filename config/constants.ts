@@ -541,9 +541,9 @@ export const durations = [
   { title: 'lifetime', value: 999, tier: 5 },
 ];
 const subscriptionCollectionAddress = {
-  [ChainId.BSC_TESTNET]: '0x9F84c23fc1Bd28781e6c666843f870eC6f0eE8c2',
-  [ChainId.BSC_MAINNET]: '0x9F84c23fc1Bd28781e6c666843f870eC6f0eE8c2',
-  [ChainId.BASE_MAINNET]: '0x9F84c23fc1Bd28781e6c666843f870eC6f0eE8c2',
+  [ChainId.BSC_TESTNET]: '0xEbCea2213AE6c69c74F6f648fcFF6A27842c78F1',
+  [ChainId.BSC_MAINNET]: '0xEbCea2213AE6c69c74F6f648fcFF6A27842c78F1',
+  [ChainId.BASE_MAINNET]: '0xEbCea2213AE6c69c74F6f648fcFF6A27842c78F1',
 };
 
 export {
