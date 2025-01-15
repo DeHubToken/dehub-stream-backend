@@ -490,8 +490,6 @@ export class NftService {
         });
         await Promise.all(userSavedPromises);
       }
-      console.log("du=00")
-      console.log('retretretret', ret);
       res.send({ result: ret });
     } catch (e) {
       console.log('   ...', new Date(), ' -- index/tokens-search err: ', e);
@@ -574,7 +572,7 @@ export class NftService {
         },
       },
     ];
-    let result = await CommentModel.aggregate(query); 
+    let result = await CommentModel.aggregate(query);
     result.forEach(comment => {
       if (comment.account?.[0]) {
         comment.writor = {
@@ -833,32 +831,40 @@ export class NftService {
       if (!token) {
         console.log(`Token with ID ${tk} not found in database`);
         return res.status(404).json({ error: 'Token not found' });
-      } 
-      const isOwner = token?.owner?.toLowerCase() == address?.toLowerCase(); 
+      }
+      const isOwner = token?.owner && address && token?.owner?.toLowerCase() === address?.toLowerCase();
       const { isLockContent = false, isPayPerView = false }: any = token?.streamInfo;
-      const { plans = null } = token; 
-      const isFree = !isLockContent && !isPayPerView && !plans; 
-      const { isSubscribed = false, planRequired = false } = await getIsSubscriptionRequired(token.tokenId, address); 
-      const isUnlockedPPV =  await isUnlockedPPVStream(token.tokenId.toString(), address)  
-      const isUnlockedLocked =await isUnlockedLockedContent(token.streamInfo, address)  
-      const apiUrl = defaultTokenImagePath(tokenId.toString(), token.minter); 
+      const { plans = null } = token;
+      const isFree = !isLockContent && !isPayPerView && !plans;
+      const { isSubscribed = false, planRequired = false } = await getIsSubscriptionRequired(token.tokenId, address);
+      const isUnlockedPPV = await isUnlockedPPVStream(token.tokenId.toString(), address);
+      const isUnlockedLocked = await isUnlockedLockedContent(token.streamInfo, address);
+      const apiUrl = defaultTokenImagePath(tokenId.toString(), token.minter);
       let imageBuffer;
-      const response = await axios.get(apiUrl, { responseType: 'arraybuffer' }); 
+      const response = await axios.get(apiUrl, { responseType: 'arraybuffer' });
       if (response.status !== 200) {
         console.log('Image not found on the server');
         return res.status(404).json({ error: 'Image not found on the server' });
       }
-      imageBuffer = Buffer.from(response.data); 
-      const shouldApplyBlur = () => { 
-        const result = isOwner || isFree ||isUnlockedPPV|| isUnlockedLocked || isSubscribed; 
+      imageBuffer = Buffer.from(response.data);
+      console.log('shouldApplyBlur', {
+        isOwner,
+        isFree,
+        isUnlockedPPV,
+        isUnlockedLocked,
+        isSubscribed,
+      });
+      const shouldApplyBlur = () => {
+        const result = isOwner || isFree || isUnlockedPPV || isUnlockedLocked || isSubscribed;
         return !result;
       };
- 
+
+      console.log('shouldApplyBlur:', shouldApplyBlur());
       let sendImage = imageBuffer;
-      if (shouldApplyBlur()) { 
+      if (shouldApplyBlur()) {
         const compressedImage = await makeBlurAndCompress(imageBuffer, { blur: 30, compress: 0 });
         sendImage = compressedImage;
-      }  
+      }
       res.set('Content-Type', 'image/jpg');
       res.send(sendImage);
     } catch (error) {
