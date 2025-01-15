@@ -435,6 +435,7 @@ const supportedTokensForPPV = supportedTokens;
 const supportedTokensForAddBounty = supportedTokens;
 
 const supportedChainIdsForMinting = [56];
+const supportedChainIdsForSubscription = [56,ChainId.BASE_MAINNET,ChainId.BSC_TESTNET];
 const supportedChainIds = isDevMode
   ? [ChainId.BSC_TESTNET, ChainId.GORLI]
   : [ChainId.MAINNET, ChainId.BSC_MAINNET, ChainId.POLYGON_MAINNET];
@@ -450,10 +451,10 @@ const mainNetworks = [
   {
     chainId: ChainId.BASE_MAINNET,
     shortName: `base`,
-    rpcUrls: [`https://base-mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`],
+    rpcUrls: [process.env.BASE_RPC_ENDPOINT],
     startBlockNumber: 14205375,
     graphUrl: process.env.BASE_GRAPH_API_ENDPOINT,
-    eventRpc: [`https://endpoints.omniatech.io/v1/base/mainnet/public`],
+    eventRpc: [process.env.BASE_RPC_ENDPOINT],
   },
   {
     chainId: ChainId.MAINNET,
