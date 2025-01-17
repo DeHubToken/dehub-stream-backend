@@ -1,16 +1,17 @@
 import { Module } from '@nestjs/common';
 import { JobService } from './job.service';
 import { BullModule } from '@nestjs/bull';
-import { VideoQueueProcessor } from './job.processor';
+import { VideoQueueProcessor ,DmQueueProcessor} from './job.processor';
 import { CdnModule } from 'src/cdn/cdn.module';
 import { JobGateway } from './job.socket';
 
 @Module({
-  providers: [JobService, VideoQueueProcessor, JobGateway],
-  imports: [ 
-  BullModule.registerQueue({
-    name: 'transcode',
-  }),CdnModule],
-  exports:[JobService]
+  providers: [JobService, VideoQueueProcessor, DmQueueProcessor,JobGateway],
+  imports: [
+    BullModule.registerQueue({ name: 'transcode' }),
+    BullModule.registerQueue({ name: 'dm-uploads' }),
+    CdnModule,
+  ],
+  exports: [JobService],
 })
 export class JobModule {}

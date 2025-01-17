@@ -11,6 +11,7 @@ export class AuthController {
   @UseGuards(AuthGuard)
   async signWithWallet(@Req() req: Request, @Res() res: Response) {
     try {
+      console.log("signinWithWallet")
       const result = await this.authService.signWithWallet(req,res);
       return res.json(result);
     } catch (error) {
@@ -21,6 +22,7 @@ export class AuthController {
   @Post('loginWithWallet')
   @UseGuards(AuthGuard)
   async login(@Req() req: Request, @Res() res: Response) {
+    console.log("loginWithWallet")
     try {
       return await this.authService.login(req, res); 
     } catch (error) {

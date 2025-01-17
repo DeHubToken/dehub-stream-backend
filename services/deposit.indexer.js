@@ -29,6 +29,8 @@ if (!curNetwork) process.exit('no supported network!');
 const chainId = curNetwork.chainId;
 console.log('---deposit indexer for:', networkName, 'chainId:', chainId);
 const tokens = supportedTokens.filter(e => e.chainId === chainId);
+console.log("deposit indexer JsonRpcProvider--->")
+
 const provider = new ethers.providers.JsonRpcProvider(curNetwork.rpcUrls[0]);
 
 const vaultContract = new ethers.Contract(vaultContractAddresses[curNetwork.chainId], ContractAbi, provider);
@@ -187,7 +189,7 @@ mongoose.set('useFindAndModify', false);
 mongoose.set('useCreateIndex', true);
 /// -- transfer listener
 mongoose
-  .connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/' + config.mongo.dbName, {
+  .connect(config?.mongo?.url||'mongodb://' + config.mongo.host + ':' + config.mongo.port + '/' + config.mongo.dbName, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })

@@ -5,9 +5,8 @@ require('dotenv').config();
 const isDevMode = process.env.RUN_MODE === 'dev';
 
 export const MAX_MINT = process.env.RUN_MODE == 'dev' ? 100 : 3;
-export const NFT_NAME_PREFIX = "Stream NFT";
+export const NFT_NAME_PREFIX = 'Stream NFT';
 export const EXPIRED_TIME_FOR_MINTING = 60000 * 2; //ms
-
 
 const paramNames = {
   address: 'address',
@@ -105,7 +104,8 @@ const ChainId = {
   AVALANCHE_MAINNET: 43114,
   POLYGON_MAINNET: 137,
   OKEX_MAINNET: undefined,
-  KOVAN: undefined
+  KOVAN: undefined,
+  BASE_MAINNET: 8453,
 };
 
 const dhbTokenAddresses = {
@@ -115,6 +115,7 @@ const dhbTokenAddresses = {
   [ChainId.FANTOM_MAINNET]: '0xbb804a896E1A6962837c0813a5F89fDb771d808f',
   [ChainId.AVALANCHE_MAINNET]: '0x84514BeaaF8f9a4cbe25A9C5a7EBdd16B4FE7154',
   [ChainId.POLYGON_MAINNET]: '0x6051e59eb50BB568415B6C476Fbd394EEF83834D',
+  [ChainId.BASE_MAINNET]: '0xD20ab1015f6a2De4a6FdDEbAB270113F689c2F7c',
 };
 
 const vaultContractAddresses = {
@@ -125,6 +126,7 @@ const vaultContractAddresses = {
   [ChainId.FANTOM_MAINNET]: '0xfBA69f9a77CAB5892D568144397DC6A2068EceD3',
   [ChainId.AVALANCHE_MAINNET]: '0xfBA69f9a77CAB5892D568144397DC6A2068EceD3',
   [ChainId.POLYGON_MAINNET]: '0xfBA69f9a77CAB5892D568144397DC6A2068EceD3',
+  [ChainId.BASE_MAINNET]: '0xfBA69f9a77CAB5892D568144397DC6A2068EceD3',
 };
 
 const stakingContractAddresses = {
@@ -135,6 +137,7 @@ const multicallContractAddresses = {
   [ChainId.MAINNET]: '0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696',
   [ChainId.GORLI]: '0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696',
   [ChainId.KOVAN]: '0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696',
+  [ChainId.BASE_MAINNET]: '0x944afB839712DfF2cCf83D2DaAf34A04B029B2B7',
   [ChainId.BSC_MAINNET]: '0x41B90b73a88804f2aed1C4672b3dbA74eb9A92ce',
   [ChainId.BSC_TESTNET]: '0x80d0d36d9E3Cb0Bd4561beB1d9d1cC8e1a33F5b1',
   [ChainId.FANTOM_MAINNET]: '0xbb804a896E1A6962837c0813a5F89fDb771d808f',
@@ -149,6 +152,7 @@ const streamCollectionAddresses = {
   [ChainId.MAINNET]: '0x1065F5922a336C75623B55D22c4a0C760efCe947',
   [ChainId.BSC_MAINNET]: '0x1065F5922a336C75623B55D22c4a0C760efCe947',
   [ChainId.POLYGON_MAINNET]: '0x1065F5922a336C75623B55D22c4a0C760efCe947',
+  [ChainId.BASE_MAINNET]: '0x9f8012074d27F8596C0E5038477ACB52057BC934',
   // testnets
   [ChainId.GORLI]: '0xfdFe40A30416e0aEcF4814d1d140e027253c00c7',
   [ChainId.BSC_TESTNET]: '0xfdFe40A30416e0aEcF4814d1d140e027253c00c7',
@@ -164,6 +168,7 @@ const streamControllerContractAddresses = {
   [ChainId.MAINNET]: '0x6e19ba22da239c46941582530c0ef61400b0e3e6',
   [ChainId.BSC_MAINNET]: '0x6e19ba22da239c46941582530c0ef61400b0e3e6',
   [ChainId.POLYGON_MAINNET]: '0x6e19ba22da239c46941582530c0ef61400b0e3e6',
+  [ChainId.BASE_MAINNET]: '0x4fa30dAef50c6dc8593470750F3c721CA3275581',
   // testnets
   [ChainId.GORLI]: '0x2b44a04d2e62d84395eb30f9cf71a256bc7b158a',
   [ChainId.BSC_TESTNET]: '0x5Ae62dF56fF1E68Fb1772a337859b856CAEEFab6',
@@ -181,7 +186,7 @@ const devTokens = [
     symbol: 'DHB',
     customAbbreviation: 'dhb',
     chainId: 97,
-    address: '0x06EdA7889330031a8417f46e4C771C628c0b6418',
+    address: '0xeb6ACdcfe1F13187126A504d56f7970bf6f3C5E1', //'0xeb6acdcfe1f13187126a504d56f7970bf6f3c5e1',
     iconUrl: 'assets/icons/tokens/DHB.png',
     decimals: 18,
   },
@@ -211,12 +216,74 @@ const devTokens = [
     symbol: 'USDC',
     customAbbreviation: 'usdc',
     chainId: 97,
-    address: '0x4131fd3F1206d48A89410EE610BF1949934e0a72',
+    address: '0x4355a87B8e08C81Fdc6eD49C374b4b47748841Ce', // '0x4131fd3F1206d48A89410EE610BF1949934e0a72',
     iconUrl: 'assets/icons/tokens/USDC.png',
     decimals: 18,
   },
 ];
 const productionTokens = [
+  {
+    value: 'dhb',
+    label: 'DHB',
+    symbol: 'DHB',
+    customAbbreviation: 'dhb',
+    chainId: 8453,
+    address: '0xD20ab1015f6a2De4a6FdDEbAB270113F689c2F7c',
+    iconUrl: '/icons/DHB.png', // Update to relevant image URL if needed
+    mintBlockNumber: 16428469,
+    decimals: 18,
+  },
+  {
+    value: 'usdc',
+    label: 'USDC',
+    symbol: 'USDC',
+    customAbbreviation: 'usdc',
+    chainId: 8453,
+    address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+    iconUrl: 'https://cryptologos.cc/logos/usd-coin-usdc-logo.png?v=024',
+    decimals: 6,
+  },
+  {
+    value: 'usdt',
+    label: 'USDT',
+    symbol: 'USDT',
+    customAbbreviation: 'usdt',
+    chainId: 8453,
+    address: '0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2',
+    iconUrl: 'https://cryptologos.cc/logos/tether-usdt-logo.png?v=002',
+    decimals: 6,
+  },
+  {
+    value: 'weth',
+    label: 'WETH',
+    symbol: 'WETH',
+    customAbbreviation: 'weth',
+    chainId: 8453,
+    address: '0x4200000000000000000000000000000000000006',
+    iconUrl: 'https://cryptologos.cc/logos/ethereum-eth-logo.png?v=002',
+    decimals: 18,
+  },
+
+  {
+    value: 'wbnb',
+    label: 'WBNB',
+    symbol: 'WBNB',
+    customAbbreviation: 'wbnb',
+    chainId: 56,
+    address: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
+    iconUrl: 'https://cryptologos.cc/logos/binance-coin-bnb-logo.png?v=002',
+    decimals: 18,
+  },
+  {
+    value: 'weth',
+    label: 'WETH',
+    symbol: 'WETH',
+    customAbbreviation: 'weth',
+    chainId: 137,
+    address: '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
+    iconUrl: 'https://cryptologos.cc/logos/ethereum-eth-logo.png?v=002',
+    decimals: 18,
+  },
   {
     value: 'dhb',
     label: 'DHB',
@@ -368,6 +435,7 @@ const supportedTokensForPPV = supportedTokens;
 const supportedTokensForAddBounty = supportedTokens;
 
 const supportedChainIdsForMinting = [56];
+const supportedChainIdsForSubscription = [56,ChainId.BASE_MAINNET,ChainId.BSC_TESTNET];
 const supportedChainIds = isDevMode
   ? [ChainId.BSC_TESTNET, ChainId.GORLI]
   : [ChainId.MAINNET, ChainId.BSC_MAINNET, ChainId.POLYGON_MAINNET];
@@ -378,6 +446,15 @@ const mainNetworks = [
     rpcUrls: [process.env.BSC_RPC_ENDPOINT],
     startBlockNumber: 25834000,
     graphUrl: process.env.BSC_GRAPH_API_ENDPOINT,
+    eventRpc: [process.env.BSC_RPC_ENDPOINT],
+  },
+  {
+    chainId: ChainId.BASE_MAINNET,
+    shortName: `base`,
+    rpcUrls: [process.env.BASE_RPC_ENDPOINT],
+    startBlockNumber: 14205375,
+    graphUrl: process.env.BASE_GRAPH_API_ENDPOINT,
+    eventRpc: [process.env.BASE_RPC_ENDPOINT],
   },
   {
     chainId: ChainId.MAINNET,
@@ -385,6 +462,7 @@ const mainNetworks = [
     rpcUrls: [`https://mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`],
     startBlockNumber: 16428469,
     graphUrl: process.env.ETHEREUM_GRAPH_API_ENDPOINT,
+    eventRpc: [`https://mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`],
   },
   {
     chainId: ChainId.POLYGON_MAINNET,
@@ -394,22 +472,25 @@ const mainNetworks = [
     ],
     startBlockNumber: 38197541,
     graphUrl: process.env.POLYGON_GRAPH_API_ENDPOINT,
+    eventRpc: [`https://rpc-mainnet.matic.quiknode.pro`],
   },
 ];
 const testNetworks = [
   {
     chainId: ChainId.BSC_TESTNET,
     shortName: `bsctest`,
-    rpcUrls: [process.env.BSCTEST_RPC_ENDPOINT],
+    rpcUrls: [process.env.BSCTEST_RPC_ENDPOINT, process.env.BSCTEST_RPC_ENDPOINT],
     startBlockNumber: 8708163,
+    graphUrl: 'https://api.thegraph.com/subgraphs/name/bscscan/bsc-testnet',
+    eventRpc: [`https://data-seed-prebsc-1-s1.bnbchain.org:8545`],
   },
-  {
-    chainId: ChainId.GORLI,
-    shortName: `goerli`,
-    rpcUrls: [`https://goerli.infura.io/v3/${process.env.INFURA_API_KEY}`],
-    startBlockNumber: 8804175,
-    graphUrl: process.env.GOERLI_GRAPH_API_ENDPOINT,
-  },
+  // {
+  //   chainId: ChainId.GORLI,
+  //   shortName: `goerli`,
+  //   rpcUrls: [`https://goerli.infura.io/v3/${process.env.INFURA_API_KEY}`],
+  //   startBlockNumber: 8804175,
+  //   graphUrl: process.env.GOERLI_GRAPH_API_ENDPOINT,
+  // },
 ];
 
 const supportedNetworks = isDevMode ? testNetworks : mainNetworks;
@@ -419,6 +500,7 @@ const tokenTemplate = {
   description: 1,
   tokenId: 1,
   imageUrl: 1,
+  imageUrls: 1,
   videoUrl: 1,
   isHidden: 1,
   isLiked: 1,
@@ -439,6 +521,8 @@ const tokenTemplate = {
   mintTxHash: 1,
   chainId: 1,
   category: 1,
+  postType: 1,
+  // plans:1,
   _id: 0,
 };
 
@@ -450,6 +534,18 @@ const blacklistOnLeaderboard = [
 ];
 
 const publicChatChannelId = 'public_chn';
+export const durations = [
+  { title: '1 month', value: 1, tier: 1 },
+  { title: '3 months', value: 3, tier: 2 },
+  { title: '6 months', value: 6, tier: 3 },
+  { title: '1 year', value: 12, tier: 4 },
+  { title: 'lifetime', value: 999, tier: 5 },
+];
+const subscriptionCollectionAddress = {
+  [ChainId.BSC_TESTNET]: '0xEbCea2213AE6c69c74F6f648fcFF6A27842c78F1',
+  [ChainId.BSC_MAINNET]: '0x64eD1cEf5ba5655DAe565Ee592b6eb229e8CB05C',
+  [ChainId.BASE_MAINNET]: '0x91Cb5e924285484Ec666fF969D3941414fcE15d1',
+};
 
 export {
   paramNames,
@@ -473,6 +569,7 @@ export {
   multicallContractAddresses,
   stakingContractAddresses,
   streamCollectionAddresses,
+  subscriptionCollectionAddress,
   streamControllerContractAddresses,
   tokenTemplate,
   blacklistOnLeaderboard,

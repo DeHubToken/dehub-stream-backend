@@ -40,6 +40,9 @@ export interface TokenDocument extends Document {
   transcodingStatus?: string;
   category?: string[];
   mintTxHash?: string;
+  postType?: 'video' | 'feed-images' | 'feed-simple';
+  imageUrls: string[];
+  plans: string[];
 }
 
 // Define the Token schema
@@ -60,8 +63,8 @@ const TokenSchema = new mongoose.Schema<TokenDocument>(
     contractAddress: { type: String },
     minter: { type: String },
     owner: { type: String },
-    isHidden: {type: Boolean},
-    progress: {type:Number},
+    isHidden: { type: Boolean },
+    progress: { type: Number },
     streamInfo: { type: Object }, // or use a specific type
     videoExt: { type: String },
     imageExt: { type: String },
@@ -69,12 +72,12 @@ const TokenSchema = new mongoose.Schema<TokenDocument>(
     videoInfo: { type: Object }, // or use a specific type
     videoDuration: { type: Number }, // in seconds
     videoFilePath: { type: String },
-    likes: { type: Number},
+    likes: { type: Number },
     views: { type: Number },
     comments: { type: Number },
     totalVotes: { type: Object }, // e.g., { for: 15, against: 1 }
     lockedBounty: { type: Object },
-    totalTips: { type: Number}, // total tips received from any users
+    totalTips: { type: Number }, // total tips received from any users
     totalFunds: { type: Number }, // total funds received from pay-per-view
     status: {
       type: String,
@@ -84,8 +87,18 @@ const TokenSchema = new mongoose.Schema<TokenDocument>(
     transcodingStatus: { type: String },
     category: { type: [String] },
     mintTxHash: { type: String },
+    imageUrls: { type: [String], default: [] },
+    postType: {
+      type: String,
+      default: 'video',
+      enum: ['video', 'feed-images', 'feed-simple'],
+    },
+    plans: {
+      type: [String],//hare is this Plans table plans.id  as array
+      default: [],
+    },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Pre-save hook to generate tokenId and other properties
@@ -97,13 +110,15 @@ TokenSchema.pre<TokenDocument>('save', async function (next) {
       const counter = await IDCounterModel.findOneAndUpdate(
         { id: 'tokenId' },
         { $inc: { seq: 1 } },
-        { new: true, upsert: true, setDefaultsOnInsert: true }
+        { new: true, upsert: true, setDefaultsOnInsert: true },
       );
 
       doc.tokenId = counter.seq;
-
-      // Generate default name and URLs if not provided
+      if (doc.postType != 'video') {
+        return next();
+      }
       if (!doc.name) {
+        // Generate default name and URLs if not provided
         doc.name = `${NFT_NAME_PREFIX} #${doc.tokenId}`;
       }
       if (!doc.imageUrl) {
