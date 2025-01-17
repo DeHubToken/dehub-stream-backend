@@ -30,17 +30,17 @@ export class StreamCronService implements OnModuleInit {
     await this.mainLoop(networkName);
   }
 
-  @Cron(CronExpression.EVERY_MINUTE)
-  async ethLoop() {
-    const networkName = 'mainnet';
-    await this.mainLoop(networkName);
-  }
+  // @Cron(CronExpression.EVERY_MINUTE)
+  // async ethLoop() {
+  //   const networkName = 'mainnet';
+  //   await this.mainLoop(networkName);
+  // }
 
-  @Cron(CronExpression.EVERY_MINUTE)
-  async polyLoop() {
-    const networkName = 'polygon';
-    await this.mainLoop(networkName);
-  }
+  // @Cron(CronExpression.EVERY_MINUTE)
+  // async polyLoop() {
+  //   const networkName = 'polygon';
+  //   await this.mainLoop(networkName);
+  // }
   @Cron(CronExpression.EVERY_MINUTE)
   async baseTestLoop() {
     const networkName = 'base';
