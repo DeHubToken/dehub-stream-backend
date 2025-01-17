@@ -3,11 +3,11 @@ import {config} from 'config';
 import { paramNames } from 'config/constants';
 import { ethers } from 'ethers';
 import * as jwt from 'jsonwebtoken'
-const secretKey = 'your_secret_key';
+const secretKey = process.env.JWT_SECRET_KEY || 'your_secret_key';
 
 const expireSecond = config.isDevMode ? 60 * 60 * 2 : 60 * 60 * 24; // 2 hours for dev mode, 24 hours for production mode
 
-const isValidAccount = (address, timestamp, sig) => {
+export const isValidAccount = (address, timestamp, sig) => {
   if (!sig || !address || !timestamp) return false;
   // const signedMsg = `${address.toLowerCase()}-${timestamp}`;
   const displayedDate = new Date(timestamp * 1000);
@@ -27,7 +27,7 @@ const isValidAccount = (address, timestamp, sig) => {
       return false;
     return true;
   } catch (e) {
-    console.log('check account:', e);
+    console.error('Error verifying account:', e);
     return false;
   }
 }
@@ -77,7 +77,6 @@ const isAuthorized = async (req, res, next) => {
 };
 
 export {
-  isValidAccount,
   reqParam,
   isAuthorized,
 };

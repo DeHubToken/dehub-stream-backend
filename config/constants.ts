@@ -481,3 +481,27 @@ export {
   ReactionType,
   ReactionSubjectType,
 };
+
+export enum StreamStatus {
+  OFFLINE = 'OFFLINE',
+  LIVE = 'LIVE',
+  ENDED = 'ENDED',
+  SCHEDULED = 'SCHEDULED',
+}
+
+export enum StreamActivityType {
+  COMMENT = 'COMMENT',
+  MESSAGE = 'MESSAGE',
+  LIKE = 'LIKE',
+  REACTION = 'REACTION',
+  JOINED = 'JOINED',
+  LEFT = 'LEFT',
+}
+
+export enum LiveReactionType {
+  LIKE = 'LIKE',
+  HEART = 'HEART',
+  CELEBRATE = 'CELEBRATE',
+  SUPPORT = 'SUPPORT',
+  LAUGH = 'LAUGH',
+}

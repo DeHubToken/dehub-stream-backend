@@ -24,6 +24,10 @@ import { statSync } from 'fs';
 import { JobService } from 'src/job/job.service';
 import { VoteModel } from 'models/Vote';
 import sharp from 'sharp';
+import { StreamActivityType, StreamStatus } from 'config/constants';
+import { InjectModel } from '@nestjs/mongoose';
+import { LiveStream, StreamDocument } from 'models/LiveStream';
+import { Model } from 'mongoose';
 
 const signer = new ethers.Wallet(process.env.SIGNER_KEY || '');
 
@@ -32,6 +36,7 @@ export class NftService {
   constructor(
     private readonly cdnService: CdnService,
     private readonly jobService: JobService,
+    @InjectModel(LiveStream.name) private livestreamModel: Model<StreamDocument>,
   ) {}
 
   async getAllNfts(req: Request, res: Response) {
@@ -161,7 +166,7 @@ export class NftService {
     );
     const { r, s, v } = splitSignature(await signer.signMessage(arrayify(messageHash)));
     const res: any = { r, s, v, createdTokenId: tokenItem.tokenId.toString(), timestamp };
-    console.log("signature res:", res);
+    console.log('signature res:', res);
     return { res, video: tokenItem };
   }
 
@@ -253,14 +258,48 @@ export class NftService {
 
       let sortRule: any = { createdAt: -1 };
       searchQuery['$match'] = {
-        $and: [
-          { status: 'minted' },
-          { $or: [{ isHidden: false }, { isHidden: { $exists: false } }] },
-        ],
+        $and: [{ status: 'minted' }, { $or: [{ isHidden: false }, { isHidden: { $exists: false } }] }],
       };
 
-      console.log('Range - sotMode - unit - page - search', range, sortMode, unit, page, search)
+      console.log('Range - sotMode - unit - page - search', range, sortMode, unit, page, search);
       switch (sortMode) {
+        case 'live':
+          const liveQuery: any = {
+            status: { $in: [StreamStatus.LIVE, StreamStatus.SCHEDULED] },
+          };
+
+          if (search) {
+            break;
+          }
+          if (owner) liveQuery.address = owner.toLowerCase();
+
+          const liveStreams = await this.livestreamModel
+            .find(liveQuery)
+            .sort(sortRule)
+            .skip(unit * page)
+            .limit(unit);
+
+          const accounts = await AccountModel.find({
+            address: { $in: liveStreams.map(stream => stream.address.toLowerCase()) },
+          });
+
+          const augmentedLiveStreams = liveStreams.map(stream => {
+            const account = accounts.find(acc => acc.address.toLowerCase() === stream.address.toLowerCase());
+
+            return {
+              ...stream.toObject(),
+              account: account
+                ? {
+                    username: account.username,
+                    displayName: account.displayName,
+                    avatarImageUrl: account.avatarImageUrl,
+                  }
+                : null,
+            };
+          });
+
+          return res.send({ result: augmentedLiveStreams });
+          break;
         case 'trends':
           if (range) {
             let fromDate = new Date();
@@ -306,16 +345,13 @@ export class NftService {
           sortRule = { likes: -1 };
           break;
         case 'ppv':
-          searchQuery['$match'][`streamInfo.${streamInfoKeys.isPayPerView}`] =
-            true;
+          searchQuery['$match'][`streamInfo.${streamInfoKeys.isPayPerView}`] = true;
           break;
         case 'bounty':
-          searchQuery['$match'][`streamInfo.${streamInfoKeys.isAddBounty}`] =
-            true;
+          searchQuery['$match'][`streamInfo.${streamInfoKeys.isAddBounty}`] = true;
           break;
         case 'locked':
-          searchQuery['$match'][`streamInfo.${streamInfoKeys.isLockContent}`] =
-            true;
+          searchQuery['$match'][`streamInfo.${streamInfoKeys.isLockContent}`] = true;
           break;
       }
 
@@ -329,26 +365,19 @@ export class NftService {
       if (bulkIdList) {
         let idList = bulkIdList.split('-');
         if (idList.length > 0) {
-          idList = idList.map((e) => '0x' + e);
+          idList = idList.map(e => '0x' + e);
           searchQuery['$match'] = { id: { $in: idList } };
         }
       }
 
-      if (
-        (verifiedOnly + '').toLowerCase() === 'true' ||
-        verifiedOnly === '1'
-      ) {
+      if ((verifiedOnly + '').toLowerCase() === 'true' || verifiedOnly === '1') {
         searchQuery['$match'] = { ...searchQuery['$match'], verified: true };
       }
 
       if (search) {
         if (!isValidSearch(search)) return res.json({ result: [] });
         var re: any = new RegExp(search, 'gi');
-        let orOptions: any = [
-          { name: re },
-          { description: re },
-          { owner: normalizeAddress(re) },
-        ];
+        let orOptions: any = [{ name: re }, { description: re }, { owner: normalizeAddress(re) }];
         if (Number(search) > 0) orOptions.push({ tokenId: Number(search) });
         searchQuery['$match'] = { ...searchQuery['$match'], $or: orOptions };
 
@@ -356,6 +385,18 @@ export class NftService {
         const accounts = await AccountModel.find({
           username: { $regex: new RegExp(search, 'i') },
         });
+
+        // search throuh livestreams
+        const livestreamQuery: any = {
+          $or: [{ title: re }, { description: re }],
+        };
+
+        const livestreams = await this.livestreamModel
+          .find(livestreamQuery)
+          .sort(sortRule)
+          .skip(unit * page)
+          .limit(unit);
+
         const videos: any = await this.getStreamNfts(
           searchQuery['$match'],
           unit * page,
@@ -376,16 +417,12 @@ export class NftService {
           result: {
             accounts,
             videos,
+            livestreams,
           },
         });
       }
 
-      const ret: any = await this.getStreamNfts(
-        searchQuery['$match'],
-        unit * page,
-        unit * page + unit * 1,
-        sortRule,
-      );
+      const ret: any = await this.getStreamNfts(searchQuery['$match'], unit * page, unit * page + unit * 1, sortRule);
       // Include userLike logic
       for (let nft of ret) {
         const userLike = await VoteModel.findOne({
@@ -400,7 +437,6 @@ export class NftService {
       res.status(500).send({ error: e.message });
     }
   }
-
 
   async getMyWatchedNfts(req: Request, res: Response) {
     let watcherAddress: any = req.query.watcherAddress || req.query.watcherAddress;
@@ -678,14 +714,14 @@ export class NftService {
     return { v, r, s };
   }
 
-  async recordVideoView(watcherAddress, tokenId){
+  async recordVideoView(watcherAddress, tokenId) {
     try {
       const existingEntry = await WatchHistoryModel.findOne({
         watcherAddress,
         tokenId,
         status: 'confirmed',
       });
-  
+
       if (!existingEntry) {
         await new WatchHistoryModel({
           tokenId,
@@ -693,10 +729,10 @@ export class NftService {
           status: 'confirmed',
           watchedAt: new Date(),
         }).save();
-  
+
         const tokenFilter = { tokenId };
         await TokenModel.updateOne(tokenFilter, { $inc: { views: 1 } });
-        return { success: true }
+        return { success: true };
       }
 
       // Always log the session, even if it's not a unique view
@@ -710,7 +746,7 @@ export class NftService {
       // increment total views for each session
       const tokenFilter = { tokenId };
       await TokenModel.updateOne(tokenFilter, { $inc: { views: 1 } });
-      return { success: true }
+      return { success: true };
     } catch (error) {
       console.error('Error recording video view:', error);
       throw new Error('Could not record video view');

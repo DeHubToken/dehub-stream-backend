@@ -17,6 +17,10 @@ import { BullModule } from '@nestjs/bull';
 import { ScheduleModule } from '@nestjs/schedule';
 import { StreamCronService } from './job/stream-cron.service';
 import { WatchCronService } from './job/watch-cron.service';
+import { LivestreamModule } from './livestream/livestream.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { MongooseModule } from '@nestjs/mongoose';
+import { config } from 'config';
 
 @Module({
   imports: [
@@ -27,10 +31,15 @@ import { WatchCronService } from './job/watch-cron.service';
         port: 6379,
       },
     }),
+    EventEmitterModule.forRoot(),
+    MongooseModule.forRoot(`mongodb://${config.mongo.host}:${config.mongo.port}/${config.mongo.dbName}`),
     UserModule, 
-    NftModule, NotificationModule, CdnModule, AuthModule, ReactionModule, CategoryModule, LeaderboardModule, AssetModule, JobModule, ScheduleModule.forRoot()],
+    NftModule, NotificationModule, CdnModule, AuthModule, ReactionModule, CategoryModule, LeaderboardModule, AssetModule, JobModule, ScheduleModule.forRoot(), LivestreamModule],
   controllers: [AppController],
-  providers: [AppService, StreamCronService, WatchCronService],
+  providers: [AppService
+    // , StreamCronService
+    // , WatchCronService
+  ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

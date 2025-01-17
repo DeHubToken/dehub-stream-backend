@@ -1,0 +1,141 @@
+import { Injectable } from '@nestjs/common';
+import { spawn } from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
+import { CdnService } from 'src/cdn/cdn.service';
+
+@Injectable()
+export class HlsService {
+  private streams: Map<
+    string,
+    {
+      ffmpegProcess: any;
+      tempPath: string;
+      outputPath: string;
+      uploadInterval: NodeJS.Timeout | null;
+    }
+  > = new Map();
+
+  constructor(private readonly cdnService: CdnService) {}
+
+  private setupStream(streamId: string) {
+    if (!this.streams.has(streamId)) {
+      const tempPath = path.join(process.cwd(), 'temp', streamId);
+      const outputPath = path.join(tempPath, 'hls');
+
+      fs.mkdirSync(outputPath, { recursive: true });
+
+      // Spawn FFmpeg process for WebM to HLS transcoding
+      const ffmpegProcess = spawn('ffmpeg', [
+        '-i',
+        'pipe:0', // Read WebM data from stdin
+        '-c:v',
+        'libx264', // Transcode video to H.264
+        '-crf',
+        '23', // Quality level (lower is better)
+        '-preset',
+        'veryfast', // Encoding speed/efficiency
+        '-c:a',
+        'aac', // Transcode audio to AAC
+        '-b:a',
+        '128k', // Audio bitrate
+        '-f',
+        'hls', // Output HLS
+        '-hls_time',
+        '2', // Segment duration
+        '-hls_list_size',
+        '6', // Number of segments in playlist
+        '-hls_flags',
+        // 'append_list',
+        'delete_segments+append_list',
+        '-hls_segment_type',
+        'mpegts',
+        '-hls_segment_filename',
+        `${outputPath}/%d.ts`,
+        `${outputPath}/playlist.m3u8`,
+      ]);
+
+      // ffmpegProcess.stderr.on('data', data => {
+      //   console.error(`[Stream ${streamId}] FFmpeg error:`, data.toString());
+      // });
+
+      ffmpegProcess.stderr.on('error', error => {
+        console.error(`[Stream ${streamId}] FFmpeg error:`, error.toString());
+      });
+
+      ffmpegProcess.on('close', code => {
+        console.log(`[Stream ${streamId}] FFmpeg process exited with code: ${code}`);
+      });
+
+      // Setup periodic upload of HLS segments
+      const uploadInterval = setInterval(() => {
+        this.uploadNewSegments(streamId);
+      }, 2000);
+
+      this.streams.set(streamId, { ffmpegProcess, tempPath, outputPath, uploadInterval });
+    }
+
+    return this.streams.get(streamId);
+  }
+
+  async handleStreamChunk(streamId: string, chunk: Buffer) {
+    const streamData = this.setupStream(streamId);
+
+    if (streamData?.ffmpegProcess?.stdin) {
+      streamData.ffmpegProcess.stdin.write(chunk);
+    } else {
+      console.error(`[Stream ${streamId}] Unable to write chunk to FFmpeg.`);
+    }
+  }
+
+  private async uploadNewSegments(streamId: string) {
+    const streamData = this.streams.get(streamId);
+    if (!streamData) return;
+
+    try {
+      const files = fs.readdirSync(streamData.outputPath);
+      const newFiles = files.filter(
+        file => (file.endsWith('.ts') || file.endsWith('.m3u8')) && !file.startsWith('uploaded_'),
+      );
+
+      console.log('New files',newFiles);
+      for (const file of newFiles) {
+        const filePath = path.join(streamData.outputPath, file);
+        const buffer = fs.readFileSync(filePath);
+
+        await this.cdnService.uploadFile(buffer, 'live', `hls/${streamId}/${file}`, percent =>
+          console.log(`[Stream ${streamId}] Uploading ${file}: ${percent}%`),
+        );
+
+        // Mark file as uploaded
+        fs.renameSync(filePath, path.join(streamData.outputPath, `uploaded_${file}`));
+        // just delete man
+        // fs.unlinkSync(filePath);
+      }
+    } catch (error) {
+      console.error(`[Stream ${streamId}] Error uploading segments:`, error);
+    }
+  }
+
+  async cleanupStream(streamId: string) {
+    console.log(`[Stream ${streamId}] Cleaning up resourcess`);
+    const streamData = this.streams.get(streamId);
+
+    if (streamData) {
+      // Stop upload interval
+      if (streamData.uploadInterval) {
+        clearInterval(streamData.uploadInterval);
+      }
+
+      // Terminate FFmpeg process
+      if (streamData.ffmpegProcess) {
+        streamData.ffmpegProcess.stdin.end();
+        streamData.ffmpegProcess.kill();
+      }
+
+      // Remove temporary files
+      fs.rmSync(streamData.tempPath, { recursive: true, force: true });
+      this.streams.delete(streamId);
+    }
+  }
+}

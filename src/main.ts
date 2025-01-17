@@ -61,7 +61,7 @@ async function bootstrap() {
 
   // Connect to MongoDB
   const mongoUri = `mongodb://${config.mongo.host}:${config.mongo.port}/${config.mongo.dbName}`;
-  console.log(config.mongo.dbName)
+
   await mongoose.connect(mongoUri); // Await connection
   
   mongoose.connection.on('error', (err) => {
@@ -74,18 +74,18 @@ async function bootstrap() {
   app.set('view engine', 'ejs');
 
   // Create HTTP server and Socket.IO instance
-  const server = createServer(app.getHttpAdapter().getInstance());
-  const io = new socketIO.Server(server, {
-    cors: {
-      origin: '*',
-      methods: ['GET', 'POST'],
-    },
-  });
+  // const server = createServer(app.getHttpAdapter().getInstance());
+  // const io = new socketIO.Server(server, {
+  //   cors: {
+  //     origin: '*',
+  //     methods: ['GET', 'POST'],
+  //   },
+  // });
 
-  io.on('connection', (socket: any) => {
-    console.log('New client connected:', socket.id);
-    webSockets(socket, io); // Initialize WebSocket handling
-  });
+  // io.on('connection', (socket: any) => {
+  //   console.log('New client connected:', socket.id);
+  //   webSockets(socket, io); // Initialize WebSocket handling
+  // });
 
   await app.listen(process.env.API_PORT);
 

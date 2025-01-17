@@ -66,7 +66,6 @@ export class AuthGuard implements CanActivate {
   }
 
   private extractParams(request): { address: string; rawSig: string; timestamp: number } {
-    
     const address = request.query.address || request.body.address || request.params.address;
     const rawSig = request.query.sig || request.body.sig || request.params.sig;
     const timestamp = request.query.timestamp || request.body.timestamp || request.params.timestamp;
