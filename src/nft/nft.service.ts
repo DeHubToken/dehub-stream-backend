@@ -831,8 +831,9 @@ export class NftService {
       if (!token) {
         console.log(`Token with ID ${tk} not found in database`);
         return res.status(404).json({ error: 'Token not found' });
-      }
-      const isOwner = token?.owner && address && token?.owner?.toLowerCase() === address?.toLowerCase();
+      } 
+      const isOwner = (token?.owner && address && token?.owner?.toLowerCase() === address?.toLowerCase())??false;
+      const isVideo=token.postType==="video";
       const { isLockContent = false, isPayPerView = false }: any = token?.streamInfo;
       const { plans = null } = token;
       const isFree = !isLockContent && !isPayPerView && !plans;
@@ -861,7 +862,7 @@ export class NftService {
 
       console.log('shouldApplyBlur:', shouldApplyBlur());
       let sendImage = imageBuffer;
-      if (shouldApplyBlur()) {
+      if (!isVideo&&shouldApplyBlur()) {
         const compressedImage = await makeBlurAndCompress(imageBuffer, { blur: 30, compress: 0 });
         sendImage = compressedImage;
       }
