@@ -340,14 +340,30 @@ export class NftService {
 
       if (!unit) unit = 20;
       if (unit > 100) unit = 100;
-      const postFilter = {};
-      if (postType === 'feed') {
-        postFilter['$or'] = [{ postType: 'feed-simple' }, { postType: 'feed-images' }];
-      } else {
-        postFilter['postType'] = postType;
-        // postFilter['transcodingStatus'] = 'done';
+      const postFilter = {}; 
+      const contentFilter = {
+        "video": { 
+          $or: [
+            { postType: { $nin: ['feed-simple', 'feed-images'] } },
+            { postType: 'video' }
+          ]
+        },
+        "feed-all": {  // Fix: Wrap the $or in an object for this case
+          $or: [
+            { postType: 'feed-simple' }, 
+            { postType: 'feed-images' }
+          ]
+        },
+        "feed-images": { postType: 'feed-images' },
+        "feed-simple": { postType: 'feed-simple' }
+      };
+       
+      if (contentFilter[postType]) {
+        Object.assign(postFilter, contentFilter[postType]);
       }
+//       // postFilter['transcodingStatus'] = 'done';  // Uncomment if needed
 
+ console.log("postFilter:",JSON.stringify(postFilter))
       console.log('sortMode', { sortMode, postType, searchQuery });
       let sortRule: any = { createdAt: -1 };
       searchQuery['$match'] = {
@@ -834,7 +850,7 @@ export class NftService {
       } 
       const isOwner = (token?.owner && address && token?.owner?.toLowerCase() === address?.toLowerCase())??false;
       const isVideo=token.postType==="video";
-      const { isLockContent = false, isPayPerView = false }: any = token?.streamInfo;
+      const { isLockContent = false, isPayPerView = false }: any = token?.streamInfo??{};
       const { plans = null } = token;
       const isFree = !isLockContent && !isPayPerView && !plans;
       const { isSubscribed = false, planRequired = false } = await getIsSubscriptionRequired(token.tokenId, address);
@@ -869,7 +885,7 @@ export class NftService {
       res.set('Content-Type', 'image/jpg');
       res.send(sendImage);
     } catch (error) {
-      console.error('Error in getNftImage:', error);
+      console.error('Error in getNftImage:', error.message);
       res.status(500).json({ error: 'Internal server error' });
     }
   }
