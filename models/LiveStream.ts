@@ -54,6 +54,9 @@ export class LiveStream {
   @Prop({ default: 0 })
   likes: number;
 
+  // @Prop({ default: 0 })
+  // totalTips: number;
+
   @Prop({ default: 0 })
   duration: number;
 

@@ -12,6 +12,9 @@ import { StreamViewer } from 'models/LiveStreamViewer';
 import { StreamActivity } from 'models/LiveStreamActivity';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import { CdnService } from 'src/cdn/cdn.service';
+import { AccountModel } from 'models/Account';
+import mongoose from 'mongoose'
+
 
 @Injectable()
 export class LivestreamService {
@@ -218,30 +221,149 @@ export class LivestreamService {
   }
 
   private async cleanupStream(streamId: string) {
-    // Additional cleanup as needed
+    // Additional cleanup as needeed
+  }
+
+  async getAugmentedLiveStreams() {
+    const liveStreamsWithAccounts = await this.livestreamModel.aggregate([
+      {
+        $lookup: {
+          from: AccountModel.collection.name, // Name of the Account collection
+          localField: 'address', // Field in LiveStream to match
+          foreignField: 'address', // Field in Account to match
+          as: 'account', // Alias for the joined data
+        },
+      },
+      {
+        $addFields: {
+          account: {
+            $arrayElemAt: ['$account', 0], // Flatten the account array (since $lookup returns an array)
+          },
+        },
+      },
+      {
+        $project: {
+          title: 1,
+          description: 1,
+          thumbnail: 1,
+          streamUrl: 1,
+          status: 1,
+          startedAt: 1,
+          endedAt: 1,
+          scheduledFor: 1,
+          categories: 1,
+          address: 1,
+          account: {
+            username: 1,
+            displayName: 1,
+            avatarImageUrl: 1,
+          },
+        },
+      },
+    ]);
+  
+    return liveStreamsWithAccounts;
   }
 
   async getStream(streamId: string) {
-    const stream = await this.livestreamModel
-      .findById(streamId)
-      .populate('address', 'username displayName avatarImageUrl')
-      .exec();
-
-    if (!stream) {
+    const streamWithAccount = await this.livestreamModel.aggregate([
+      {
+        $match: { _id: new mongoose.Types.ObjectId(streamId) },
+      },
+      {
+        $lookup: {
+          from: 'accounts', 
+          localField: 'address', 
+          foreignField: 'address', 
+          as: 'account',
+        },
+      },
+      {
+        $addFields: {
+          account: {
+            $arrayElemAt: ['$account', 0],
+          },
+        },
+      },
+      {
+        $project: {
+          title: 1,
+          description: 1,
+          thumbnail: 1,
+          streamUrl: 1,
+          status: 1,
+          startedAt: 1,
+          endedAt: 1,
+          scheduledFor: 1,
+          categories: 1,
+          address: 1,
+          account: {
+            username: 1,
+            displayName: 1,
+            avatarImageUrl: 1,
+          },
+        },
+      },
+    ]);
+  
+    if (!streamWithAccount.length) {
       throw new NotFoundException('Stream not found');
     }
-
-    return stream;
+  
+    return streamWithAccount[0];
   }
 
   async getLiveStreams(limit = 20, offset = 0) {
-    return this.livestreamModel
-      .find({ status: { $in: [StreamStatus.LIVE, StreamStatus.SCHEDULED] } })
-      .sort({ startedAt: -1 })
-      .skip(offset)
-      .limit(limit)
-      .populate('address', 'username displayName avatarImageUrl')
-      .exec();
+    const liveStreamsWithAccounts = await this.livestreamModel.aggregate([
+      {
+        $match: { status: { $in: [StreamStatus.LIVE, StreamStatus.SCHEDULED] } }, 
+      },
+      {
+        $sort: { startedAt: -1 }, 
+      },
+      {
+        $skip: offset, 
+      },
+      {
+        $limit: limit, 
+      },
+      {
+        $lookup: {
+          from: 'accounts', 
+          localField: 'address', 
+          foreignField: 'address', 
+          as: 'account',
+        },
+      },
+      {
+        $addFields: {
+          account: {
+            $arrayElemAt: ['$account', 0],
+          },
+        },
+      },
+      {
+        $project: {
+          title: 1,
+          description: 1,
+          thumbnail: 1,
+          streamUrl: 1,
+          status: 1,
+          startedAt: 1,
+          endedAt: 1,
+          scheduledFor: 1,
+          categories: 1,
+          address: 1,
+          account: {
+            username: 1,
+            displayName: 1,
+            avatarImageUrl: 1,
+          },
+        },
+      },
+    ]);
+  
+    return liveStreamsWithAccounts;
   }
 
   async getUserStreams(address: string, limit = 20, offset = 0) {
