@@ -354,6 +354,12 @@ export class NftService {
             { postType: 'feed-images' }
           ]
         },
+        "feed": {  // Fix: Wrap the $or in an object for this case
+          $or: [
+            { postType: 'feed-simple' }, 
+            { postType: 'feed-images' }
+          ]
+        },
         "feed-images": { postType: 'feed-images' },
         "feed-simple": { postType: 'feed-simple' }
       };
