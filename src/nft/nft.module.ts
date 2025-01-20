@@ -7,7 +7,13 @@ import { NftIndexer } from './mint.indexer';
 
 @Module({
   controllers: [NFTController],
-  providers: [NftService, NftIndexer],
-  imports:[CdnModule, JobModule]
+  providers: [
+    NftService,
+     NftIndexer
+    ],
+  imports:[
+    CdnModule,
+     JobModule
+    ]
 })
 export class NftModule {}

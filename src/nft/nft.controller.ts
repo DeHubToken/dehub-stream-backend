@@ -1,22 +1,23 @@
-import { Controller, Get, Post, Req, Res, UploadedFiles, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Post, Req, Res, UploadedFiles, UseGuards } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { AuthGuard } from 'common/guards/auth.guard';
 import { NftService } from './nft.service';
+import { MediaAuthGuard } from 'common/guards/auth.meida.guard';
+import { reqParam } from './nft.imports';
 
 @Controller()
 export class NFTController {
-  constructor(private readonly nftServices: NftService){}
-
+  constructor(private readonly nftServices: NftService) { }
 
   @Get('getServerTime')
   getServerTime(@Res() res: Response) {
-    return res.json({ status: true, data: Math.floor(Date.now() / 1000), note: 's' }); 
+    return res.json({ status: true, data: Math.floor(Date.now() / 1000), note: 's' });
   }
 
   @Get('all_nfts')
   async getAllNfts(@Req() req: Request, @Res() res: Response) {
     try {
-      return await this.nftServices.getAllNfts(req, res)
+      return await this.nftServices.getAllNfts(req, res);
     } catch (error) {
       return res.status(500).json({ message: 'Failed to fetch NFTs', error: error.message });
     }
@@ -24,7 +25,9 @@ export class NFTController {
   @Get('search_nfts')
   async Filtered(@Req() req: Request, @Res() res: Response) {
     try {
-      return await this.nftServices.getFilteredNfts(req, res)
+      console.log('GET NFT');
+      
+      return await this.nftServices.getFilteredNfts(req, res);
     } catch (error) {
       return res.status(500).json({ message: 'Failed to fetch NFTs', error: error.message });
     }
@@ -33,7 +36,7 @@ export class NFTController {
   @Get('my_nfts')
   async myNfts(@Req() req: Request, @Res() res: Response) {
     try {
-      return await this.nftServices.getMyNfts(req, res)
+      return await this.nftServices.getMyNfts(req, res);
     } catch (error) {
       return res.status(500).json({ message: 'Failed to fetch NFTs', error: error.message });
     }
@@ -42,7 +45,7 @@ export class NFTController {
   @Post('token_visibility')
   async changeVisibility(@Req() req: Request, @Res() res: Response) {
     try {
-      return await this.nftServices.updateTokenVisibility(req, res)
+      return await this.nftServices.updateTokenVisibility(req, res);
     } catch (error) {
       return res.status(500).json({ message: 'Failed to fetch NFTs', error: error.message });
     }
@@ -51,7 +54,7 @@ export class NFTController {
   @Get('my_watched_nfts')
   async watchhistory(@Req() req: Request, @Res() res: Response) {
     try {
-      return await this.nftServices.getMyWatchedNfts(req, res)
+      return await this.nftServices.getMyWatchedNfts(req, res);
     } catch (error) {
       return res.status(500).json({ message: 'Failed to fetch NFTs', error: error.message });
     }
@@ -59,28 +62,38 @@ export class NFTController {
   @Get('get_categories')
   async getCat(@Res() res: Response) {
     try {
-      return await this.nftServices.getCategories(res)
+      return await this.nftServices.getCategories(res);
     } catch (error) {
       return res.status(500).json({ message: 'Failed to fetch Categories', error: error.message });
     }
   }
- 
+
   @Get('/claim_bounty')
   async claimBounty(@Req() req: Request, @Res() res: Response) {
-    return await this.nftServices.getSignForClaimBounty(req, res)
+    return await this.nftServices.getSignForClaimBounty(req, res);
   }
 
   @Post('user_mint')
   @UseGuards(AuthGuard)
   async userMint(@Req() req: Request, @Res() res: Response, @UploadedFiles() files?: Express.Multer.File[]) {
-    if (!files || files.length === 0) {
+    const { postType = 'video' } = req.body;
+    if (postType != 'feed-simple' && (!files || files.length === 0)) {
       return res.status(400).json({ message: 'No files provided for minting' });
     }
-    const { address, name, description, streamInfo, chainId, category } = req.body;
-    
+    const { address, name, description, streamInfo, chainId, category, plans = null } = req.body;
+
     try {
-      const nft = await this.nftServices.mintNFT(files[0], files[1], name, description,streamInfo, address, chainId, category)
-      return res.status(201).json(nft); // Send the minted NFT as a JSON response
+      const nft = await this.nftServices.mintNFT(
+        name,
+        description,
+        JSON.parse(streamInfo),
+        address,
+        chainId,
+        category,
+        postType, JSON.parse(plans),
+        files,
+      );
+      return res.json(nft);
     } catch (error) {
       return res.status(500).json({ message: 'Failed to mint NFT', error: error.message });
     }
@@ -89,14 +102,25 @@ export class NFTController {
   @Get('liked_videos')
   @UseGuards(AuthGuard)
   async getLikedVideos(@Req() req: Request, @Res() res: Response) {
-    const resp = await this.nftServices.getlikedVideos(req,res)
+    const resp = await this.nftServices.getlikedVideos(req, res);
     res.send(resp);
-  } 
-  
+  }
+
   @Get('/nft_info/:id')
   async nftinfo(@Req() req: Request, @Res() res: Response) {
     try {
-      return await this.nftServices.getNftInfo(req, res)
+      return await this.nftServices.getNftInfo(req, res);
+    } catch (error) {
+      return res.status(500).json({ message: 'Failed to fetch NFTs', error: error.message });
+    }
+  }
+
+  @Get('/nfts/images/:id')
+  @UseGuards(MediaAuthGuard)
+
+  async nftImage(@Req() req: Request, @Res() res: Response) {
+    try {
+      return await this.nftServices.getNftImage(req, res);
     } catch (error) {
       return res.status(500).json({ message: 'Failed to fetch NFTs', error: error.message });
     }
@@ -104,10 +128,37 @@ export class NFTController {
   @Get('/unlocked_nfts/:id')
   async unlockedNft(@Req() req: Request, @Res() res: Response) {
     try {
-      return await this.nftServices.getUnlockedNfts(req, res)
+      return await this.nftServices.getUnlockedNfts(req, res);
     } catch (error) {
       return res.status(500).json({ message: 'Failed to fetch NFTs', error: error.message });
     }
   }
-  
+
+  @Get('record-view/:tokenId')
+  @UseGuards(AuthGuard)
+  recordWatchVideo(@Req() req, @Param('tokenId') tokenId: string) {
+    const watcherAddress = req.params.address;
+    return this.nftServices.recordVideoView(watcherAddress, tokenId)
+  }
+
+  @Post('/savePost')
+  @UseGuards(AuthGuard)
+  async savePost(@Req() req: Request, @Res() res: Response) {
+    const { tokenId } = req.body;
+    const address = reqParam(req, 'address');
+    if (!tokenId) {
+      return res.status(400).json({ message: 'Missing tokenId or userId in request body.' });
+    }
+    try {
+      const savePost = await this.nftServices.savePost(tokenId,address)
+      console.log('savePost:', savePost)
+      res.json(savePost)
+    } catch (error) {
+      return res.status(500).json({
+        message: 'Something went wrong while saving the post.',
+        error: error.message,
+      });
+    }
+  }
+
 }

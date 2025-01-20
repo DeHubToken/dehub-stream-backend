@@ -4,12 +4,20 @@ import { ethers, solidityPackedKeccak256 } from 'ethers'; // Import ethers
 import { arrayify, splitSignature } from '@ethersproject/bytes';
 import { CdnService } from '../cdn/cdn.service';
 import { TokenModel } from 'models/Token';
+import SavedPost from 'models/SavedPost';
 import { normalizeAddress } from 'common/util/format';
 import { paramNames, streamCollectionAddresses, streamInfoKeys, tokenTemplate } from 'config/constants';
-import { eligibleBountyForAccount, isValidSearch, removeDuplicatedElementsFromArray } from 'common/util/validation';
+import {
+  eligibleBountyForAccount,
+  getIsSubscriptionRequired,
+  isUnlockedLockedContent,
+  isUnlockedPPVStream,
+  isValidSearch,
+  removeDuplicatedElementsFromArray,
+} from 'common/util/validation';
 import { CategoryModel } from 'models/Category';
 import { Request, Response } from 'express';
-import { AccountModel } from 'models/Account';
+import { AccountDocument, AccountModel } from 'models/Account';
 import { config } from 'config';
 import { reqParam } from 'common/util/auth';
 import { WatchHistoryModel } from 'models/WatchHistory';
@@ -19,12 +27,12 @@ import { LikedVideos } from 'models/LikedVideos';
 import { streamControllerContractAddresses } from 'config/constants';
 import ffprobe from 'ffprobe';
 import ffprobeStatic from 'ffprobe-static';
-import { defaultVideoFilePath } from 'common/util/file';
+import { defaultTokenImagePath, defaultVideoFilePath } from 'common/util/file';
 import { statSync } from 'fs';
 import { JobService } from 'src/job/job.service';
 import { VoteModel } from 'models/Vote';
 import sharp from 'sharp';
-
+import axios from 'axios';
 const signer = new ethers.Wallet(process.env.SIGNER_KEY || '');
 
 @Injectable()
@@ -37,9 +45,12 @@ export class NftService {
   async getAllNfts(req: Request, res: Response) {
     const skip = req.body.skip || req.query.skip || 0;
     const limit = req.body.limit || req.query.limit || 1000;
-    const filter = { status: 'minted' };
+    const postType = req.body.postType || req.query.postType || 'video';
+    console.log('getAllNfts', postType);
+    const filter = { status: 'minted', postType };
     const totalCount = await TokenModel.countDocuments(filter, tokenTemplate);
-    const all = await this.getStreamNfts(filter, skip, limit);
+    const address = reqParam(req, 'address');
+    const all = await this.getStreamNfts(filter, skip, limit, null, address);
     return res.json({ result: { items: all, totalCount, skip, limit } });
   }
 
@@ -47,47 +58,74 @@ export class NftService {
     const skip = req.body.skip || req.query.skip || 0;
     const limit = req.body.limit || req.query.limit || 1000;
     const owner = req.body.owner || req.query.owner;
+    const postType = req.body.postType || req.query.postType || 'video';
     if (!owner) return res.status(400).json({ error: 'Owner field is required' });
     // const filter = { status: 'minted', $or: [{ owner: owner.toLowerCase() }, { minter: owner.toLowerCase() }] };
-    const filter = { status: 'minted', minter: owner.toLowerCase() };
+    const filter = { status: 'minted', minter: owner.toLowerCase(), postType };
     const totalCount = await TokenModel.countDocuments(filter, tokenTemplate);
     const all = await TokenModel.find(filter, tokenTemplate).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean();
     return res.json({ result: { items: all, totalCount, skip, limit } });
   }
 
   async mintNFT(
-    videoFile: Express.Multer.File,
-    imageFile: Express.Multer.File,
     name: string,
     description: string,
     streamInfo: any, // Adjust the type based on your streamInfo structure
     address: string,
     chainId: number,
     category: string[],
+    postType: string,
+    plans: any,
+    files: Express.Multer.File[],
   ): Promise<any> {
     // Adjust the return type based on what signatureForMintingNFT returns
 
     // Call the signatureForMintingNFT method with the uploaded URLs
 
-    const { res, video }: any = await this.signatureForMintingNFT(
+    const { res, token }: any = await this.signatureForMintingNFT(
       name,
       description,
       streamInfo,
       address,
       chainId,
       category,
+      postType,
+      plans,
     );
 
-    const imageUrl = await this.cdnService.uploadFile(imageFile.buffer, 'images', video.id + '.jpg');
+    if (postType == 'feed-simple') {
+      return res;
+    }
+    if (postType == 'feed-images') {
+      const imageUrls = await Promise.all(
+        files.map(async (image: Express.Multer.File, index: number) => {
+          // const fileExtension = image.mimetype.split('/')[1]; // Ensure correct file extension
+          const filename = `${token.tokenId}-${index + 1}.jpg`;
+          await this.cdnService.uploadFile(image.buffer, address, filename);
+          return `nfts/images/${filename}`;
+        }),
+      );
+      // Filter out null values (in case some uploads failed)
+      const filteredUrls = imageUrls.filter(url => url);
+      // Update database
+      await TokenModel.findOneAndUpdate({ _id: token._id }, { $set: { imageUrls: filteredUrls } });
+      return res;
+    }
+    //clg type video
+    console.log('type video');
 
+    const imageUrl = await this.cdnService.uploadFile(files[1].buffer, address, token.tokenId + '.jpg');
+    console.log('adding cron ');
     await this.jobService.addUploadAndTranscodeJob(
-      videoFile.buffer,
+      files[0].buffer,
       address,
-      videoFile.originalname,
-      videoFile.mimetype,
-      video.id,
+      files[0].originalname,
+      files[0].mimetype,
+      token._id,
       imageUrl,
     );
+
+    console.log('if redis run then adding job and response is sending to client');
     return res;
   }
 
@@ -108,10 +146,12 @@ export class NftService {
     address: string,
     chainId: number,
     category: any,
+    postType: string,
+    plans: any,
   ) {
+    let imageExt = postType != 'feed-simple' ? 'jpg' : null;
     const collectionAddress = normalizeAddress(streamCollectionAddresses[chainId]);
     address = normalizeAddress(address);
-    let imageExt = 'jpg';
 
     // Checking category
     if (category?.length > 0) {
@@ -148,6 +188,8 @@ export class NftService {
       imageExt,
       chainId,
       category,
+      postType,
+      plans,
       minter: normalizeAddress(address),
       ...addedOptions,
     });
@@ -159,16 +201,77 @@ export class NftService {
     );
     const { r, s, v } = splitSignature(await signer.signMessage(arrayify(messageHash)));
     const res: any = { r, s, v, createdTokenId: tokenItem.tokenId.toString(), timestamp };
-    console.log("signature res:", res);
-    return { res, video: tokenItem };
+    console.log('signature res:', res);
+    return { res, token: tokenItem };
   }
 
-  async getStreamNfts(filter: any, skip: number, limit: number, sortOption = null) {
+  async getStreamNfts(filter: any, skip: number, limit: number, sortOption = null, subscriber) {
     try {
+      const user: any = await AccountModel.findOne({ address: subscriber?.toLowerCase() });
+      // if (!user?._id) {
+      //   return { result: false, error: 'User not found or invalid' };
+      // }
+
       const query = [
+        { $match: filter },
+
+        // Join plans collection
         {
-          $match: filter,
+          $lookup: {
+            from: 'plans',
+            localField: 'plans',
+            foreignField: 'id',
+            as: 'plansDetails',
+          },
         },
+
+        // Join subscriptions with date and userId checks
+        {
+          $lookup: {
+            from: 'subscriptions',
+            let: { planIds: '$plans' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$userId', user?._id] },
+                      { $eq: ['$active', true] },
+                      { $lte: ['$startDate', new Date()] },
+                      { $gte: ['$endDate', new Date()] },
+                    ],
+                  },
+                },
+              },
+              { $project: { planId: 1 } },
+            ],
+            as: 'userSubscriptions',
+          },
+        },
+
+        // Add alreadySubscribed to plans
+        {
+          $addFields: {
+            plansDetails: {
+              $map: {
+                input: '$plansDetails',
+                as: 'plan',
+                in: {
+                  $mergeObjects: [
+                    '$$plan',
+                    {
+                      alreadySubscribed: {
+                        $in: ['$$plan._id', { $map: { input: '$userSubscriptions', as: 'sub', in: '$$sub.planId' } }],
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+
+        // Join account and balances collections
         {
           $lookup: {
             from: 'accounts',
@@ -183,49 +286,36 @@ export class NftService {
             localField: 'minter',
             foreignField: 'address',
             pipeline: [
-              {
-                $match: {
-                  tokenAddress: '0x680d3113caf77b61b510f332d5ef4cf5b41a761d',
-                },
-              },
-              {
-                $project: {
-                  staked: 1,
-                  _id: 0,
-                },
-              },
+              { $match: { tokenAddress: '0x680d3113caf77b61b510f332d5ef4cf5b41a761d' } },
+              { $project: { staked: 1, _id: 0 } },
             ],
             as: 'balance',
           },
         },
+
+        // Final projection
         {
           $project: {
             ...tokenTemplate,
+            plansDetails: 1,
             mintername: { $first: '$account.username' },
             minterDisplayName: { $first: '$account.displayName' },
             minterAvatarUrl: { $first: '$account.avatarImageUrl' },
             minterStaked: { $first: '$balance.staked' },
           },
         },
-        {
-          $sort: sortOption
-            ? sortOption
-            : {
-                createdAt: -1,
-              },
-        },
-        {
-          $skip: skip,
-        },
-        {
-          $limit: limit,
-        },
+
+        // Sort, skip, and limit
+        { $sort: sortOption || { createdAt: -1 } },
+        { $skip: skip },
+        { $limit: limit },
       ];
+
       const result = await TokenModel.aggregate(query);
       return result;
     } catch (err) {
       console.log('-----get stream nfts:', err);
-      return { result: false, error: 'fetching was failed' };
+      return { result: false, error: 'Fetching failed' };
     }
   }
 
@@ -243,22 +333,28 @@ export class NftService {
         owner,
         category,
         range,
-        address, // Add address to the destructured query parameters
+        address,
+        postType = 'video', // Add address to the destructured query parameters
       }: any = req.query;
       const searchQuery: any = {};
+
       if (!unit) unit = 20;
       if (unit > 100) unit = 100;
+      const postFilter = {};
+      if (postType === 'feed') {
+        postFilter['$or'] = [{ postType: 'feed-simple' }, { postType: 'feed-images' }];
+      } else {
+        postFilter['postType'] = postType;
+        // postFilter['transcodingStatus'] = 'done';
+      }
 
+      console.log('sortMode', { sortMode, postType, searchQuery });
       let sortRule: any = { createdAt: -1 };
       searchQuery['$match'] = {
-        $and: [
-          { status: 'minted' },
-          { $or: [{ isHidden: false }, { isHidden: { $exists: false } }] },
-          // { transcodingStatus: 'done' }
-        ],
+        $and: [{ status: 'minted' }, { $or: [{ isHidden: false }, { isHidden: { $exists: false } }] }, postFilter],
       };
-
-      console.log('Range- sortMode', range, sortMode);
+      console.log('searchQuery', JSON.stringify(searchQuery));
+      console.log('Range - sotMode - unit - page - search', range, sortMode, unit, page, search);
       switch (sortMode) {
         case 'trends':
           if (range) {
@@ -279,6 +375,9 @@ export class NftService {
             }
             searchQuery['$match']['createdAt'] = { $gt: fromDate };
           }
+          // else {
+          // searchQuery['$match']['createdAt'] = { $gt: new Date(Date.now() - config.recentTimeDiff) };
+          // }
           sortRule = { views: -1 };
           break;
         case 'new':
@@ -300,6 +399,9 @@ export class NftService {
             }
             searchQuery['$match']['createdAt'] = { $gt: fromDate };
           }
+          // else {
+          // searchQuery['$match']['createdAt'] = { $gt: new Date(Date.now() - config.recentTimeDiff) };
+          // }
           break;
         case 'mostLiked':
           sortRule = { likes: -1 };
@@ -343,16 +445,21 @@ export class NftService {
 
         // Search through the accounts table
         const accounts = await AccountModel.find({ username: { $regex: new RegExp(search, 'i') } });
+        const address = reqParam(req, 'address');
         const videos: any = await this.getStreamNfts(
           searchQuery['$match'],
           unit * page,
           unit * page + unit * 1,
           sortRule,
+          address,
         );
 
         // Include userLike logic
         for (let video of videos) {
-          const userLike = await VoteModel.findOne({ tokenId: video.tokenId, address });
+          const userLike = await VoteModel.findOne({
+            tokenId: video.tokenId,
+            address,
+          });
           video.isLiked = Boolean(userLike);
         }
 
@@ -363,12 +470,25 @@ export class NftService {
           },
         });
       }
-
-      const ret: any = await this.getStreamNfts(searchQuery['$match'], unit * page, unit * page + unit * 1, sortRule);
+      const ret: any = await this.getStreamNfts(
+        searchQuery['$match'],
+        unit * page,
+        unit * page + unit * 1,
+        sortRule,
+        address,
+      );
       // Include userLike logic
-      for (let nft of ret) {
-        const userLike = await VoteModel.findOne({ tokenId: nft.tokenId, address });
-        nft.isLiked = Boolean(userLike);
+
+      if (ret.length > 0) {
+        for (let nft of ret) {
+          const userLike = await VoteModel.findOne({ tokenId: nft?.tokenId, address: address?.toLowerCase() });
+          nft.isLiked = Boolean(userLike);
+        }
+        const userSavedPromises = ret?.map(async nft => {
+          const userSaved = await SavedPost?.findOne({ tokenId: nft?.tokenId, address: address?.toLowerCase() });
+          nft.isSaved = Boolean(userSaved);
+        });
+        await Promise.all(userSavedPromises);
       }
       res.send({ result: ret });
     } catch (e) {
@@ -379,15 +499,18 @@ export class NftService {
 
   async getMyWatchedNfts(req: Request, res: Response) {
     let watcherAddress: any = req.query.watcherAddress || req.query.watcherAddress;
+    let postType = req.query.postType || 'video';
     const category = reqParam(req, 'category');
     if (!watcherAddress) return res.status(400).json({ error: 'Watcher address is required' });
     watcherAddress = watcherAddress.toLowerCase();
     const watchedTokenIds = await WatchHistoryModel.find({ watcherAddress }).limit(20).distinct('tokenId');
     if (!watchedTokenIds || watchedTokenIds.length < 1) return res.json({ result: [] });
     const myWatchedNfts: any = await this.getStreamNfts(
-      { tokenId: { $in: watchedTokenIds }, category: category ? { $elemMatch: { $eq: category } } : null },
+      { tokenId: { $in: watchedTokenIds }, postType, category: category ? { $elemMatch: { $eq: category } } : null },
       0,
       20,
+      null,
+      watcherAddress,
     );
     // myWatchedNfts.map(e => {
     //   e.imageUrl = process.env.DEFAULT_DOMAIN + '/' + e.imageUrl;
@@ -401,7 +524,8 @@ export class NftService {
 
     if (!tokenId) return res.status(400).json({ error: 'Bad request: No token id' });
     // const nftInfo = await Token.findOne({ tokenId }, tokenTemplate).lean();
-    const nftInfo = (await this.getStreamNfts({ tokenId: Number(tokenId) }, 0, 1))?.[0];
+    const address = reqParam(req, 'address');
+    const nftInfo = (await this.getStreamNfts({ tokenId: Number(tokenId) }, 0, 1, null, address))?.[0];
     const userLike = await VoteModel.findOne({ tokenId, address: req.query?.address });
     if (!nftInfo) return res.status(404).json({ error: 'Not Found: NFT does not exist' });
     const comments = await this.commentsForTokenId(tokenId);
@@ -437,6 +561,7 @@ export class NftService {
           _id: 0,
           address: 1,
           content: 1,
+          imageUrl: 1,
           account: 1,
           createdAt: 1,
           updatedAt: 1,
@@ -615,6 +740,49 @@ export class NftService {
     console.log('updated video info', tokenId);
   }
 
+  async savePost(tokenId: number, address: string) {
+    try {
+      // Find the user by their address (case-insensitive)
+      const user = await AccountModel.findOne({ address: address?.toLowerCase() }, { _id: 1, address: 1 });
+
+      // Check if the user exists
+      if (!user) {
+        console.log('User not found');
+        return { status: 'error', message: 'User not found' };
+      }
+
+      // Check if the post is already saved by the user
+      const existingPost = await SavedPost.findOne({
+        tokenId: tokenId,
+        userId: user._id,
+        address: address?.toLowerCase(),
+      });
+
+      if (existingPost) {
+        // If the post exists, remove it and return response that feed is unsaved
+        await SavedPost.deleteOne({ tokenId: tokenId, userId: user._id, address: address?.toLowerCase() });
+
+        console.log('Feed unsaved successfully');
+        return { status: 'success', message: 'Feed unsaved' };
+      } else {
+        // If the post doesn't exist, save the new post and return response that feed is saved
+        const newPost = new SavedPost({
+          tokenId: tokenId,
+          userId: user._id,
+          address: address?.toLowerCase(),
+        });
+
+        await newPost.save();
+
+        console.log('Feed saved successfully');
+        return { status: 'success', message: 'Feed saved' };
+      }
+    } catch (error) {
+      console.log('Error:', error);
+      return { status: 'error', message: 'An error occurred', error: error.message };
+    }
+  }
+
   async getSignForClaimBounty(req: Request, res: Response) {
     const address = reqParam(req, paramNames.address);
     const tokenId = reqParam(req, 'tokenId');
@@ -639,7 +807,72 @@ export class NftService {
       return res.json(result);
     }
   }
+  async getNftImage(req: Request, res: Response) {
+    try {
+      // console.log('Received request to fetch NFT image');
 
+      // Retrieve tokenId from query or params
+      const tokenId = req.query.id || req.params?.id;
+      if (!tokenId) {
+        console.log('Token ID is missing in request');
+        return res.status(400).json({ error: 'Token ID is required' });
+      }
+      // console.log(`Token ID retrieved: ${tokenId}`);
+
+      const address = reqParam(req, 'address');
+      // console.log(`Address retrieved: ${address}`);
+
+      // Extract token base ID (in case it's concatenated with some other string)
+      const tk = tokenId.toString().split('-')[0];
+      // console.log(`Extracted base token ID: ${tk}`);
+
+      // Retrieve token from the database
+      const token = await TokenModel.findOne({ tokenId: tk });
+      if (!token) {
+        console.log(`Token with ID ${tk} not found in database`);
+        return res.status(404).json({ error: 'Token not found' });
+      } 
+      const isOwner = (token?.owner && address && token?.owner?.toLowerCase() === address?.toLowerCase())??false;
+      const isVideo=token.postType==="video";
+      const { isLockContent = false, isPayPerView = false }: any = token?.streamInfo;
+      const { plans = null } = token;
+      const isFree = !isLockContent && !isPayPerView && !plans;
+      const { isSubscribed = false, planRequired = false } = await getIsSubscriptionRequired(token.tokenId, address);
+      const isUnlockedPPV = await isUnlockedPPVStream(token.tokenId.toString(), address);
+      const isUnlockedLocked = await isUnlockedLockedContent(token.streamInfo, address);
+      const apiUrl = defaultTokenImagePath(tokenId.toString(), token.minter);
+      let imageBuffer;
+      const response = await axios.get(apiUrl, { responseType: 'arraybuffer' });
+      if (response.status !== 200) {
+        console.log('Image not found on the server');
+        return res.status(404).json({ error: 'Image not found on the server' });
+      }
+      imageBuffer = Buffer.from(response.data);
+      console.log('shouldApplyBlur', {
+        isOwner,
+        isFree,
+        isUnlockedPPV,
+        isUnlockedLocked,
+        isSubscribed,
+      });
+      const shouldApplyBlur = () => {
+        const result = isOwner || isFree || isUnlockedPPV || isUnlockedLocked || isSubscribed;
+        return !result;
+      };
+
+      console.log('shouldApplyBlur:', shouldApplyBlur());
+      let sendImage = imageBuffer;
+      if (!isVideo&&shouldApplyBlur()) {
+        const compressedImage = await makeBlurAndCompress(imageBuffer, { blur: 30, compress: 0 });
+        sendImage = compressedImage;
+      }
+      res.set('Content-Type', 'image/jpg');
+      res.send(sendImage);
+    } catch (error) {
+      console.error('Error in getNftImage:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
   private async signatureForClaimBounty(address: string, tokenId: number, bountyType: any) {
     console.log('------sig for bounty', address, tokenId, bountyType);
     const tokenItem = await TokenModel.findOne({ tokenId }, { chainId: 1, streamInfo: 1 }).lean();
@@ -652,4 +885,76 @@ export class NftService {
     const { r, s, v } = splitSignature(await signer.signMessage(arrayify(toSignForClaim)));
     return { v, r, s };
   }
+
+  async recordVideoView(watcherAddress, tokenId) {
+    try {
+      const existingEntry = await WatchHistoryModel.findOne({
+        watcherAddress,
+        tokenId,
+        status: 'confirmed',
+      });
+
+      if (!existingEntry) {
+        await new WatchHistoryModel({
+          tokenId,
+          watcherAddress,
+          status: 'confirmed',
+          watchedAt: new Date(),
+        }).save();
+
+        const tokenFilter = { tokenId };
+        await TokenModel.updateOne(tokenFilter, { $inc: { views: 1 } });
+        return { success: true };
+      }
+
+      // Always log the session, even if it's not a unique view
+      await new WatchHistoryModel({
+        tokenId,
+        watcherAddress,
+        status: 'session',
+        startedAt: new Date(),
+      }).save();
+
+      // increment total views for each session
+      const tokenFilter = { tokenId };
+      await TokenModel.updateOne(tokenFilter, { $inc: { views: 1 } });
+      return { success: true };
+    } catch (error) {
+      console.error('Error recording video view:', error);
+      throw new Error('Could not record video view');
+    }
+  }
 }
+
+const makeBlurAndCompress = async (buffer, options) => {
+  // Resize and compress the image
+  const width = 800; // Set desired width, adjust as needed
+  const compressedImage = await sharp(buffer)
+    .blur(options.blur)
+    .resize({ width }) // Resize while maintaining aspect ratio
+    .toBuffer();
+  return compressedImage;
+};
+
+const extractFromCookie = req => {
+  const cookieKey = config.isDevMode ? 'data_dev' : 'data_v2';
+  try {
+    const cookie = req.cookies[cookieKey];
+
+    if (cookie) {
+      const parsedCookie = JSON.parse(cookie);
+      // console.log('Parsed cookie:', parsedCookie);
+      // Extract dynamic address
+      const address = Object.keys(parsedCookie)[0]; // Get the dynamic address key
+      const data = parsedCookie[address]; // Access the corresponding data for that address
+      console.log(`Address: ${address}, Data:`, data);
+
+      // You can now use 'address' and 'data' as needed
+      req.params.address = address.toLowerCase();
+      req.params.timestamp = data.timestamp;
+      req.params.rawSig = data.sig;
+    }
+  } catch (error) {
+    console.error('Error parsing cookie:', error.message);
+  }
+};

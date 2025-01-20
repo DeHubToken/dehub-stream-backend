@@ -42,6 +42,7 @@ export interface TokenDocument extends Document {
   mintTxHash?: string;
   postType?: 'video' | 'feed-images' | 'feed-simple';
   imageUrls: string[];
+  plans: string[];
 }
 
 // Define the Token schema
@@ -91,6 +92,10 @@ const TokenSchema = new mongoose.Schema<TokenDocument>(
       type: String,
       default: 'video',
       enum: ['video', 'feed-images', 'feed-simple'],
+    },
+    plans: {
+      type: [String],//hare is this Plans table plans.id  as array
+      default: [],
     },
   },
   { timestamps: true },

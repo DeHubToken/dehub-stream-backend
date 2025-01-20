@@ -1,13 +1,17 @@
 import {
   Controller,
   Get,
+  Post,
   Req,
   Res,
+  UploadedFiles,
   UseGuards,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { AuthGuard } from 'common/guards/auth.guard';
 import { ReactionService } from './reaction.service';
+import { reqParam } from 'common/util/auth';
+import { paramNames } from 'config/constants';
 
 @Controller()
 export class ReactionsController {
@@ -50,14 +54,24 @@ export class ReactionsController {
   @Get('/request_comment')
   @UseGuards(AuthGuard)
   async requestComment(@Req() req: Request, @Res() res: Response) {
-    try {
-      const result = await this.reactionsService.requestComment(req,res);
-      return res.json(result);
+    try { 
+      return   await this.reactionsService.requestComment(req,res);
     } catch (error) {
       console.error('-----request comment error', error);
       return res.status(500).json({ result: false, error: 'Comment request failed' });
     }
   }
+  @Post('/request_comment')
+  @UseGuards(AuthGuard)
+  async requestCommentImage(@Req() req: Request, @Res() res: Response, @UploadedFiles() files?: Express.Multer.File[]) {
+    try { 
+      return   await this.reactionsService.requestComment(req,res,files);
+    } catch (error) {
+      console.error('-----request comment error', error);
+      return res.status(500).json({ result: false, error: 'Comment request failed' });
+    }
+  }
+
 
   @Get('/request_vote')
   @UseGuards(AuthGuard)
@@ -69,7 +83,11 @@ export class ReactionsController {
   @UseGuards(AuthGuard)
   async requestFollow(@Req() req: Request, @Res() res: Response) {
     try {
-      const result = await this.reactionsService.requestFollow(req,res);
+      const address = reqParam(req, paramNames.address);
+      const following = reqParam(req, 'following');
+      const unFollowing = reqParam(req, 'unFollowing');
+      
+      const result = await this.reactionsService.handleRequestFollow(address, following, unFollowing);
       return res.json(result);
     } catch (error) {
       console.error('-----request follow error', error);

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { reqParam } from 'common/util/auth';
 import { normalizeAddress } from 'common/util/format';
 import { eligibleBountyForAccount, isValidUsername } from 'common/util/validation';
@@ -163,9 +163,9 @@ export class UserService {
 
 async requestFollow  (address, following){
   following = normalizeAddress(following);
-  if (address === following) return { result: false, error: "Can't follow yourself" };
+  if (address === following) throw new BadRequestException("Can't follow yourself");
   const updatedResult:any = await Follow.updateOne({ address, following }, {}, overrideOptions);
-  if (updatedResult?.nModified > 0) return { result: false, error: 'Already following' };
+  if (updatedResult?.nModified > 0) throw new ConflictException("Already following user");
   return { result: updatedResult };
 };
 
@@ -173,7 +173,7 @@ async unFollow (address, following){
   following = normalizeAddress(following);
   const deletedResult = await Follow.deleteOne({ address, following });
   if (deletedResult?.deletedCount > 0) return { result: true };
-  return { result: false, error: 'no following' };
+  throw new ConflictException("Not following user");
 };
 
 async getFollowing (address){

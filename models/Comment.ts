@@ -20,6 +20,9 @@ export class Comment {
   @Prop({ required: true })
   content: string;
 
+  @Prop({ required: false })
+  imageUrl: string;
+
   @Prop({ type: [Number], default: [] })
   replyIds: number[];
 
