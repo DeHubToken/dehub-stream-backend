@@ -14,13 +14,13 @@ export class DMSocketService {
   private redisClient: Redis;
   constructor(dmNamespace) {
     this.dmNamespace = dmNamespace;
-    this.redisClient = new Redis(config.redis);
+    this.redisClient = new Redis({...config.redis,db:2});
   }
 
   async getOnlineSocketsUsers(ids: string[]) {
     const users = await AccountModel.find({ _id: { $in: ids } }, { address: 1 }).lean();
 
-    const onlineUsers = await Promise.all(
+    const onlineUsers = await Promise.all(  
       users.map(async user => {
         const redisKey = `user:${user.address.toLowerCase()}`;
         const sessionData = await this.redisClient.get(redisKey);

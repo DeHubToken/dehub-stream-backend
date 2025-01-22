@@ -28,8 +28,9 @@ export class DMSocketController {
   constructor(private readonly io: Server) {
     this.dmNamespace = this.io.of('/dm');
     this.eventEmitter = EventManager.getInstance();
+    this.redisClient =new Redis({...config.redis,db:2});
+    this.listenEvents();
     this.bootstrap();
-    this.redisClient = new Redis(config.redis);
     this.listenEvents();
   }
 
