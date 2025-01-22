@@ -69,7 +69,7 @@ export class PlanEventListenerService implements OnModuleInit {
         return;
       }
 
-      const provider = new ethers.JsonRpcProvider(network.rpcUrls[0]);
+      const provider = new ethers.JsonRpcProvider(network.eventRpc[0]);
 
       this.logger.log(
         `Instantiating contract for ${networkName} with address: ${subscriptionCollectionAddress[network.chainId]}`,

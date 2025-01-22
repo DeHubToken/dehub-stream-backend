@@ -11,11 +11,14 @@ const config = {
   dirDmVideos: 'dm-videos', 
   devPort: 9002,
   devBaseUrl: 'http://127.0.0.1:9002',
-  mongo: {
-    url: process.env.DB_URL,
+  mongo: { 
     host: '127.0.0.1',
     port: 27017,
     dbName: process.env.DB_NAME || 'streaming_production_db',
+  },
+  redis:{
+    host: 'localhost',
+    port: 6379,
   },
   graphQlUrl: 'https://api.thegraph.com/subgraphs/name/streaming-nft/streaming-nft',
   expireSigninTime: isDevMode ? 2 : 24 * 60 * 60, // 2 hours

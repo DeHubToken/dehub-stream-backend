@@ -40,9 +40,7 @@ async function bootstrap() {
 
   app.use(cookieParser());
   app.use(cors());
-
   app.use(json()); // Ensure JSON body parsing is set up
-
   app.use(
     session({
       secret: '1234567890',
@@ -51,7 +49,6 @@ async function bootstrap() {
       cookie: { secure: false },
     }),
   );
-
   app.use(flash());
   app.use(methodOverride('X-HTTP-Method-Override'));
   app.useGlobalPipes(new ValidationPipe());
@@ -61,8 +58,8 @@ async function bootstrap() {
   app.useGlobalFilters(new AllExceptionsFilter());
 
   // Connect to MongoDB
-  const mongoUri = config?.mongo?.url || `mongodb://${config.mongo.host}:${config.mongo.port}/${config.mongo.dbName}`;
-  console.log(config?.mongo?.url || config.mongo.dbName);
+  const mongoUri = `mongodb://${config.mongo.host}:${config.mongo.port}/${config.mongo.dbName}`;
+  console.log(config.mongo.dbName);
   await mongoose.connect(mongoUri); // Await connection
 
   mongoose.connection.on('error', err => {

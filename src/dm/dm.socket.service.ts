@@ -7,14 +7,14 @@ import { AccountModel } from 'models/Account';
 import Redis from 'ioredis'; 
 import {  UserReportModel } from 'models/user-report';
 import { singleMessagePipeline } from './pipline';
-
+import {config} from "../../config/index"
 @Injectable()
 export class DMSocketService {
   private dmNamespace: Namespace;
   private redisClient: Redis;
   constructor(dmNamespace) {
     this.dmNamespace = dmNamespace;
-    this.redisClient = new Redis();
+    this.redisClient = new Redis(config.redis);
   }
 
   async getOnlineSocketsUsers(ids: string[]) {

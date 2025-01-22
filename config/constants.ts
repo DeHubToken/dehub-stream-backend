@@ -443,37 +443,37 @@ const mainNetworks = [
   {
     chainId: ChainId.BSC_MAINNET,
     shortName: `bsc`,
-    rpcUrls: [process.env.BSC_RPC_ENDPOINT],
+    rpcUrls: [`https://bsc-mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`],
     startBlockNumber: 25834000,
     graphUrl: process.env.BSC_GRAPH_API_ENDPOINT,
-    eventRpc: [process.env.BSC_RPC_ENDPOINT],
+    eventRpc: [`https://bnb-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`],
   },
   {
     chainId: ChainId.BASE_MAINNET,
     shortName: `base`,
-    rpcUrls: [process.env.BASE_RPC_ENDPOINT],
+    rpcUrls: [`https://base-mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`],
     startBlockNumber: 14205375,
     graphUrl: process.env.BASE_GRAPH_API_ENDPOINT,
-    eventRpc: [process.env.BASE_RPC_ENDPOINT],
+    eventRpc: [`https://base-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`],
   },
-  {
-    chainId: ChainId.MAINNET,
-    shortName: `mainnet`,
-    rpcUrls: [`https://mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`],
-    startBlockNumber: 16428469,
-    graphUrl: process.env.ETHEREUM_GRAPH_API_ENDPOINT,
-    eventRpc: [`https://mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`],
-  },
-  {
-    chainId: ChainId.POLYGON_MAINNET,
-    shortName: `polygon`,
-    rpcUrls: [
-      `https://polygon-mainnet.rpcfast.com?api_key=xbhWBI1Wkguk8SNMu1bvvLurPGLXmgwYeC4S6g2H7WdwFigZSmPWVZRxrskEQwIf`,
-    ],
-    startBlockNumber: 38197541,
-    graphUrl: process.env.POLYGON_GRAPH_API_ENDPOINT,
-    eventRpc: [`https://rpc-mainnet.matic.quiknode.pro`],
-  },
+  // {
+  //   chainId: ChainId.MAINNET,
+  //   shortName: `mainnet`,
+  //   rpcUrls: [`https://mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`],
+  //   startBlockNumber: 16428469,
+  //   graphUrl: process.env.ETHEREUM_GRAPH_API_ENDPOINT,
+  //   eventRpc: [`https://mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`],
+  // },
+  // {
+  //   chainId: ChainId.POLYGON_MAINNET,
+  //   shortName: `polygon`,
+  //   rpcUrls: [
+  //     `https://polygon-mainnet.rpcfast.com?api_key=xbhWBI1Wkguk8SNMu1bvvLurPGLXmgwYeC4S6g2H7WdwFigZSmPWVZRxrskEQwIf`,
+  //   ],
+  //   startBlockNumber: 38197541,
+  //   graphUrl: process.env.POLYGON_GRAPH_API_ENDPOINT,
+  //   eventRpc: [`https://rpc-mainnet.matic.quiknode.pro`],
+  // },
 ];
 const testNetworks = [
   {

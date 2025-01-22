@@ -9,6 +9,8 @@ import { Types } from 'mongoose';
 import { DmModel } from 'models/message/DM';
 import { dmTips } from './pipline';
 import Redis from 'ioredis';
+import {config} from "../../config/index"
+
 // interface Session {
 //   username: string;
 //   socketIds: string[]; // Store multiple socket IDs for each user
@@ -27,7 +29,7 @@ export class DMSocketController {
     this.dmNamespace = this.io.of('/dm');
     this.eventEmitter = EventManager.getInstance();
     this.bootstrap();
-    this.redisClient = new Redis();
+    this.redisClient = new Redis(config.redis);
     this.listenEvents();
   }
 
