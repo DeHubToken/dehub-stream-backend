@@ -2,7 +2,7 @@ import { Controller, Get, Param, Post, Req, Res, UploadedFiles, UseGuards } from
 import { Request, Response } from 'express';
 import { AuthGuard } from 'common/guards/auth.guard';
 import { NftService } from './nft.service';
-import { MediaAuthGuard } from 'common/guards/auth.meida.guard';
+import { MediaAuthGuard } from 'common/guards/auth.media.guard';
 import { reqParam } from './nft.imports';
 
 @Controller()
