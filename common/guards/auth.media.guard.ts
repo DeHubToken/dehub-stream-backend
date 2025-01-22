@@ -38,9 +38,7 @@ export class MediaAuthGuard implements CanActivate {
  
     if (address && rawSig && timestamp) {
       // Token is absent; extract parameters from the request
-      if (!rawSig || !address || !timestamp) {
-        console.log('fffff', request);
-
+      if (!rawSig || !address || !timestamp) {    
         throw new BadRequestException('Signature, address, and timestamp are required');
       }
 
