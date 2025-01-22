@@ -33,14 +33,18 @@ import { JobService } from 'src/job/job.service';
 import { VoteModel } from 'models/Vote';
 import sharp from 'sharp';
 import axios from 'axios';
+import Redis from 'ioredis';
 const signer = new ethers.Wallet(process.env.SIGNER_KEY || '');
 
 @Injectable()
 export class NftService {
+  private redisClient: Redis;
   constructor(
     private readonly cdnService: CdnService,
     private readonly jobService: JobService,
-  ) {}
+  ) {
+    this.redisClient = new Redis({...config.redis,db:1});
+  }
 
   async getAllNfts(req: Request, res: Response) {
     const skip = req.body.skip || req.query.skip || 0;
@@ -340,36 +344,26 @@ export class NftService {
 
       if (!unit) unit = 20;
       if (unit > 100) unit = 100;
-      const postFilter = {}; 
+      const postFilter = {};
       const contentFilter = {
-        "video": { 
-          $or: [
-            { postType: { $nin: ['feed-simple', 'feed-images'] } },
-            { postType: 'video' }
-          ]
+        video: {
+          $or: [{ postType: { $nin: ['feed-simple', 'feed-images'] } }, { postType: 'video' }],
         },
-        "feed-all": {  // Fix: Wrap the $or in an object for this case
-          $or: [
-            { postType: 'feed-simple' }, 
-            { postType: 'feed-images' }
-          ]
+        'feed-all': {
+          $or: [{ postType: 'feed-simple' }, { postType: 'feed-images' }],
         },
-        "feed": {  // Fix: Wrap the $or in an object for this case
-          $or: [
-            { postType: 'feed-simple' }, 
-            { postType: 'feed-images' }
-          ]
+        feed: {
+          $or: [{ postType: 'feed-simple' }, { postType: 'feed-images' }],
         },
-        "feed-images": { postType: 'feed-images' },
-        "feed-simple": { postType: 'feed-simple' }
+        'feed-images': { postType: 'feed-images' },
+        'feed-simple': { postType: 'feed-simple' },
       };
-       
+
       if (contentFilter[postType]) {
         Object.assign(postFilter, contentFilter[postType]);
       }
-//       // postFilter['transcodingStatus'] = 'done';  // Uncomment if needed
+      //       // postFilter['transcodingStatus'] = 'done';  // Uncomment if needed
 
- console.log("postFilter:",JSON.stringify(postFilter))
       console.log('sortMode', { sortMode, postType, searchQuery });
       let sortRule: any = { createdAt: -1 };
       searchQuery['$match'] = {
@@ -831,65 +825,53 @@ export class NftService {
   }
   async getNftImage(req: Request, res: Response) {
     try {
-      // console.log('Received request to fetch NFT image');
-
-      // Retrieve tokenId from query or params
-      const tokenId = req.query.id || req.params?.id;
+      const tokenId = req.query.id ?? req.params?.id;
       if (!tokenId) {
         console.log('Token ID is missing in request');
         return res.status(400).json({ error: 'Token ID is required' });
       }
-      // console.log(`Token ID retrieved: ${tokenId}`);
-
       const address = reqParam(req, 'address');
-      // console.log(`Address retrieved: ${address}`);
-
-      // Extract token base ID (in case it's concatenated with some other string)
       const tk = tokenId.toString().split('-')[0];
-      // console.log(`Extracted base token ID: ${tk}`);
-
-      // Retrieve token from the database
       const token = await TokenModel.findOne({ tokenId: tk });
       if (!token) {
         console.log(`Token with ID ${tk} not found in database`);
         return res.status(404).json({ error: 'Token not found' });
-      } 
-      const isOwner = (token?.owner && address && token?.owner?.toLowerCase() === address?.toLowerCase())??false;
-      const isVideo=token.postType==="video";
-      const { isLockContent = false, isPayPerView = false }: any = token?.streamInfo??{};
+      }
+      const isOwner = (token?.owner && address && token?.owner?.toLowerCase() === address?.toLowerCase()) ?? false;
+      const isVideo = token.postType === 'video';
+      const { isLockContent = false, isPayPerView = false }: any = token?.streamInfo ?? {};
       const { plans = null } = token;
       const isFree = !isLockContent && !isPayPerView && !plans;
       const { isSubscribed = false, planRequired = false } = await getIsSubscriptionRequired(token.tokenId, address);
       const isUnlockedPPV = await isUnlockedPPVStream(token.tokenId.toString(), address);
-      const isUnlockedLocked = await isUnlockedLockedContent(token.streamInfo, address);
-      const apiUrl = defaultTokenImagePath(tokenId.toString(), token.minter);
-      let imageBuffer;
-      const response = await axios.get(apiUrl, { responseType: 'arraybuffer' });
-      if (response.status !== 200) {
-        console.log('Image not found on the server');
-        return res.status(404).json({ error: 'Image not found on the server' });
-      }
-      imageBuffer = Buffer.from(response.data);
-      console.log('shouldApplyBlur', {
-        isOwner,
-        isFree,
-        isUnlockedPPV,
-        isUnlockedLocked,
-        isSubscribed,
-      });
+      const isUnlockedLocked = await isUnlockedLockedContent(token.streamInfo, address); 
       const shouldApplyBlur = () => {
         const result = isOwner || isFree || isUnlockedPPV || isUnlockedLocked || isSubscribed;
         return !result;
       };
-
-      console.log('shouldApplyBlur:', shouldApplyBlur());
-      let sendImage = imageBuffer;
-      if (!isVideo&&shouldApplyBlur()) {
-        const compressedImage = await makeBlurAndCompress(imageBuffer, { blur: 30, compress: 0 });
-        sendImage = compressedImage;
+      const apiUrl = defaultTokenImagePath(tokenId.toString(), token.minter);
+      if (!isVideo && shouldApplyBlur()) {
+        let cacheImage = await this.getCachedImage(`blur-image-${tokenId}`);
+        if (cacheImage != null) {
+          res.set('Content-Type', 'image/jpg');
+          return res.send(cacheImage);
+        }
+        const originalImage = await this.fetchImageFromApi(apiUrl);
+        const bluedImage = await this.createBlurredImage(originalImage);
+        await this.cacheImage(`blur-image-${tokenId}`, bluedImage);
+        res.set('Content-Type', 'image/jpg');
+        return res.send(bluedImage);
       }
+
+      let cacheImage = await this.getCachedImage(`original-image-${tokenId}`);
+      if (cacheImage != null) {
+        res.set('Content-Type', 'image/jpg');
+        return res.send(cacheImage);
+      }
+      const originalImage = await this.fetchImageFromApi(apiUrl);
+      await this.cacheImage(`original-image-${tokenId}`, originalImage);
       res.set('Content-Type', 'image/jpg');
-      res.send(sendImage);
+      return res.send(originalImage);
     } catch (error) {
       console.error('Error in getNftImage:', error.message);
       res.status(500).json({ error: 'Internal server error' });
@@ -946,6 +928,27 @@ export class NftService {
       throw new Error('Could not record video view');
     }
   }
+
+  async fetchImageFromApi(apiUrl) {
+    const response = await axios.get(apiUrl, { responseType: 'arraybuffer' });
+    if (response.status !== 200) {
+      throw new Error('Image not found on the server');
+    }
+    return Buffer.from(response.data);
+  }
+
+  async cacheImage(key, imageBuffer) {
+    await this.redisClient.set(key, imageBuffer.toString('base64'), 'EX', 3600); // Cache for 1 hour
+  }
+
+  async getCachedImage(key) {
+    const cachedImage = await this.redisClient.get(key);
+    return cachedImage ? Buffer.from(cachedImage, 'base64') : null;
+  }
+
+  async createBlurredImage(imageBuffer) {
+    return await makeBlurAndCompress(imageBuffer, { blur: 30, compress: 0 });
+  }
 }
 
 const makeBlurAndCompress = async (buffer, options) => {
@@ -956,27 +959,4 @@ const makeBlurAndCompress = async (buffer, options) => {
     .resize({ width }) // Resize while maintaining aspect ratio
     .toBuffer();
   return compressedImage;
-};
-
-const extractFromCookie = req => {
-  const cookieKey = config.isDevMode ? 'data_dev' : 'data_v2';
-  try {
-    const cookie = req.cookies[cookieKey];
-
-    if (cookie) {
-      const parsedCookie = JSON.parse(cookie);
-      // console.log('Parsed cookie:', parsedCookie);
-      // Extract dynamic address
-      const address = Object.keys(parsedCookie)[0]; // Get the dynamic address key
-      const data = parsedCookie[address]; // Access the corresponding data for that address
-      console.log(`Address: ${address}, Data:`, data);
-
-      // You can now use 'address' and 'data' as needed
-      req.params.address = address.toLowerCase();
-      req.params.timestamp = data.timestamp;
-      req.params.rawSig = data.sig;
-    }
-  } catch (error) {
-    console.error('Error parsing cookie:', error.message);
-  }
 };
