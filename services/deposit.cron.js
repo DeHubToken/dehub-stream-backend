@@ -141,7 +141,7 @@ async function cronLoop() {
 mongoose.set('useFindAndModify', false);
 mongoose.set('useCreateIndex', true);
 /// -- transfer listener
-mongoose.connect(config?.mongo?.url||'mongodb://' + config.mongo.host + ':' + config.mongo.port + '/' + config.mongo.dbName,
+mongoose.connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/' + config.mongo.dbName,
     { useNewUrlParser: true, useUnifiedTopology: true })
     .then(async () => {
         console.log(' -- starting deposit cron...');

@@ -212,7 +212,7 @@ mongoose.set('useFindAndModify', false);
 mongoose.set('useCreateIndex', true);
 /// -- transfer listener
 mongoose
-  .connect(config?.mongo?.url||'mongodb://' + config.mongo.host + ':' + config.mongo.port + '/' + config.mongo.dbName, {
+  .connect('mongodb://' + config.mongo.host + ':' + config.mongo.port + '/' + config.mongo.dbName, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
