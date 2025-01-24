@@ -58,8 +58,45 @@ export class DMSocketService {
         },
       ];
     }
-    const newMsg: any = await MessageModel.create(state);
-    socket.emit(SocketEvent.sendMessage, { ...newMsg?._doc, author: 'me' });
+    const newMsg: any = await MessageModel.create(state); 
+    const populatedMsg = await MessageModel.aggregate([
+      {
+        $match: { _id: newMsg._id }, // Match the newly created message
+      },
+      {
+        $lookup: {
+          from: 'accounts', // The collection name of the referenced model
+          localField: 'sender', // The field in Message schema referencing the Account
+          foreignField: '_id', // The field in Account schema to match
+          as: 'senderDetails', // Output field for the joined data
+          pipeline: [
+            {
+              $project: {
+                _id: 1,
+                username: 1,
+                address: 1,
+                displayName: 1,
+                avatarImageUrl: 1, 
+              },
+            },
+          ],
+        },
+      },
+      {
+        $project: {
+          sender: { $first: '$senderDetails' }, // Extract the first (and only) matched sender
+          conversation: 1,
+          content: 1, 
+          msgType: 1,
+          isRead: 1, 
+          isUnLocked: 1,  
+          mediaUrls: 1,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+    ]); 
+    socket.emit(SocketEvent.sendMessage, { ...populatedMsg[0], author: 'me' });
     const dm = await DmModel.findByIdAndUpdate(req.dmId, {
       $set: {
         lastMessageAt: new Date(),
@@ -87,7 +124,7 @@ export class DMSocketService {
     });
     socketsUsers.forEach(su => {
       if (su.socketIds && su.socketIds.length > 0) {
-        socket.in(su.socketIds).emit(SocketEvent.sendMessage, { ...newMsg?._doc, author: 'other' });
+        socket.in(su.socketIds).emit(SocketEvent.sendMessage, { ...populatedMsg[0], author: 'other' });
       }
     });
   }
