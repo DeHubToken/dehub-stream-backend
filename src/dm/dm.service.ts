@@ -765,7 +765,7 @@ export class DMService {
         );
         console.log('updatedReport:', updatedReport);
         const out = {
-          message: 'Group successfully unblocked.',
+          message: 'successfully unblocked.',
           unblocked: true,
           conversationId: conversationId,
           reportId: updatedReport._id,
