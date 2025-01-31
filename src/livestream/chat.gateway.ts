@@ -93,7 +93,7 @@ export class ChatGateway {
         throw new Error('Stream not found.');
       }
 
-      if (stream.status !== StreamStatus.LIVE) {
+      if (stream.status !== StreamStatus.LIVE && stream.status !== StreamStatus.ENDED) {
         throw new Error('Stream is not live.');
       }
 
@@ -129,11 +129,11 @@ export class ChatGateway {
   async handleEndStream(@ConnectedSocket() client: Socket, @MessageBody() data: { streamId: string }) {
     console.log('Ending stream');
     await this.livestreamService.endStream(data.streamId, client.data.user.address);
-    await this.hlsService.cleanupStream(data.streamId);
     this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.EndStream, {
       streamId: data.streamId,
     });
     await client.leave(`stream:${data.streamId}`);
+    await this.hlsService.cleanupStream(data.streamId);
   }
 
   @UseGuards(WsAuthGuard)

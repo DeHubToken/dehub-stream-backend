@@ -119,6 +119,8 @@ export class LivestreamService {
       const uploadedThumbnail = await this.cdnService.uploadFile(thumbnail.buffer, 'live', `thumbnails/${fileName}`);
 
       stream.thumbnail = uploadedThumbnail;
+
+      await stream.save();
     }
 
     // **1. Handle Scheduling**
@@ -149,9 +151,13 @@ export class LivestreamService {
 
       // Join room
       this.chatGateway.server.socketsJoin(`stream:${stream._id}`);
+      return stream;
     }
 
-    return stream;
+    await stream.save();
+
+    return stream
+
   }
 
   async endStream(streamId: string, address: string) {

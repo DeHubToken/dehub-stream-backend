@@ -13,6 +13,8 @@ export class HlsService {
       tempPath: string;
       outputPath: string;
       uploadInterval: NodeJS.Timeout | null;
+      isEnding?: boolean;
+      pendingChunks?: number;
     }
   > = new Map();
 
@@ -55,13 +57,13 @@ export class HlsService {
         `${outputPath}/playlist.m3u8`,
       ]);
 
-      // ffmpegProcess.stderr.on('data', data => {
-      //   console.error(`[Stream ${streamId}] FFmpeg error:`, data.toString());
-      // });
+      ffmpegProcess.stderr.on('data', data => {
+        console.error(`[Stream ${streamId}] FFmpeg error:`, data.toString());
+      });
 
-      // ffmpegProcess.stderr.on('error', error => {
-      //   console.error(`[Stream ${streamId}] FFmpeg error:`, error.toString());
-      // });
+      ffmpegProcess.stderr.on('error', error => {
+        console.error(`[Stream ${streamId}] FFmpeg error:`, error.toString());
+      });
 
       ffmpegProcess.on('close', code => {
         console.log(`[Stream ${streamId}] FFmpeg process exited with code: ${code}`);
@@ -72,7 +74,8 @@ export class HlsService {
         this.uploadNewSegments(streamId);
       }, 2000);
 
-      this.streams.set(streamId, { ffmpegProcess, tempPath, outputPath, uploadInterval });
+      this.streams.set(streamId, { ffmpegProcess, tempPath, outputPath, uploadInterval, isEnding: false,
+        pendingChunks: 0 });
     }
 
     return this.streams.get(streamId);
@@ -81,10 +84,41 @@ export class HlsService {
   async handleStreamChunk(streamId: string, chunk: Buffer) {
     const streamData = this.setupStream(streamId);
 
+    if (!streamData || streamData.isEnding) {
+      console.log(`[Stream ${streamId}] Stream is ending, rejecting new chunks`);
+      return;
+    }
+
     if (streamData?.ffmpegProcess?.stdin) {
-      streamData.ffmpegProcess.stdin.write(chunk);
+      streamData.pendingChunks++;
+      
+      return new Promise<void>((resolve, reject) => {
+        streamData.ffmpegProcess.stdin.write(chunk, (error) => {
+          streamData.pendingChunks--;
+          if (error) {
+            reject(error);
+          } else {
+            resolve();
+          }
+        });
+      });
     } else {
       console.error(`[Stream ${streamId}] Unable to write chunk to FFmpeg.`);
+    }
+  }
+
+  private async waitForPendingChunks(streamId: string, timeout = 10000): Promise<void> {
+    const streamData = this.streams.get(streamId);
+    if (!streamData) return;
+
+    const startTime = Date.now();
+    
+    while (streamData.pendingChunks > 0) {
+      if (Date.now() - startTime > timeout) {
+        console.warn(`[Stream ${streamId}] Timeout waiting for pending chunks`);
+        break;
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
   }
 
@@ -130,9 +164,9 @@ export class HlsService {
         outputFilePath, // Output MP4 file
       ]);
 
-      // ffmpegProcess.stderr.on('data', (data) => {
-      //   console.error(`FFmpeg error:`, data.toString());
-      // });
+      ffmpegProcess.stderr.on('data', (data) => {
+        console.error(`FFmpeg error:`, data.toString());
+      });
 
       ffmpegProcess.on('close', (code) => {
         if (code === 0) {
@@ -150,15 +184,29 @@ export class HlsService {
     const streamData = this.streams.get(streamId);
 
     if (streamData) {
+      try {
+      streamData.isEnding = true;
+
+      await this.waitForPendingChunks(streamId);
+
       // Stop upload interval
       if (streamData.uploadInterval) {
         clearInterval(streamData.uploadInterval);
       }
 
+      await this.uploadNewSegments(streamId);
+
       // Terminate FFmpeg process
       if (streamData.ffmpegProcess) {
-        streamData.ffmpegProcess.stdin.end();
-        streamData.ffmpegProcess.kill();
+        // streamData.ffmpegProcess.stdin.end();
+        // streamData.ffmpegProcess.kill();
+        await new Promise<void>((resolve) => {
+          streamData.ffmpegProcess.stdin.end(() => {
+            streamData.ffmpegProcess.on('close', () => {
+              resolve();
+            });
+          });
+        });
       }
 
       const outputFilePath = path.join(streamData.tempPath, 'output.mp4');
@@ -172,6 +220,10 @@ export class HlsService {
       // Remove temporary files
       fs.rmSync(streamData.tempPath, { recursive: true, force: true });
       this.streams.delete(streamId);
+    } catch (error) {
+      console.error(`[Stream ${streamId}] Error during cleanup:`, error);
+      throw error;
+    }
     }
   }
 }
