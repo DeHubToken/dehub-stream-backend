@@ -1,0 +1,361 @@
+import { Injectable } from '@nestjs/common';
+import { Namespace } from 'socket.io';
+import { MessageModel } from 'models/message/dm-messages';
+import { SocketEvent } from './types';
+import { DmModel } from 'models/message/DM';
+import { AccountModel } from 'models/Account';
+import Redis from 'ioredis'; 
+import {  UserReportModel } from 'models/user-report';
+import { singleMessagePipeline } from './pipline';
+import {config} from "../../config/index"
+@Injectable()
+export class DMSocketService {
+  private dmNamespace: Namespace;
+  private redisClient: Redis;
+  constructor(dmNamespace) {
+    this.dmNamespace = dmNamespace;
+    this.redisClient = new Redis({...config.redis,db:2});
+  }
+
+  async getOnlineSocketsUsers(ids: string[]) {
+    const users = await AccountModel.find({ _id: { $in: ids } }, { address: 1 }).lean();
+
+    const onlineUsers = await Promise.all(  
+      users.map(async user => {
+        const redisKey = `user:${user.address.toLowerCase()}`;
+        const sessionData = await this.redisClient.get(redisKey);
+        if (sessionData) {
+          return JSON.parse(sessionData); // Return session if found in Redis
+        }
+        return user; // Fallback to user details from DB
+      }),
+    );
+
+    return onlineUsers.filter(Boolean); // Filter out null or undefined entries
+  }
+
+  async sendMessage({ socket, req, session, blockList }: { socket: any; req: any; session: any; blockList: any }) {
+    if (!socket || !req || !session) {
+      return;
+    }
+
+    const userId = session.user._id;
+    const state: any = {
+      conversation: req.dmId,
+      sender: userId,
+      isRead: false,
+      content: req.content,
+      isPaid: false,
+      isUnLocked: true,
+      msgType: req.type,
+    };
+    if (state.msgType == 'gif') {
+      state.mediaUrls = [
+        {
+          url: req.gif, // Assuming req.gif contains the URL of the uploaded GIF
+          type: 'gif',
+          mimeType: 'image/gif', // MIME type for GIF
+        },
+      ];
+    }
+    const newMsg: any = await MessageModel.create(state); 
+    const populatedMsg = await MessageModel.aggregate([
+      {
+        $match: { _id: newMsg._id }, // Match the newly created message
+      },
+      {
+        $lookup: {
+          from: 'accounts', // The collection name of the referenced model
+          localField: 'sender', // The field in Message schema referencing the Account
+          foreignField: '_id', // The field in Account schema to match
+          as: 'senderDetails', // Output field for the joined data
+          pipeline: [
+            {
+              $project: {
+                _id: 1,
+                username: 1,
+                address: 1,
+                displayName: 1,
+                avatarImageUrl: 1, 
+              },
+            },
+          ],
+        },
+      },
+      {
+        $project: {
+          sender: { $first: '$senderDetails' }, // Extract the first (and only) matched sender
+          conversation: 1,
+          content: 1, 
+          msgType: 1,
+          isRead: 1, 
+          isUnLocked: 1,  
+          mediaUrls: 1,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+    ]); 
+    socket.emit(SocketEvent.sendMessage, { ...populatedMsg[0], author: 'me' });
+    const dm = await DmModel.findByIdAndUpdate(req.dmId, {
+      $set: {
+        lastMessageAt: new Date(),
+      },
+    });
+    let ids = dm.participants.reduce((acc, current) => {
+      const { participant } = current;
+      if (participant && participant.toString() !== userId.toString()) {
+        return [...acc, participant];
+      }
+      return acc;
+    }, []);
+
+    let socketsUsers = await this.getOnlineSocketsUsers(ids);
+    socketsUsers = socketsUsers.filter(user => {
+      return !blockList.some(blocked => {
+        if (blocked.reportedBy) {
+          return blocked.reportedBy.toString() === user._id.toString();
+        }
+
+        if (blocked.reportedUser) {
+          return blocked.reportedUser.toString() === user._id.toString();
+        }
+      });
+    });
+    socketsUsers.forEach(su => {
+      if (su.socketIds && su.socketIds.length > 0) {
+        socket.in(su.socketIds).emit(SocketEvent.sendMessage, { ...populatedMsg[0], author: 'other' });
+      }
+    });
+  }
+  async createAndStart({ socket, req, session }: { socket: any; req: any; session: any }) {
+    // Extract the second user's ID from the request
+    const { _id: userId2 } = req;
+
+    if (!userId2) {
+      socket.emit(SocketEvent.error, { msg: 'Invalid user.' });
+      return;
+    }
+
+    // Check if a DM session already exists between the two users
+    const existingDm = await DmModel.findOne({
+      participants: {
+        $all: [{ $elemMatch: { participant: session.user._id } }, { $elemMatch: { participant: userId2 } }],
+      },
+      conversationType: 'dm',
+    }).lean();
+
+    // Retrieve the second user's information
+    const user2 = await AccountModel.findById(userId2, {
+      _id: 1,
+      username: 1,
+      avatarImageUrl: 1,
+      displayName: 1,
+      address: 1,
+    }).lean();
+
+    if (existingDm) {
+      // If a DM session exists, send it back to the client
+      socket.emit(SocketEvent.createAndStart, {
+        msg: 'DM session exists',
+        data: { ...existingDm, participants: [{ participant: user2, role: 'member' }] },
+      });
+    } else {
+      // Prepare participants array
+      const participants = [
+        { participant: session.user._id, role: 'member' }, // Assign 'member' role to the initiator
+        { participant: userId2, role: 'member' }, // Assign 'member' role to the other user
+      ];
+
+      // If no DM session exists, create a new one
+      const newDm: any = new DmModel({
+        participants,
+        createdBy: session.user._id,
+        conversationType: 'dm',
+        lastMessageAt: new Date(),
+      });
+      // Save the new DM session to the database
+      await newDm.save();
+      // Emit the event to notify the client
+      socket.emit(SocketEvent.createAndStart, {
+        msg: 'Created new DM',
+        data: { ...newDm._doc, participants: [{ participant: user2, role: 'member' }] },
+      });
+    }
+  }
+  async deleteMessage({ socket, req, session, blockList }: { socket: any; req: any; session: any; blockList: any }) {
+    if (!socket || !req || !session) {
+      return;
+    }
+    const userId = session.user._id;
+    const messageId = req.messageId;
+    const dmId = req.dmId;
+
+    // Validate message existence and user permissions
+    const message = await MessageModel.findById(messageId);
+    if (!message) {
+      socket.emit(SocketEvent.error, { message: 'Message not found' });
+      return;
+    }
+    if (message.sender.toString() !== userId.toString()) {
+      socket.emit(SocketEvent.error, { message: 'You are not authorized to delete this message' });
+      return;
+    }
+    // Delete the message
+    await MessageModel.findByIdAndDelete(messageId);
+
+    // Fetch the conversation (DM or group chat) associated with the message
+    const dm = await DmModel.findById(req.dmId);
+    if (!dm) {
+      socket.emit(SocketEvent.error, { message: 'Conversation not found' });
+      return;
+    }
+
+    // Get participants excluding the message deleter
+    const ids = dm.participants.reduce((acc, current) => {
+      const { participant } = current;
+      if (participant && participant.toString() !== userId.toString()) {
+        return [...acc, participant];
+      }
+      return acc;
+    }, []);
+
+    // Get online users, excluding those in the block list
+    let socketsUsers = await this.getOnlineSocketsUsers(ids);
+    socketsUsers = socketsUsers.filter(user => {
+      return !blockList.some(blocked => {
+        if (blocked.reportedBy) {
+          return blocked.reportedBy.toString() === user._id.toString();
+        }
+
+        if (blocked.reportedUser) {
+          return blocked.reportedUser.toString() === user._id.toString();
+        }
+      });
+    });
+
+    // Notify all relevant users about the deleted message
+    socketsUsers.forEach(su => {
+      if (su.socketIds && su.socketIds.length > 0) {
+        socket.in(su.socketIds).emit(SocketEvent.deleteMessage, { dmId, messageId });
+      }
+    });
+    console.log(SocketEvent.deleteMessage, { messageId, dmId });
+    socket.emit(SocketEvent.deleteMessage, { messageId, dmId });
+  }
+  async deleteAllMessage({ socket, req, session, blockList }: { socket: any; req: any; session: any; blockList: any }) {
+    if (!socket || !req || !session) {
+      return;
+    }
+    const userId = session.user._id;
+    const state: any = {
+      conversation: req.dmId,
+      sender: userId,
+      isRead: false,
+      content: req.content,
+      isPaid: false,
+      isUnLocked: true,
+      msgType: req.type,
+    };
+    if (state.msgType == 'gif') {
+      state.mediaUrls = [
+        {
+          url: req.gif, // Assuming req.gif contains the URL of the uploaded GIF
+          type: 'gif',
+          mimeType: 'image/gif', // MIME type for GIF
+        },
+      ];
+    }
+    const newMsg: any = await MessageModel.create(state);
+    socket.emit(SocketEvent.sendMessage, { ...newMsg?._doc, author: 'me' });
+    const dm = await DmModel.findById(req.dmId);
+    let ids = dm.participants.reduce((acc, current) => {
+      const { participant } = current;
+      if (participant && participant.toString() !== userId.toString()) {
+        return [...acc, participant];
+      }
+      return acc;
+    }, []);
+
+    let socketsUsers = await this.getOnlineSocketsUsers(ids);
+    socketsUsers = socketsUsers.filter(user => {
+      return !blockList.some(blocked => {
+        if (blocked.reportedBy) {
+          return blocked.reportedBy.toString() === user._id.toString();
+        }
+
+        if (blocked.reportedUser) {
+          return blocked.reportedUser.toString() === user._id.toString();
+        }
+      });
+    });
+    socketsUsers.forEach(su => {
+      if (su.socketIds && su.socketIds.length > 0) {
+        socket.in(su.socketIds).emit(SocketEvent.sendMessage, { ...newMsg?._doc, author: 'other' });
+      }
+    });
+  }
+  async reValidateMessage({
+    socket,
+    req,
+    session,
+    blockList,
+  }: {
+    socket: any;
+    req: any;
+    session: any;
+    blockList: any;
+  }) {
+    const userId = session?.user?._id;
+    const messageId = req.messageId;
+    const pipeline = [...singleMessagePipeline(messageId)];
+    const validatedMessages = await MessageModel.aggregate(pipeline);
+    const message = validatedMessages[0];
+
+    if (message.sender._id.toString() == userId.toString()) {
+      message.author = 'me';
+    }
+    socket.emit(SocketEvent.ReValidateMessage, {
+      dmId: req.dmId,
+      message: message,
+    });
+    const dm = await DmModel.findById(req.dmId);
+    let ids = dm.participants.reduce((acc, current) => {
+      const { participant } = current;
+      if (participant && participant.toString() !== userId.toString()) {
+        return [...acc, participant];
+      }
+      return acc;
+    }, []);
+    let socketsUsers = await this.getOnlineSocketsUsers(ids);
+    message.author = 'other';
+    socketsUsers = socketsUsers.filter(user => {
+      return !blockList.some(blocked => {
+        if (blocked.reportedBy) {
+          return blocked.reportedBy.toString() === user._id.toString();
+        }
+
+        if (blocked.reportedUser) {
+          return blocked.reportedUser.toString() === user._id.toString();
+        }
+      });
+    });
+    socketsUsers.forEach(su => {
+      if (su.socketIds && su.socketIds.length > 0) {
+        socket.in(su.socketIds).emit(SocketEvent.ReValidateMessage, {
+          dmId: req.dmId,
+          message: message,
+        });
+      }
+    });
+  }
+  async getBlockedUsersForConversation(conversationId: string): Promise<any[]> {
+    // Explicit return type of UserReport[]
+    const blocked = await UserReportModel.find({
+      conversation: conversationId,
+      resolved: false, // Ensure the block is unresolved
+    }).lean();
+
+    return blocked;
+  }
+}

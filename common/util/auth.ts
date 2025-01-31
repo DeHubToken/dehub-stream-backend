@@ -42,14 +42,27 @@ const reqParam = (req, paramName) => {
   const result = req.query?.[paramName] || req.body?.[paramName] || req.params?.[paramName];
   return typeof result === 'string' ? result?.trim() : result;
 };
+ 
 
+const addProperty = (req,obj:any,key: string ,as?:string) => {
+  const value = reqParam(req, key);
+  if (value !== undefined && value !== null) {
+    if(as){
+      obj[as] = value;
+    } 
+    obj[key] = value;
+  }
+};
 
 const isAuthorized = async (req, res, next) => {
   const token = req.headers?.authorization?.split(' ')[1];
 
   if (token) {
     try {
-      const decodedToken = jwt.verify(token, secretKey);
+      // interface jwtRes extends JwtPayload {
+      //   address:string;rawSig:string;timestamp:string
+      // }
+      const decodedToken :any= jwt.verify(token, secretKey);
       req.params.address = decodedToken.address.toLowerCase();
       req.params.rawSig = decodedToken.rawSig;
       req.params.timestamp = decodedToken.timestamp;
@@ -79,4 +92,5 @@ const isAuthorized = async (req, res, next) => {
 export {
   reqParam,
   isAuthorized,
+  addProperty
 };

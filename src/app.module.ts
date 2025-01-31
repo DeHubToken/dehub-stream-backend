@@ -7,6 +7,7 @@ import { NotificationModule } from './notification/notification.module';
 import { CdnModule } from './cdn/cdn.module';
 import { AuthModule } from './auth/auth.module';
 import { ConfigModule } from '@nestjs/config';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ReqloggerMiddleware } from './reqlogger/reqlogger.middleware';
 import { ReactionModule } from './reaction/reaction.module';
 import { CategoryModule } from './category/category.module';
@@ -16,9 +17,10 @@ import { JobModule } from './job/job.module';
 import { BullModule } from '@nestjs/bull';
 import { ScheduleModule } from '@nestjs/schedule';
 import { StreamCronService } from './job/stream-cron.service';
-import { WatchCronService } from './job/watch-cron.service';
+import { PlansModule } from './plans/plans.module';
+import { PlanEventListenerService } from './job/plans.listener';
+import { DmModule } from './dm/dm.module';
 import { LivestreamModule } from './livestream/livestream.module';
-import { EventEmitterModule } from '@nestjs/event-emitter';
 import { MongooseModule } from '@nestjs/mongoose';
 import { config } from 'config';
 
@@ -34,12 +36,9 @@ import { config } from 'config';
     EventEmitterModule.forRoot(),
     MongooseModule.forRoot(`mongodb://${config.mongo.host}:${config.mongo.port}/${config.mongo.dbName}`),
     UserModule, 
-    NftModule, NotificationModule, CdnModule, AuthModule, ReactionModule, CategoryModule, LeaderboardModule, AssetModule, JobModule, ScheduleModule.forRoot(), LivestreamModule],
+    NftModule, NotificationModule, CdnModule, AuthModule, PlansModule,DmModule, ReactionModule, CategoryModule, LeaderboardModule, AssetModule, JobModule, ScheduleModule.forRoot(), LivestreamModule],
   controllers: [AppController],
-  providers: [AppService
-    // , StreamCronService
-    // , WatchCronService
-  ],
+  providers: [AppService, StreamCronService,PlanEventListenerService],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

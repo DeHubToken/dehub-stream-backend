@@ -10,3 +10,4 @@ import { CdnModule } from 'src/cdn/cdn.module';
   exports:[UserService]
 })
 export class UserModule {}
+  

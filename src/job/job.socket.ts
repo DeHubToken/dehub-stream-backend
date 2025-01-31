@@ -12,7 +12,10 @@ export class JobGateway {
   server: Server;
 
   // Emit progress
-  emitProgress(props: {progress: number, stage: string}, tokenId:string) {
-    this.server.emit(tokenId, props );
+  emitProgress(props: { progress: number; stage: string }, tokenId: string) {
+    this.server.emit(tokenId, props);
+  }
+  emitDmUploadProgress(data) { 
+    this.server.of('/dm').emit('jobMessageId',data)
   }
 }
