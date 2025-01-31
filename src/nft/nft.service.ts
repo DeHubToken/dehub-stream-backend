@@ -832,46 +832,46 @@ export class NftService {
         return res.status(400).json({ error: 'Token ID is required' });
       }
   
-      console.log('Token ID:', tokenId);
+      // console.log('Token ID:', tokenId);
   
       const address = reqParam(req, 'address');
-      console.log('Request address:', address);
+      // console.log('Request address:', address);
   
       const tk = tokenId.toString().split('-')[0];
-      console.log('Token ID without suffix:', tk);
+      // console.log('Token ID without suffix:', tk);
   
       const token = await TokenModel.findOne({ tokenId: tk });
       if (!token) {
-        console.log(`Token with ID ${tk} not found in database`);
+        // console.log(`Token with ID ${tk} not found in database`);
         return res.status(404).json({ error: 'Token not found' });
       }
-      console.log('Token found in database:', token);
+      // console.log('Token found in database:', token);
   
       const isOwner = (token?.owner && address && token?.owner?.toLowerCase() === address?.toLowerCase()) ?? false;
-      console.log('Is owner:', isOwner);
+      // console.log('Is owner:', isOwner);
   
       const isVideo = token.postType === 'video';
-      console.log('Is video:', isVideo);
+      // console.log('Is video:', isVideo);
   
       const { isLockContent = false, isPayPerView = false }: any = token?.streamInfo ?? {};
-      console.log('Lock Content:', isLockContent, 'Pay Per View:', isPayPerView);
+      // console.log('Lock Content:', isLockContent, 'Pay Per View:', isPayPerView);
   
       const { plans = null } = token;
       const isFree = !isLockContent && !isPayPerView && !(plans.push.length > 0);
-      console.log('Is Free:', isFree);
+      // console.log('Is Free:', isFree);
   
       const { isSubscribed = false, planRequired = false } = await getIsSubscriptionRequired(token.tokenId, address);
-      console.log('Is Subscribed:', isSubscribed, 'Plan Required:', planRequired);
+      // console.log('Is Subscribed:', isSubscribed, 'Plan Required:', planRequired);
   
       const isUnlockedPPV = await isUnlockedPPVStream(token.tokenId.toString(), address);
-      console.log('Is PPV unlocked:', isUnlockedPPV);
+      // console.log('Is PPV unlocked:', isUnlockedPPV);
   
       const isUnlockedLocked = await isUnlockedLockedContent(token.streamInfo, address); 
-      console.log('Is Locked content unlocked:', isUnlockedLocked);
+      // console.log('Is Locked content unlocked:', isUnlockedLocked);
   
       const shouldApplyBlur = () => {
         const result = isOwner || isFree || isUnlockedPPV || isUnlockedLocked || isSubscribed;
-        console.log('Should apply blur (result):', !result);
+        // console.log('Should apply blur (result):', !result);
         return !result;
       };
   
@@ -883,10 +883,10 @@ export class NftService {
   
       // Check for blurred image and Redis cache
       if (!isVideo && shouldApplyBlur()) {
-        console.log(`Checking Redis cache for blurred image with tokenId: ${tokenId}`);
+        // console.log(`Checking Redis cache for blurred image with tokenId: ${tokenId}`);
         let cacheImage = await this.getCachedImage(`blur-image-${tokenId}`);
         if (cacheImage != null) {
-          console.log(`Cache hit for blurred image with tokenId: ${tokenId}`);
+          // console.log(`Cache hit for blurred image with tokenId: ${tokenId}`);
           res.set('Content-Type', 'image/jpg');
           return res.send(cacheImage);
         }
