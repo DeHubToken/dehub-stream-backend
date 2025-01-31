@@ -154,7 +154,7 @@ export class LivestreamService {
       return stream;
     }
 
-    await stream.save();
+    // await stream.save();
 
     return stream
 
