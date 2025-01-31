@@ -59,9 +59,9 @@ export class HlsService {
       //   console.error(`[Stream ${streamId}] FFmpeg error:`, data.toString());
       // });
 
-      ffmpegProcess.stderr.on('error', error => {
-        console.error(`[Stream ${streamId}] FFmpeg error:`, error.toString());
-      });
+      // ffmpegProcess.stderr.on('error', error => {
+      //   console.error(`[Stream ${streamId}] FFmpeg error:`, error.toString());
+      // });
 
       ffmpegProcess.on('close', code => {
         console.log(`[Stream ${streamId}] FFmpeg process exited with code: ${code}`);
@@ -130,9 +130,9 @@ export class HlsService {
         outputFilePath, // Output MP4 file
       ]);
 
-      ffmpegProcess.stderr.on('data', (data) => {
-        console.error(`FFmpeg error:`, data.toString());
-      });
+      // ffmpegProcess.stderr.on('data', (data) => {
+      //   console.error(`FFmpeg error:`, data.toString());
+      // });
 
       ffmpegProcess.on('close', (code) => {
         if (code === 0) {
