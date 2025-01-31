@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { LiveStream } from 'models/LiveStream';
 import { Model } from 'mongoose';
@@ -9,22 +9,27 @@ import { LivestreamService } from './livestream.service';
 
 @Injectable()
 export class StreamChatService {
-  constructor(
-    private livestreamService: LivestreamService
-  ) {}
+  constructor(@Inject(forwardRef(() => LivestreamService)) private livestreamService: LivestreamService) {}
 
-  async addChatMessage(streamId: string, address: string, content: string, meta: any) {
+  async addChatMessage(streamId: string, address: string, content: string, meta?: any) {
     return this.livestreamService.recordActivity(streamId, StreamActivityType.MESSAGE, {
-        ...meta,
+      ...meta,
       address,
       content,
     });
   }
 
-//   async addReaction(streamId: string, address: string, reactionType: string) {
-//     return this.livestreamService.recordActivity(streamId, StreamActivityType.REACTION, {
-//       address,
-//       reactionType,
-//     });
-//   }
+  async likeStream(streamId: string, address: string, meta?: any) {
+    return this.livestreamService.recordActivity(streamId, StreamActivityType.LIKE, {
+      address,
+      ...meta
+    });
+  }
+
+  //   async addReaction(streamId: string, address: string, reactionType: string) {
+  //     return this.livestreamService.recordActivity(streamId, StreamActivityType.REACTION, {
+  //       address,
+  //       reactionType,
+  //     });
+  //   }
 }

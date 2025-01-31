@@ -490,6 +490,8 @@ export enum StreamStatus {
 }
 
 export enum StreamActivityType {
+  START = 'START',
+  END = 'END',
   COMMENT = 'COMMENT',
   MESSAGE = 'MESSAGE',
   LIKE = 'LIKE',

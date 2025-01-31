@@ -1,4 +1,11 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  forwardRef,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { LiveStream, StreamDocument } from 'models/LiveStream';
 import { Model } from 'mongoose';
@@ -13,8 +20,9 @@ import { StreamActivity } from 'models/LiveStreamActivity';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import { CdnService } from 'src/cdn/cdn.service';
 import { AccountModel } from 'models/Account';
-import mongoose from 'mongoose'
-
+import mongoose from 'mongoose';
+import { LivestreamEvents } from './enums/livestream.enum';
+import { ChatGateway } from './chat.gateway';
 
 @Injectable()
 export class LivestreamService {
@@ -24,18 +32,42 @@ export class LivestreamService {
     @InjectModel(StreamActivity.name) private streamActivityModel: Model<StreamActivity>,
     private eventEmitter: EventEmitter2,
     private readonly cdnService: CdnService,
-    // @InjectRedis() private readonly redis: Redis,
+    @Inject(forwardRef(() => ChatGateway))
+    private readonly chatGateway: ChatGateway,
+    @InjectRedis() private readonly redis: Redis,
   ) {}
 
-  async recordActivity(streamId: string, type: StreamActivityType, meta: Record<string, any> = {}) {
+  async recordActivity(streamId: string, status: StreamActivityType, meta: Record<string, any> = {}) {
     const stream = await this.livestreamModel.findById(streamId);
     if (!stream) throw new NotFoundException('Stream not found');
-
-    return this.streamActivityModel.create({
+    if(stream.status !== StreamStatus.LIVE) return;
+    if (meta?.address) {
+      const account = await AccountModel.findOne({ address: meta?.address });
+      meta = {
+        ...meta,
+        username: account.username,
+        displayName: account.displayName,
+        avatarImageUrl: account.avatarImageUrl,
+      };
+    }
+    const activity = await this.streamActivityModel.create({
       streamId,
-      status: type,
+      status,
+      address: meta?.address,
       meta,
     });
+
+    await this.livestreamModel.findByIdAndUpdate(streamId, {
+      $push: {
+        activities: {
+          $each: [activity._id],
+          $position: 0,
+        },
+      },
+    });
+
+    // const {_id, meta, status, streamId, } = activity;
+    return activity.toObject();
   }
 
   async createStream(address: string, data: Partial<LiveStream>) {
@@ -63,6 +95,7 @@ export class LivestreamService {
   async startStream(address: string, data?: Partial<LiveStream>, streamId?: string, thumbnail?: Express.Multer.File) {
     let stream = await this.livestreamModel.findById(streamId).exec();
 
+    console.log(stream, streamId);
     if (!stream && data) {
       stream = await this.createStream(address, {
         ...data,
@@ -75,24 +108,48 @@ export class LivestreamService {
       throw new BadRequestException('Unauthorized');
     }
 
-    if (stream.status === StreamStatus.LIVE) {
-      return stream;
+    if (stream.status === StreamStatus.ENDED) {
+      throw new BadRequestException('Stream already ended');
     }
 
     if (thumbnail) {
-      const fileExt = extname(thumbnail.originalname) || '.jpg'; 
-      const fileName = `${stream._id}${fileExt}`; 
+      const fileExt = extname(thumbnail.originalname) || '.jpg';
+      const fileName = `${stream._id}${fileExt}`;
 
       const uploadedThumbnail = await this.cdnService.uploadFile(thumbnail.buffer, 'live', `thumbnails/${fileName}`);
 
-      stream.thumbnail = uploadedThumbnail; 
+      stream.thumbnail = uploadedThumbnail;
     }
 
-    stream.status = data.status;
-    stream.startedAt = new Date();
-    await stream.save();
+    // **1. Handle Scheduling**
+    if (data?.status === StreamStatus.SCHEDULED) {
+      if (stream.status !== StreamStatus.SCHEDULED) {
+        stream.status = StreamStatus.SCHEDULED;
+        await stream.save();
+      }
+      return stream;
+    }
+    // **2. Handle Starting Stream**
+    if (data?.status === StreamStatus.LIVE) {
+      if (stream.status === StreamStatus.LIVE) {
+      this.chatGateway.server.socketsJoin(`stream:${stream._id}`);
+        console.log('Stream is already live');
+        return stream;
+      }
 
-    this.eventEmitter.emit('stream.started', { stream });
+      stream.status = StreamStatus.LIVE;
+      stream.startedAt = new Date();
+      await stream.save();
+
+      // Emit start event
+      this.chatGateway.server.emit(LivestreamEvents.StartStream, { streamId: stream._id });
+
+      // Record activity
+      await this.recordActivity(stream._id as string, StreamActivityType.START, { address });
+
+      // Join room
+      this.chatGateway.server.socketsJoin(`stream:${stream._id}`);
+    }
 
     return stream;
   }
@@ -115,6 +172,8 @@ export class LivestreamService {
     stream.endedAt = endedAt;
     stream.duration = duration;
     await stream.save();
+
+    await this.recordActivity(streamId, StreamActivityType.END, { address });
 
     // Clean up streaming resources
     await this.cleanupStream(streamId);
@@ -144,9 +203,10 @@ export class LivestreamService {
     await stream.save();
 
     // Update Redis viewer count
-    // await this.redis.incr(`stream:${streamId}:viewers`);
+    await this.redis.incr(`stream:${streamId}:viewers`);
 
-    this.eventEmitter.emit('stream.joined', { viewer });
+    // this.chatGateway.server.emit(LivestreamEvents.JoinStream, { viewer });
+    // this.eventEmitter.emit('stream.joined', { viewer });
 
     return viewer;
   }
@@ -161,11 +221,11 @@ export class LivestreamService {
       await this.streamViewerModel.updateOne({ _id: viewer._id }, { leftAt, duration });
 
       // Update Redis viewer count
-      // await this.redis.decr(`stream:${streamId}:viewers`);
+      await this.redis.decr(`stream:${streamId}:viewers`);
 
       await this.recordActivity(streamId, StreamActivityType.LEFT, { address });
 
-      this.eventEmitter.emit('stream.left', { viewer });
+      // this.eventEmitter.emit('stream.left', { viewer });
     }
   }
 
@@ -183,37 +243,70 @@ export class LivestreamService {
     };
 
     // Emit real-time event
-    this.eventEmitter.emit('stream.comment', { comment });
+    // this.eventEmitter.emit('stream.comment', { comment });
 
     return comment;
   }
 
   async getViewerCount(streamId: string): Promise<number> {
-    // const count = await this.redis.get(`stream:${streamId}:viewers`);
+    const count = await this.redis.get(`stream:${streamId}:viewers`);
 
     // If Redis has no data, fallback to database
-    // if (count === null) {
-    const currentViewers = await this.streamActivityModel.countDocuments({
-      streamId,
-      status: StreamActivityType.JOINED,
-      'meta.address': { $exists: true },
+    if (count === null) {
+      const currentViewers = await this.streamActivityModel.countDocuments({
+        streamId,
+        status: StreamActivityType.JOINED,
+        'meta.address': { $exists: true },
+      });
+
+      const viewersLeft = await this.streamActivityModel.countDocuments({
+        streamId,
+        status: StreamActivityType.LEFT,
+        'meta.address': { $exists: true },
+      });
+
+      const viewers = currentViewers - viewersLeft;
+
+      // Cache the count in Redis for future use
+      await this.redis.set(`stream:${streamId}:viewers`, viewers);
+
+      return viewers;
+    }
+
+    return parseInt(count, 10);
+  }
+
+  async likeStream(streamId: string, address: string): Promise<StreamDocument> {
+    const stream = await this.livestreamModel.findById(streamId);
+    if (!stream) {
+      throw new NotFoundException('Stream not found');
+    }
+
+    const likeKey = `likesRecord.${address}`;
+
+    const existingLike = await this.livestreamModel.findOne({
+      _id: streamId,
+      [`likesRecord.${address}`]: { $exists: true },
     });
 
-    const viewersLeft = await this.streamActivityModel.countDocuments({
+    if (existingLike) {
+      throw new ConflictException('User has already liked this stream');
+    }
+
+    const updatedStream = await this.livestreamModel.findByIdAndUpdate(
       streamId,
-      status: StreamActivityType.LEFT,
-      'meta.address': { $exists: true },
-    });
+      {
+        $inc: { likes: 1 },
+        $set: { [likeKey]: true },
+      },
+      { new: true },
+    );
 
-    const viewers = currentViewers - viewersLeft;
+    if (!updatedStream) {
+      throw new NotFoundException('Stream not found during update');
+    }
 
-    // Cache the count in Redis for future use
-    // await this.redis.set(`stream:${streamId}:viewers`, viewers);
-
-    return viewers;
-    // }
-
-    // return parseInt(count, 10);
+    return updatedStream;
   }
 
   private generateStreamKey(): string {
@@ -261,8 +354,37 @@ export class LivestreamService {
         },
       },
     ]);
-  
+
     return liveStreamsWithAccounts;
+  }
+
+  async getActiveStreamByUser(userAddress: string) {
+    return this.livestreamModel
+      .findOne({
+        address: userAddress,
+        status: StreamStatus.LIVE,
+      })
+      .exec();
+  }
+
+  async getStreamsByViewer(userId: string) {
+    const viewerEntries = await this.streamViewerModel
+      .find({
+        address: userId,
+        leftAt: { $exists: false }, // Only active viewers (not left the stream)
+      })
+      .select('streamId')
+      .lean()
+      .exec();
+
+    const streamIds = viewerEntries.map(entry => entry.streamId);
+
+    return this.livestreamModel
+      .find({
+        _id: { $in: streamIds },
+        status: StreamStatus.LIVE,
+      })
+      .exec();
   }
 
   async getStream(streamId: string) {
@@ -272,10 +394,26 @@ export class LivestreamService {
       },
       {
         $lookup: {
-          from: 'accounts', 
-          localField: 'address', 
-          foreignField: 'address', 
+          from: 'accounts',
+          localField: 'address',
+          foreignField: 'address',
           as: 'account',
+        },
+      },
+      {
+        $lookup: {
+          from: 'streamactivities',
+          let: { streamId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ['$streamId', '$$streamId'] },
+              },
+            },
+            { $sort: { createdAt: 1 } },
+            { $limit: 100 },
+          ],
+          as: 'activities',
         },
       },
       {
@@ -297,6 +435,11 @@ export class LivestreamService {
           scheduledFor: 1,
           categories: 1,
           address: 1,
+          likes: 1,
+          peakViewers: 1,
+          totalViews: 1,
+          activities: 1,
+          viewers: 1,
           account: {
             username: 1,
             displayName: 1,
@@ -305,33 +448,52 @@ export class LivestreamService {
         },
       },
     ]);
-  
+
     if (!streamWithAccount.length) {
       throw new NotFoundException('Stream not found');
     }
-  
+
     return streamWithAccount[0];
+  }
+
+  async getStreamActivities(
+    streamId: string,
+    options: {
+      limit?: number;
+      skip?: number;
+      type?: StreamActivityType;
+      address?: string;
+    } = {},
+  ) {
+    const { limit = 100, skip = 0, type, address } = options;
+
+    const query: any = { streamId };
+    if (type) query.status = type;
+    if (address) query.address = address;
+
+    // return this.streamActivityModel.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).exec();
+    return this.streamActivityModel.find(query).sort({ createdAt: 1 }).skip(skip).exec();
   }
 
   async getLiveStreams(limit = 20, offset = 0) {
     const liveStreamsWithAccounts = await this.livestreamModel.aggregate([
       {
-        $match: { status: { $in: [StreamStatus.LIVE, StreamStatus.SCHEDULED] } }, 
+        $match: { status: { $in: [StreamStatus.LIVE, StreamStatus.SCHEDULED] } },
       },
       {
-        $sort: { startedAt: -1 }, 
+        $sort: { startedAt: -1 },
       },
       {
-        $skip: offset, 
+        $skip: offset,
       },
       {
-        $limit: limit, 
+        $limit: limit,
       },
       {
         $lookup: {
-          from: 'accounts', 
-          localField: 'address', 
-          foreignField: 'address', 
+          from: 'accounts',
+          localField: 'address',
+          foreignField: 'address',
           as: 'account',
         },
       },
@@ -362,7 +524,7 @@ export class LivestreamService {
         },
       },
     ]);
-  
+
     return liveStreamsWithAccounts;
   }
 

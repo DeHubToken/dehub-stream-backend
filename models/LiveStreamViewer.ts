@@ -8,10 +8,10 @@ export type StreamViewerDocument = StreamViewer & Document;
 @Schema()
 export class StreamViewer {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'LiveStream', required: true })
-  streamId: LiveStream;
+  streamId: LiveStream | string;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Account', required: true })
-  address: Account;
+  @Prop({ type: String, ref: 'Account', required: true })
+  address: string;
 
   @Prop({ required: true, default: Date.now })
   joinedAt: Date;
@@ -24,4 +24,4 @@ export class StreamViewer {
 }
 
 export const StreamViewerSchema = SchemaFactory.createForClass(StreamViewer);
-StreamViewerSchema.index({ streamId: 1, address: 1 }, { unique: true });
+// StreamViewerSchema.index({ streamId: 1, address: 1 }, { unique: true });

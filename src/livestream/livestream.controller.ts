@@ -55,31 +55,13 @@ export class LivestreamController {
     return this.livestreamService.getStream(streamId);
   }
 
-  // @UseGuards(AuthGuard)
-  // @Post(':streamId')
-  // @UseInterceptors(FileInterceptor('file'))
-  // async startLiveStream(@Req() req, @UploadedFile() file: Express.Multer.File, @Param('streamId') streamId: string) {
-  //   const address = req.params.address;
-  //   const slug = `hls/${address}/${streamId}`
-  //   const filePath = path.join('uploads', streamId + '.mp4');
+  @Get(':streamId/activities')
+  getStreamAtivities(@Param('streamId') streamId: string) {
+    return this.livestreamService.getStreamActivities(streamId);
+  }
 
-  //   fs.writeFileSync(filePath, file.buffer);
-
-  //   // const playbackUrl = await this.hlsService.processStream(filePath, slug);
-  //   const playbackUrl = 'await this.hlsService.processStream(filePath, slug)';
-
-  //   fs.unlinkSync(filePath);
-
-  //   console.log(playbackUrl)
-
-  //   return { playbackUrl };
+  // @Get(':streamId')
+  // getStreamDetails(@Param('streamId') streamId: string) {
+  //   return this.livestreamService.getStream(streamId);
   // }
-
-  @UseGuards(AuthGuard)
-  @Patch()
-  async updateStream(@Body('streamId') streamId: string) {}
-
-  @UseGuards(AuthGuard)
-  @Post('end')
-  async endStream() {}
 }

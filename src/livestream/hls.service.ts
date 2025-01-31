@@ -117,6 +117,34 @@ export class HlsService {
     }
   }
 
+  private async convertHlsToMp4(hlsPath: string, outputFilePath: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const playlistPath = path.join(hlsPath, 'playlist.m3u8');
+
+      // Spawn FFmpeg process to convert HLS to MP4
+      const ffmpegProcess = spawn('ffmpeg', [
+        '-i',
+        playlistPath, // Input HLS playlist
+        '-c',
+        'copy', // Copy codec (no re-encoding)
+        outputFilePath, // Output MP4 file
+      ]);
+
+      ffmpegProcess.stderr.on('data', (data) => {
+        console.error(`FFmpeg error:`, data.toString());
+      });
+
+      ffmpegProcess.on('close', (code) => {
+        if (code === 0) {
+          console.log(`HLS converted to MP4: ${outputFilePath}`);
+          resolve();
+        } else {
+          reject(new Error(`FFmpeg process exited with code: ${code}`));
+        }
+      });
+    });
+  }
+
   async cleanupStream(streamId: string) {
     console.log(`[Stream ${streamId}] Cleaning up resourcess`);
     const streamData = this.streams.get(streamId);
@@ -132,6 +160,14 @@ export class HlsService {
         streamData.ffmpegProcess.stdin.end();
         streamData.ffmpegProcess.kill();
       }
+
+      const outputFilePath = path.join(streamData.tempPath, 'output.mp4');
+      await this.convertHlsToMp4(streamData.outputPath, outputFilePath);
+
+      const buffer = fs.readFileSync(outputFilePath);
+      await this.cdnService.uploadFile(buffer, 'live', `mp4/${streamId}.mp4`, (percent) =>
+        console.log(`[Stream ${streamId}] Uploading MP4: ${percent}%`),
+      );
 
       // Remove temporary files
       fs.rmSync(streamData.tempPath, { recursive: true, force: true });

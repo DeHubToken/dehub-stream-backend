@@ -19,12 +19,13 @@ import { ChatGateway } from './chat.gateway';
       { name: StreamViewer.name, schema: StreamViewerSchema },
       { name: StreamActivity.name, schema: StreamActivitySchema },
     ]),
-    CdnModule
-    // RedisModule.forRoot({ url:'localhost:6379', type: 'single'})
+    CdnModule,
+    RedisModule.forRoot({ url:'localhost:6379', type: 'single'})
   ],
   controllers: [LivestreamController],
   providers: [LivestreamService, StreamChatService, HlsService, ChatGateway
     // , NmsStreamingService
   ],
+  exports: [LivestreamService, StreamChatService, ChatGateway]
 })
 export class LivestreamModule {}

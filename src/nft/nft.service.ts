@@ -265,7 +265,9 @@ export class NftService {
       switch (sortMode) {
         case 'live':
           const liveQuery: any = {
-            status: { $in: [StreamStatus.LIVE, StreamStatus.SCHEDULED] },
+            status: owner
+              ? { $in: [StreamStatus.LIVE, StreamStatus.SCHEDULED, StreamStatus.ENDED] }
+              : { $in: [StreamStatus.LIVE, StreamStatus.SCHEDULED] },
           };
 
           if (search) {

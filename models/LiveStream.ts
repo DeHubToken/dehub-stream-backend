@@ -54,6 +54,12 @@ export class LiveStream {
   @Prop({ default: 0 })
   likes: number;
 
+  @Prop({ default: 0 })
+  likesCount: number;
+
+  @Prop({ type: mongoose.Schema.Types.Mixed, default: {} })
+  likesRecord: Record<string, boolean>;
+
   // @Prop({ default: 0 })
   // totalTips: number;
 
@@ -70,7 +76,7 @@ export class LiveStream {
   //   reactions: Reaction[];
 
   @Prop({ type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'StreamActivity' }] })
-  activity: StreamActivity[];
+  activities: StreamActivity[]; 
 
   @Prop({ type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'StreamViewer' }] })
   viewers: StreamViewer[];
@@ -78,4 +84,25 @@ export class LiveStream {
 
 export const LiveStreamSchema = SchemaFactory.createForClass(LiveStream);
 LiveStreamSchema.index({ status: 1 });
-LiveStreamSchema.index({ addresss: 1 });
+LiveStreamSchema.index({ address: 1 });
+LiveStreamSchema.index({ streamKey: 1 }, { unique: true });
+LiveStreamSchema.index({ createdAt: -1 });
+
+LiveStreamSchema.statics.findWithActivities = async function(
+  streamId: string,
+  limit: number = 50
+) {
+  return this.findById(streamId)
+    .populate({
+      path: 'activities',
+      options: {
+        limit,
+        sort: { createdAt: -1 }
+      }
+    })
+    .exec();
+};
+
+export interface LiveStreamModel extends mongoose.Model<StreamDocument> {
+  findWithActivities(streamId: string, limit?: number): Promise<StreamDocument>;
+}
