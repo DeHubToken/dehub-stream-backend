@@ -20,6 +20,9 @@ import { StreamCronService } from './job/stream-cron.service';
 import { PlansModule } from './plans/plans.module';
 import { PlanEventListenerService } from './job/plans.listener';
 import { DmModule } from './dm/dm.module';
+import { LivestreamModule } from './livestream/livestream.module';
+import { MongooseModule } from '@nestjs/mongoose';
+import { config } from 'config';
 
 @Module({
   imports: [
@@ -30,9 +33,10 @@ import { DmModule } from './dm/dm.module';
         port: 6379,
       },
     }),
-    EventEmitterModule.forRoot(), 
+    EventEmitterModule.forRoot(),
+    MongooseModule.forRoot(`mongodb://${config.mongo.host}:${config.mongo.port}/${config.mongo.dbName}`),
     UserModule, 
-    NftModule, NotificationModule, CdnModule, AuthModule, PlansModule,DmModule, ReactionModule, CategoryModule, LeaderboardModule, AssetModule, JobModule, ScheduleModule.forRoot()],
+    NftModule, NotificationModule, CdnModule, AuthModule, PlansModule,DmModule, ReactionModule, CategoryModule, LeaderboardModule, AssetModule, JobModule, ScheduleModule.forRoot(), LivestreamModule],
   controllers: [AppController],
   providers: [AppService, StreamCronService,PlanEventListenerService],
 })

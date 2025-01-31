@@ -59,7 +59,7 @@ async function bootstrap() {
 
   // Connect to MongoDB
   const mongoUri = `mongodb://${config.mongo.host}:${config.mongo.port}/${config.mongo.dbName}`;
-  console.log(config.mongo.dbName);
+;
   await mongoose.connect(mongoUri); // Await connection
 
   mongoose.connection.on('error', err => {

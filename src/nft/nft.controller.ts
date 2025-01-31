@@ -102,10 +102,9 @@ export class NFTController {
   @Get('liked_videos')
   @UseGuards(AuthGuard)
   async getLikedVideos(@Req() req: Request, @Res() res: Response) {
-    const resp = await this.nftServices.getlikedVideos(req, res);
-    res.send(resp);
-  }
-
+    return this.nftServices.getlikedVideos(req,res)
+  } 
+  
   @Get('/nft_info/:id')
   async nftinfo(@Req() req: Request, @Res() res: Response) {
     try {

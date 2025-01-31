@@ -34,6 +34,11 @@ import { VoteModel } from 'models/Vote';
 import sharp from 'sharp';
 import axios from 'axios';
 import Redis from 'ioredis';
+import { StreamActivityType, StreamStatus } from 'config/constants';
+import { InjectModel } from '@nestjs/mongoose';
+import { LiveStream, StreamDocument } from 'models/LiveStream';
+import { Model } from 'mongoose';
+
 const signer = new ethers.Wallet(process.env.SIGNER_KEY || '');
 
 @Injectable()
@@ -42,6 +47,7 @@ export class NftService {
   constructor(
     private readonly cdnService: CdnService,
     private readonly jobService: JobService,
+    @InjectModel(LiveStream.name) private livestreamModel: Model<StreamDocument>,
   ) {
     this.redisClient = new Redis({...config.redis,db:1});
   }
@@ -373,6 +379,45 @@ export class NftService {
       console.log('searchQuery', JSON.stringify(searchQuery));
       console.log('Range - sotMode - unit - page - search', range, sortMode, unit, page, search);
       switch (sortMode) {
+        case 'live':
+          const liveQuery: any = {
+            status: owner
+              ? { $in: [StreamStatus.LIVE, StreamStatus.SCHEDULED, StreamStatus.ENDED] }
+              : { $in: [StreamStatus.LIVE, StreamStatus.SCHEDULED] },
+          };
+
+          if (search) {
+            break;
+          }
+          if (owner) liveQuery.address = owner.toLowerCase();
+
+          const liveStreams = await this.livestreamModel
+            .find(liveQuery)
+            .sort(sortRule)
+            .skip(unit * page)
+            .limit(unit);
+
+          const accounts = await AccountModel.find({
+            address: { $in: liveStreams.map(stream => stream.address.toLowerCase()) },
+          });
+
+          const augmentedLiveStreams = liveStreams.map(stream => {
+            const account = accounts.find(acc => acc.address.toLowerCase() === stream.address.toLowerCase());
+
+            return {
+              ...stream.toObject(),
+              account: account
+                ? {
+                    username: account.username,
+                    displayName: account.displayName,
+                    avatarImageUrl: account.avatarImageUrl,
+                  }
+                : null,
+            };
+          });
+
+          return res.send({ result: augmentedLiveStreams });
+          break;
         case 'trends':
           if (range) {
             let fromDate = new Date();
@@ -463,6 +508,18 @@ export class NftService {
         // Search through the accounts table
         const accounts = await AccountModel.find({ username: { $regex: new RegExp(search, 'i') } });
         const address = reqParam(req, 'address');
+
+        // search throuh livestreams
+        const livestreamQuery: any = {
+          $or: [{ title: re }, { description: re }],
+        };
+
+        const livestreams = await this.livestreamModel
+          .find(livestreamQuery)
+          .sort(sortRule)
+          .skip(unit * page)
+          .limit(unit);
+
         const videos: any = await this.getStreamNfts(
           searchQuery['$match'],
           unit * page,
@@ -484,6 +541,7 @@ export class NftService {
           result: {
             accounts,
             videos,
+            livestreams,
           },
         });
       }

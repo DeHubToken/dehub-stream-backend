@@ -4,6 +4,8 @@ import { NFTController } from './nft.controller';
 import { CdnModule } from 'src/cdn/cdn.module';
 import { JobModule } from 'src/job/job.module';
 import { NftIndexer } from './mint.indexer';
+import { MongooseModule } from '@nestjs/mongoose';
+import { LiveStream, LiveStreamSchema } from 'models/LiveStream';
 
 @Module({
   controllers: [NFTController],
@@ -13,7 +15,7 @@ import { NftIndexer } from './mint.indexer';
     ],
   imports:[
     CdnModule,
-     JobModule
+     JobModule, MongooseModule.forFeature([{ name: LiveStream.name, schema: LiveStreamSchema }])
     ]
 })
 export class NftModule {}

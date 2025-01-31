@@ -11,8 +11,8 @@ export class SocketIoAdapter extends IoAdapter {
       ...options,
     });
 
-    server.on('connection', socket => {
-      console.log(`Client connected: ${socket.id}`);
+    server.on('connection', (socket) => {
+      // console.log(`Client connected: ${socket.id}`);
     });
     new DMSocketController(server); 
     return server;

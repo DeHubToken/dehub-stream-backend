@@ -5,6 +5,8 @@ import { Upload } from '@aws-sdk/lib-storage';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { generateSlug } from 'common/util/slugify';
+import * as Fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class CdnService {
@@ -20,6 +22,7 @@ export class CdnService {
       },
     });
   }
+
   async uploadFile(buffer: Buffer, slug: string, filename: string, onProgress?: (percent: number) => void): Promise<string> {
     const key = `${generateSlug(slug)}/${filename}`;
     const body = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
@@ -94,6 +97,7 @@ export class CdnService {
         });
     });
   }
+
   async deleteFile(key: string): Promise<void> {
     const parsedUrl = new URL(key);
       const keyg = decodeURIComponent(parsedUrl.pathname.substring(1));
@@ -105,5 +109,20 @@ export class CdnService {
     } catch (error) {
       throw new Error(`Failed to delete file from DigitalOcean: ${error.message}`);
     }
+  }
+
+  async uploadHLSFolder(localFolderPath: string, slug: string): Promise<void> {
+    const files = Fs.readdirSync(localFolderPath);
+  
+    for (const file of files) {
+      const filePath = path.join(localFolderPath, file);
+      const fileBuffer = Fs.readFileSync(filePath);
+  
+      await this.uploadFile(fileBuffer, slug, file);
+    }
+  }
+
+  async cleanupLocalFiles(folderPath: string) {
+    Fs.rmSync(folderPath, { recursive: true, force: true });
   }
 }
