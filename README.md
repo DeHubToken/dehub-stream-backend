@@ -9,6 +9,13 @@
 
 Streaming platform for NFTs.
 
+## Prerequisites
+- Node.js v18+
+- pnpm v9+
+- Docker
+- [MongoDB](https://www.mongodb.com/docs/manual/tutorial/install-mongodb-on-os-x/)
+- [Redis](https://redis.io/docs/latest/getting_started/)
+
 
 ## Installation
 
@@ -16,7 +23,7 @@ Streaming platform for NFTs.
 $ pnpm install
 ```
 
-## Prerequisites
+## Development
 
 1. Define `.env` file
 1. Start **MongoDB** locally
