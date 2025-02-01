@@ -27,8 +27,18 @@ export class HlsService {
 
       fs.mkdirSync(outputPath, { recursive: true });
 
+      // '-g', '30', // Force keyframe interval (helps with HLS segmenting)
+      // '-re',
+      // '-probesize', '500k',
+      // '-analyzeduration', '500000',
       // Spawn FFmpeg process for WebM to HLS transcoding
       const ffmpegProcess = spawn('ffmpeg', [
+        '-loglevel', 'debug',
+        '-fflags', 'nobuffer',
+        '-flags', 'low_delay',
+        '-probesize', '32',
+        '-analyzeduration', '0',
+        '-flush_packets', '1',
         '-i',
         'pipe:0', // Read WebM data from stdin
         '-c:v',
@@ -48,6 +58,7 @@ export class HlsService {
         '-hls_list_size',
         '6', // Number of segments in playlist
         '-hls_flags',
+        // 'split_by_time',
         // 'append_list',
         'delete_segments+append_list',
         '-hls_segment_type',
@@ -90,14 +101,19 @@ export class HlsService {
     }
 
     if (streamData?.ffmpegProcess?.stdin) {
+      console.log("writing chunks before promise", streamData.pendingChunks, chunk.length)
       streamData.pendingChunks++;
       
       return new Promise<void>((resolve, reject) => {
         streamData.ffmpegProcess.stdin.write(chunk, (error) => {
+          console.log("writing chunks in promise", streamData.pendingChunks)
           streamData.pendingChunks--;
           if (error) {
-            reject(error);
-          } else {
+          console.log("writing chunks in erre", streamData.pendingChunks, error)
+          
+          reject(error);
+        } else {
+            console.log("writing chunks in resolve", streamData.pendingChunks)
             resolve();
           }
         });
@@ -128,6 +144,8 @@ export class HlsService {
 
     try {
       const files = fs.readdirSync(streamData.outputPath);
+      console.log('All files', streamData.outputPath, files);
+
       const newFiles = files.filter(
         file => (file.endsWith('.ts') || file.endsWith('.m3u8')) && !file.startsWith('uploaded_'),
       );
