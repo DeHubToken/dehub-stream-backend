@@ -49,7 +49,7 @@ export class NftService {
     private readonly jobService: JobService,
     @InjectModel(LiveStream.name) private livestreamModel: Model<StreamDocument>,
   ) {
-    this.redisClient = new Redis({...config.redis,db:1});
+    this.redisClient = new Redis({ ...config.redis, db: 1 });
   }
 
   async getAllNfts(req: Request, res: Response) {
@@ -111,7 +111,7 @@ export class NftService {
         files.map(async (image: Express.Multer.File, index: number) => {
           // const fileExtension = image.mimetype.split('/')[1]; // Ensure correct file extension
           const filename = `${token.tokenId}-${index + 1}.jpg`;
-          await this.cdnService.uploadFile(image.buffer, address, filename);
+          await this.cdnService.uploadFile(image.buffer, config.dirFeedsImages, filename);
           return `nfts/images/${filename}`;
         }),
       );
@@ -309,8 +309,8 @@ export class NftService {
             ...tokenTemplate,
             plansDetails: 1,
             mintername: { $first: '$account.username' },
-            minterDisplayName: { $first: '$account.displayName' }, 
-            minterAvatarUrl: { $first: '$account.avatarImageUrl' }, 
+            minterDisplayName: { $first: '$account.displayName' },
+            minterAvatarUrl: { $first: '$account.avatarImageUrl' },
             minterAboutMe: { $first: '$account.aboutMe' },
             minterStaked: { $first: '$balance.staked' },
           },
@@ -889,56 +889,56 @@ export class NftService {
         console.log('Token ID is missing in request');
         return res.status(400).json({ error: 'Token ID is required' });
       }
-  
+
       // console.log('Token ID:', tokenId);
-  
+
       const address = reqParam(req, 'address');
       // console.log('Request address:', address);
-  
+
       const tk = tokenId.toString().split('-')[0];
       // console.log('Token ID without suffix:', tk);
-  
+
       const token = await TokenModel.findOne({ tokenId: tk });
       if (!token) {
         // console.log(`Token with ID ${tk} not found in database`);
         return res.status(404).json({ error: 'Token not found' });
       }
       // console.log('Token found in database:', token);
-  
+
       const isOwner = (token?.owner && address && token?.owner?.toLowerCase() === address?.toLowerCase()) ?? false;
       // console.log('Is owner:', isOwner);
-  
+
       const isVideo = token.postType === 'video';
       // console.log('Is video:', isVideo);
-  
+
       const { isLockContent = false, isPayPerView = false }: any = token?.streamInfo ?? {};
       // console.log('Lock Content:', isLockContent, 'Pay Per View:', isPayPerView);
-  
+
       const { plans = null } = token;
-      const isFree = !isLockContent && !isPayPerView && !(plans.push.length > 0);
+      const isFree = !isLockContent && !isPayPerView && !(plans&&plans.length > 0);
       // console.log('Is Free:', isFree);
-  
+
       const { isSubscribed = false, planRequired = false } = await getIsSubscriptionRequired(token.tokenId, address);
       // console.log('Is Subscribed:', isSubscribed, 'Plan Required:', planRequired);
-  
+
       const isUnlockedPPV = await isUnlockedPPVStream(token.tokenId.toString(), address);
       // console.log('Is PPV unlocked:', isUnlockedPPV);
-  
-      const isUnlockedLocked = await isUnlockedLockedContent(token.streamInfo, address); 
+
+      const isUnlockedLocked = await isUnlockedLockedContent(token.streamInfo, address);
       // console.log('Is Locked content unlocked:', isUnlockedLocked);
-  
+
       const shouldApplyBlur = () => {
         const result = isOwner || isFree || isUnlockedPPV || isUnlockedLocked || isSubscribed;
         // console.log('Should apply blur (result):', !result);
         return !result;
       };
-  
-      console.log("should apply blur", { isLockContent, isPayPerView });
-      console.log("should apply blur", { isOwner, isFree, isUnlockedPPV, isUnlockedLocked, isSubscribed });
-  
-      const apiUrl = defaultTokenImagePath(tokenId.toString(), token.minter);
+
+      console.log('should apply blur', { isLockContent, isPayPerView });
+      console.log('should apply blur', { isOwner, isFree, isUnlockedPPV, isUnlockedLocked, isSubscribed });
+
+      const apiUrl = defaultTokenImagePath(tokenId.toString());
       console.log('API URL for image:', apiUrl);
-  
+
       // Check for blurred image and Redis cache
       if (!isVideo && shouldApplyBlur()) {
         // console.log(`Checking Redis cache for blurred image with tokenId: ${tokenId}`);
@@ -957,7 +957,7 @@ export class NftService {
         res.set('Content-Type', 'image/jpg');
         return res.send(bluedImage);
       }
-  
+
       console.log(`Checking Redis cache for original image with tokenId: ${tokenId}`);
       let cacheImage = await this.getCachedImage(`original-image-${tokenId}`);
       if (cacheImage != null) {
@@ -973,10 +973,10 @@ export class NftService {
       return res.send(originalImage);
     } catch (error) {
       console.error('Error in getNftImage:', error.message);
-      res.status(500).json({ error: 'Internal server error',log:error });
+      res.status(500).json({ error: 'Internal server error', log: error });
     }
   }
-  
+
   private async signatureForClaimBounty(address: string, tokenId: number, bountyType: any) {
     console.log('------sig for bounty', address, tokenId, bountyType);
     const tokenItem = await TokenModel.findOne({ tokenId }, { chainId: 1, streamInfo: 1 }).lean();

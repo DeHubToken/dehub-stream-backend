@@ -7,16 +7,17 @@ const config = {
   port: process.env.API_PORT || 9015,
   socket: 9003,
   baseUrl: `http://127.0.0.1:${process.env.API_PORT || 9015}`,
-  dirDmImages: 'dm-images',
-  dirDmVideos: 'dm-videos', 
+  dirDmImages:  'dm-images',
+  dirDmVideos:  'dm-videos',
+  dirFeedsImages:  'feed-images',
   devPort: 9002,
   devBaseUrl: 'http://127.0.0.1:9002',
-  mongo: { 
+  mongo: {
     host: '127.0.0.1',
     port: 27017,
     dbName: process.env.DB_NAME || 'streaming_production_db',
   },
-  redis:{
+  redis: {
     host: 'localhost',
     port: 6379,
   },

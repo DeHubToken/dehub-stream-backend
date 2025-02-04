@@ -1,3 +1,5 @@
+import { config } from "config";
+
 const fs = require('fs');
 const path = require('path');
 
@@ -13,9 +15,10 @@ const defaultImageFilePath = (tokenId: number, imageExt = 'jpg') => {
   return `${process.env.CDN_BASE_URL}images/${tokenId}.${imageExt}`;
 };
 
-const defaultTokenImagePath = (tokenId: string, address: string) => {
+const defaultTokenImagePath = (tokenId: string) => {
+  
   // Construct the base URL
-  let url = `${process.env.CDN_BASE_URL}${address}/${tokenId}`;
+  let url = `${process.env.CDN_BASE_URL}${config.dirFeedsImages}/${tokenId}`;
 
   // Check if the URL already has an extension (e.g., .jpg, .png, etc.)
   const hasExtension = /\.(jpg|jpeg|png|gif|svg)$/i.test(url);
