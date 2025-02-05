@@ -354,7 +354,7 @@ export class NftService {
       const postFilter = {};
       const contentFilter = {
         video: {
-          $or: [{ postType: { $nin: ['feed-simple', 'feed-images'] } }, { postType: 'video' }],
+          $or: [{ postType: { $nin: ['feed-simple', 'feed-images'] } }],
         },
         'feed-all': {
           $or: [{ postType: 'feed-simple' }, { postType: 'feed-images' }],
@@ -370,7 +370,7 @@ export class NftService {
         Object.assign(postFilter, contentFilter[postType]);
       }
       //       // postFilter['transcodingStatus'] = 'done';  // Uncomment if needed
-
+      console.log('postFilter', postFilter);
       console.log('sortMode', { sortMode, postType, searchQuery });
       let sortRule: any = { createdAt: -1 };
       searchQuery['$match'] = {
@@ -479,13 +479,17 @@ export class NftService {
           break;
       }
 
-      if (!page) page = 0;
-      if (minter) searchQuery['$match'] = { minter: minter.toLowerCase() };
-      if (owner) searchQuery['$match'] = { owner: owner.toLowerCase() };
+      if (!page) page = 0; 
+      if (minter) searchQuery['$match']['$and'].push({ minter: minter.toLowerCase() });
+      if (owner) searchQuery['$match']['$and'].push({ owner: owner.toLowerCase() });
       if (category) {
-        searchQuery['$match']['category'] = { $elemMatch: { $eq: category } };
+        searchQuery['$match']['$and'].push({ category: { $elemMatch: { $eq: category } } });
       }
-
+      
+      // Remove `$and` if it's empty to avoid unnecessary filtering
+      if (searchQuery['$match']['$and'].length === 0) {
+        delete searchQuery['$match']['$and'];
+      }
       if (bulkIdList) {
         let idList = bulkIdList.split('-');
         if (idList.length > 0) {
@@ -915,7 +919,7 @@ export class NftService {
       // console.log('Lock Content:', isLockContent, 'Pay Per View:', isPayPerView);
 
       const { plans = null } = token;
-      const isFree = !isLockContent && !isPayPerView && !(plans&&plans.length > 0);
+      const isFree = !isLockContent && !isPayPerView && !(plans && plans.length > 0);
       // console.log('Is Free:', isFree);
 
       const { isSubscribed = false, planRequired = false } = await getIsSubscriptionRequired(token.tokenId, address);
