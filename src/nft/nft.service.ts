@@ -19,7 +19,7 @@ import { CategoryModel } from 'models/Category';
 import { Request, Response } from 'express';
 import { AccountDocument, AccountModel } from 'models/Account';
 import { config } from 'config';
-import { reqParam } from 'common/util/auth';
+import { isValidAccount, reqParam } from 'common/util/auth';
 import { WatchHistoryModel } from 'models/WatchHistory';
 import { CommentModel } from 'models/Comment';
 import { PPVTransactionModel } from 'models/PPVTransaction';
@@ -479,13 +479,13 @@ export class NftService {
           break;
       }
 
-      if (!page) page = 0; 
+      if (!page) page = 0;
       if (minter) searchQuery['$match']['$and'].push({ minter: minter.toLowerCase() });
       if (owner) searchQuery['$match']['$and'].push({ owner: owner.toLowerCase() });
       if (category) {
         searchQuery['$match']['$and'].push({ category: { $elemMatch: { $eq: category } } });
       }
-      
+
       // Remove `$and` if it's empty to avoid unnecessary filtering
       if (searchQuery['$match']['$and'].length === 0) {
         delete searchQuery['$match']['$and'];
@@ -888,16 +888,17 @@ export class NftService {
   }
   async getNftImage(req: Request, res: Response) {
     try {
-      const tokenId = req.query.id ?? req.params?.id;
+      const address = reqParam(req, 'address');
+      const tokenId = reqParam(req, 'id');
+      const sig = reqParam(req, 'sig');
+      const timestamp = reqParam(req, 'timestamp');
+      // console.log('Request address:', address);
       if (!tokenId) {
         console.log('Token ID is missing in request');
         return res.status(400).json({ error: 'Token ID is required' });
       }
 
       // console.log('Token ID:', tokenId);
-
-      const address = reqParam(req, 'address');
-      // console.log('Request address:', address);
 
       const tk = tokenId.toString().split('-')[0];
       // console.log('Token ID without suffix:', tk);
@@ -908,7 +909,7 @@ export class NftService {
         return res.status(404).json({ error: 'Token not found' });
       }
       // console.log('Token found in database:', token);
-
+      const isValidAcc = isValidAccount(address, sig, timestamp);
       const isOwner = (token?.owner && address && token?.owner?.toLowerCase() === address?.toLowerCase()) ?? false;
       // console.log('Is owner:', isOwner);
 
@@ -932,7 +933,8 @@ export class NftService {
       // console.log('Is Locked content unlocked:', isUnlockedLocked);
 
       const shouldApplyBlur = () => {
-        const result = isOwner || isFree || isUnlockedPPV || isUnlockedLocked || isSubscribed;
+        const result =
+          (isValidAcc && isOwner) || isFree || (isValidAcc && (isUnlockedPPV || isUnlockedLocked || isSubscribed));
         // console.log('Should apply blur (result):', !result);
         return !result;
       };
