@@ -93,71 +93,7 @@ export class LivestreamService {
   }
 
   async startStream(address: string, data?: Partial<LiveStream>, streamId?: string, thumbnail?: Express.Multer.File) {
-    let stream = await this.livestreamModel.findById(streamId).exec();
-
-    console.log(stream, streamId);
-    if (!stream && data) {
-      stream = await this.createStream(address, {
-        ...data,
-      });
-    } else if (!stream && streamId) {
-      throw new NotFoundException('Stream not found');
-    }
-
-    if (stream.address.toString() !== address) {
-      throw new BadRequestException('Unauthorized');
-    }
-
-    if (stream.status === StreamStatus.ENDED) {
-      throw new BadRequestException('Stream already ended');
-    }
-
-    if (thumbnail) {
-      const fileExt = extname(thumbnail.originalname) || '.jpg';
-      const fileName = `${stream._id}${fileExt}`;
-
-      const uploadedThumbnail = await this.cdnService.uploadFile(thumbnail.buffer, 'live', `thumbnails/${fileName}`);
-
-      stream.thumbnail = uploadedThumbnail;
-
-      await stream.save();
-    }
-
-    // **1. Handle Scheduling**
-    if (data?.status === StreamStatus.SCHEDULED) {
-      if (stream.status !== StreamStatus.SCHEDULED) {
-        stream.status = StreamStatus.SCHEDULED;
-        await stream.save();
-      }
-      return stream;
-    }
-    // **2. Handle Starting Stream**
-    if (data?.status === StreamStatus.LIVE) {
-      if (stream.status === StreamStatus.LIVE) {
-      this.chatGateway.server.socketsJoin(`stream:${stream._id}`);
-        console.log('Stream is already live');
-        return stream;
-      }
-
-      stream.status = StreamStatus.LIVE;
-      stream.startedAt = new Date();
-      await stream.save();
-
-      // Emit start event
-      this.chatGateway.server.emit(LivestreamEvents.StartStream, { streamId: stream._id });
-
-      // Record activity
-      await this.recordActivity(stream._id as string, StreamActivityType.START, { address });
-
-      // Join room
-      this.chatGateway.server.socketsJoin(`stream:${stream._id}`);
-      return stream;
-    }
-
-    // await stream.save();
-
-    return stream
-
+   return true
   }
 
   async endStream(streamId: string, address: string) {

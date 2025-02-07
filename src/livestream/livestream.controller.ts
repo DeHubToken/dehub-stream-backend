@@ -34,15 +34,28 @@ export class LivestreamController {
 
   @UseGuards(AuthGuard)
   @Post()
-  async createStream(
-    @Req() req,
-    @Body() liveStreamDto: any,
-    @UploadedFiles() files: Express.Multer.File[],
-  ) {
+  async createStream(@Req() req, @Body() liveStreamDto: any, @UploadedFiles() files: Express.Multer.File[]) {
     const address = req.params.address;
     const { streamId, ...data } = liveStreamDto;
     const thumbnail = files.find(file => file.fieldname === 'thumbnail') || null;
     return this.livestreamService.startStream(address, data, streamId, thumbnail);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('start')
+  async startStream(@Body('streamId') streamId: string) {
+    return this.livestreamService.startStream(streamId);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('end')
+  async endStream(@Body('streamId') streamId: string) {
+    return this.livestreamService.endStream(streamId);
+  }
+
+  @Get(':streamId/playback-url')
+  async getPlaybackUrl(@Param('streamId') streamId: string) {
+    return this.livestreamService.getStreamPlaybackUrl(streamId);
   }
 
   @Get('user/:address')
@@ -59,9 +72,4 @@ export class LivestreamController {
   getStreamAtivities(@Param('streamId') streamId: string) {
     return this.livestreamService.getStreamActivities(streamId);
   }
-
-  // @Get(':streamId')
-  // getStreamDetails(@Param('streamId') streamId: string) {
-  //   return this.livestreamService.getStream(streamId);
-  // }
 }

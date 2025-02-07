@@ -24,6 +24,10 @@ export class LiveStream {
   @Prop({ required: true, unique: true })
   streamKey: string;
 
+  // @Prop({ required: true })
+  @Prop()
+  playbackId: string;
+
   @Prop({ type: String, enum: StreamStatus, default: StreamStatus.OFFLINE })
   status: StreamStatus;
 

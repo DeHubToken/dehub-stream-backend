@@ -24,6 +24,7 @@
     "@aws-sdk/lib-storage": "^3.688.0",
     "@ethersproject/bytes": "^5.7.0",
     "@ethersproject/providers": "^5.7.2",
+    "@mux/mux-node": "^9.0.1",
     "@nestjs-modules/ioredis": "^2.0.2",
     "@nestjs/bull": "^10.2.1",
     "@nestjs/common": "^10.4.7",
