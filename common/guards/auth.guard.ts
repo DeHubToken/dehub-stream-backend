@@ -83,8 +83,6 @@ export class AuthGuard implements CanActivate {
     try {
       const signedAddress = ethers.verifyMessage(signedMsg, sig).toLowerCase();
       const nowTime = Math.floor(Date.now() / 1000);
-      // console.log(signedAddress, address)
-      // Check if the signature is expired or does not match the address
       if (nowTime - this.expireSecond > timestamp || signedAddress.toLowerCase() !== address.toLowerCase()) {
         return false;
       }

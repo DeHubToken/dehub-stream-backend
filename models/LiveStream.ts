@@ -21,8 +21,11 @@ export class LiveStream {
   @Prop()
   streamUrl?: string;
 
-  @Prop({ required: true, unique: true })
+  @Prop({ unique: true })
   streamKey: string;
+
+  @Prop({ unique: true })
+  livepeerId: string;
 
   // @Prop({ required: true })
   @Prop()
@@ -30,6 +33,9 @@ export class LiveStream {
 
   @Prop({ type: String, enum: StreamStatus, default: StreamStatus.OFFLINE })
   status: StreamStatus;
+
+  @Prop({ type: Boolean })
+  isActive: boolean;
 
   @Prop()
   startedAt?: Date;
@@ -43,8 +49,8 @@ export class LiveStream {
   @Prop([String])
   categories?: string[];
 
-//   @Prop([String])
-//   tags?: string[];
+  //   @Prop([String])
+  //   tags?: string[];
 
   @Prop({ type: mongoose.Schema.Types.Mixed })
   settings?: Record<string, any>;
@@ -80,10 +86,13 @@ export class LiveStream {
   //   reactions: Reaction[];
 
   @Prop({ type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'StreamActivity' }] })
-  activities: StreamActivity[]; 
+  activities: StreamActivity[];
 
   @Prop({ type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'StreamViewer' }] })
   viewers: StreamViewer[];
+
+  @Prop({ type: mongoose.Schema.Types.Mixed })
+  meta?: Record<string, any>; // Extras
 }
 
 export const LiveStreamSchema = SchemaFactory.createForClass(LiveStream);
@@ -92,17 +101,14 @@ LiveStreamSchema.index({ address: 1 });
 LiveStreamSchema.index({ streamKey: 1 }, { unique: true });
 LiveStreamSchema.index({ createdAt: -1 });
 
-LiveStreamSchema.statics.findWithActivities = async function(
-  streamId: string,
-  limit: number = 50
-) {
+LiveStreamSchema.statics.findWithActivities = async function (streamId: string, limit: number = 50) {
   return this.findById(streamId)
     .populate({
       path: 'activities',
       options: {
         limit,
-        sort: { createdAt: -1 }
-      }
+        sort: { createdAt: -1 },
+      },
     })
     .exec();
 };

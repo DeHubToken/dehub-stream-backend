@@ -23,6 +23,7 @@ import { AccountModel } from 'models/Account';
 import mongoose from 'mongoose';
 import { LivestreamEvents } from './enums/livestream.enum';
 import { ChatGateway } from './chat.gateway';
+import { LivepeerService } from './livepeer.service';
 
 @Injectable()
 export class LivestreamService {
@@ -35,12 +36,13 @@ export class LivestreamService {
     @Inject(forwardRef(() => ChatGateway))
     private readonly chatGateway: ChatGateway,
     @InjectRedis() private readonly redis: Redis,
+    private livepeerService: LivepeerService,
   ) {}
 
   async recordActivity(streamId: string, status: StreamActivityType, meta: Record<string, any> = {}) {
     const stream = await this.livestreamModel.findById(streamId);
     if (!stream) throw new NotFoundException('Stream not found');
-    if(stream.status !== StreamStatus.LIVE) return;
+    if (stream.status !== StreamStatus.LIVE) return;
     if (meta?.address) {
       const account = await AccountModel.findOne({ address: meta?.address });
       meta = {
@@ -70,30 +72,42 @@ export class LivestreamService {
     return activity.toObject();
   }
 
-  async createStream(address: string, data: Partial<LiveStream>) {
-    const streamKey = this.generateStreamKey();
+  async createStream(address: string, data: Partial<LiveStream>, thumbnail?: Express.Multer.File) {
+    const livepeerResponse = await this.livepeerService.createStream(data.title);
 
     const stream = new this.livestreamModel({
-      ...data,
-      streamKey,
+      title: data.title,
+      description: data.description,
       address,
-      status: StreamStatus.SCHEDULED,
-      settings: {
-        quality: '1080p',
-        chat: {
-          enabled: true,
-          followersOnly: false,
-          slowMode: 0,
-        },
-      },
+      streamKey: livepeerResponse.streamKey,
+      livepeerId: livepeerResponse.id,
+      playbackId: livepeerResponse.playbackId,
+      status: StreamStatus.OFFLINE,
+      isActive: false,
+      categories: data.categories || [],
+      meta: livepeerResponse, // Store full Livepeer response in meta
     });
+
+    // Step 3: Handle thumbnail upload
+    if (thumbnail) {
+      const fileExt = extname(thumbnail.originalname) || '.jpg';
+      const fileName = `${stream._id}${fileExt}`;
+      const uploadedThumbnail = await this.cdnService.uploadFile(thumbnail.buffer, 'live', `thumbnails/${fileName}`);
+
+      stream.thumbnail = uploadedThumbnail;
+    }
+
+    if (data.status === StreamStatus.SCHEDULED) {
+      stream.status = StreamStatus.SCHEDULED;
+      stream.scheduledFor = data.scheduledFor || new Date();
+    }
 
     await stream.save();
     return stream;
   }
 
   async startStream(address: string, data?: Partial<LiveStream>, streamId?: string, thumbnail?: Express.Multer.File) {
-   return true
+    return true;
   }
 
   async endStream(streamId: string, address: string) {
