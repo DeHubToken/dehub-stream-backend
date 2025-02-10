@@ -53,7 +53,7 @@ export class UserService {
       accountTemplate,
     ).lean();
     const balanceData = await Balance.find(
-      { address: walletAddress.toLowerCase() },
+      { address: accountInfo?.address?.toLowerCase() },
       { chainId: 1, tokenAddress: 1, walletBalance: 1, staked: 1, _id: 0 },
     );
     if (!balanceData?.length && !accountInfo && !isAddress(walletAddress)) {
@@ -62,7 +62,7 @@ export class UserService {
       walletAddress = accountInfo?.address;
     } else {
       accountInfo = {};
-    }
+    } 
     const unlockedPPVStreams = await PPVTransactionModel.find(
       { address: walletAddress }, // No expiry
       // { address: walletAddress, createdAt: { $gt: new Date(Date.now() - config.availableTimeForPPVStream) } },

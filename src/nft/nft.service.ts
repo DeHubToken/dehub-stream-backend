@@ -221,7 +221,6 @@ export class NftService {
       // if (!user?._id) {
       //   return { result: false, error: 'User not found or invalid' };
       // }
-
       const query = [
         { $match: filter },
 
@@ -348,35 +347,31 @@ export class NftService {
         postType = 'video', // Add address to the destructured query parameters
       }: any = req.query;
       const searchQuery: any = {};
-
       if (!unit) unit = 20;
       if (unit > 100) unit = 100;
       const postFilter = {};
       const contentFilter = {
         video: {
-          $or: [{ postType: { $nin: ['feed-simple', 'feed-images'] } }],
+          $or: [{postType:{ $nin: ['feed-simple','feed-images'] } }],
         },
         'feed-all': {
-          $or: [{ postType: 'feed-simple' }, { postType: 'feed-images' }],
+          $or: [{postType:'feed-simple' },{ postType:'feed-images' }],
         },
         feed: {
-          $or: [{ postType: 'feed-simple' }, { postType: 'feed-images' }],
+          $or: [{postType:'feed-simple' },{ postType:'feed-images' }],
         },
-        'feed-images': { postType: 'feed-images' },
-        'feed-simple': { postType: 'feed-simple' },
+        'feed-images': {postType: 'feed-images' },
+        'feed-simple': {postType: 'feed-simple' },
       };
-
       if (contentFilter[postType]) {
         Object.assign(postFilter, contentFilter[postType]);
       }
-      //       // postFilter['transcodingStatus'] = 'done';  // Uncomment if needed
-      console.log('postFilter', postFilter);
-      console.log('sortMode', { sortMode, postType, searchQuery });
+      // postFilter['transcodingStatus'] = 'done';  // Uncomment if needed
+      console.log('sortMode', { sortMode, postType, searchQuery,postFilter }); 
       let sortRule: any = { createdAt: -1 };
       searchQuery['$match'] = {
         $and: [{ status: 'minted' }, { $or: [{ isHidden: false }, { isHidden: { $exists: false } }] }, postFilter],
-      };
-      console.log('searchQuery', JSON.stringify(searchQuery));
+      }; 
       console.log('Range - sotMode - unit - page - search', range, sortMode, unit, page, search);
       switch (sortMode) {
         case 'live':
@@ -478,14 +473,12 @@ export class NftService {
           searchQuery['$match'][`streamInfo.${streamInfoKeys.isLockContent}`] = true;
           break;
       }
-
       if (!page) page = 0;
       if (minter) searchQuery['$match']['$and'].push({ minter: minter.toLowerCase() });
       if (owner) searchQuery['$match']['$and'].push({ owner: owner.toLowerCase() });
       if (category) {
         searchQuery['$match']['$and'].push({ category: { $elemMatch: { $eq: category } } });
-      }
-
+      } 
       // Remove `$and` if it's empty to avoid unnecessary filtering
       if (searchQuery['$match']['$and'].length === 0) {
         delete searchQuery['$match']['$and'];
@@ -496,34 +489,28 @@ export class NftService {
           idList = idList.map(e => '0x' + e);
           searchQuery['$match'] = { id: { $in: idList } };
         }
-      }
-
+      } 
       if ((verifiedOnly + '').toLowerCase() === 'true' || verifiedOnly === '1') {
         searchQuery['$match'] = { ...searchQuery['$match'], verified: true };
-      }
-
+      } 
       if (search) {
         if (!isValidSearch(search)) return res.json({ result: [] });
         var re: any = new RegExp(search, 'gi');
         let orOptions: any = [{ name: re }, { description: re }, { owner: normalizeAddress(re) }];
         if (Number(search) > 0) orOptions.push({ tokenId: Number(search) });
         searchQuery['$match'] = { ...searchQuery['$match'], $or: orOptions };
-
         // Search through the accounts table
         const accounts = await AccountModel.find({ username: { $regex: new RegExp(search, 'i') } });
         const address = reqParam(req, 'address');
-
         // search throuh livestreams
         const livestreamQuery: any = {
           $or: [{ title: re }, { description: re }],
         };
-
         const livestreams = await this.livestreamModel
           .find(livestreamQuery)
           .sort(sortRule)
           .skip(unit * page)
           .limit(unit);
-
         const videos: any = await this.getStreamNfts(
           searchQuery['$match'],
           unit * page,
@@ -531,7 +518,6 @@ export class NftService {
           sortRule,
           address,
         );
-
         // Include userLike logic
         for (let video of videos) {
           const userLike = await VoteModel.findOne({
@@ -540,7 +526,6 @@ export class NftService {
           });
           video.isLiked = Boolean(userLike);
         }
-
         return res.send({
           result: {
             accounts,
@@ -556,8 +541,7 @@ export class NftService {
         sortRule,
         address,
       );
-      // Include userLike logic
-
+      // Include userLike logic 
       if (ret.length > 0) {
         for (let nft of ret) {
           const userLike = await VoteModel.findOne({ tokenId: nft?.tokenId, address: address?.toLowerCase() });
@@ -909,7 +893,9 @@ export class NftService {
         return res.status(404).json({ error: 'Token not found' });
       }
       // console.log('Token found in database:', token);
-      const isValidAcc = isValidAccount(address, sig, timestamp);
+
+      const isValidAcc = isValidAccount(address, timestamp,sig );
+      console.log("sig Data",{address, sig, timestamp,isValidAcc})
       const isOwner = (token?.owner && address && token?.owner?.toLowerCase() === address?.toLowerCase()) ?? false;
       // console.log('Is owner:', isOwner);
 

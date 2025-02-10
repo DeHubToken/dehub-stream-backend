@@ -25,15 +25,15 @@ export class MediaAuthGuard implements CanActivate {
       // Token is present; verify it
 
       const decodedToken = this.jwtService.verify(token, { secret: this.secretKey });
-      request.params.address = decodedToken.address.toLowerCase();
-      request.params.rawSig = decodedToken.rawSig;
-      request.params.timestamp = decodedToken.timestamp;
+      request.params.address = decodedToken?.address?.toLowerCase()??"";
+      request.params.rawSig = decodedToken?.rawSig??"";
+      request.params.timestamp = decodedToken?.timestamp??"";
       return true;
     }
     const { address, rawSig, timestamp } = this.extractParams(request);
     // Generate a new token
     const generatedToken = this.generateToken(address, rawSig, timestamp);
-    request.params.address = address.toLowerCase();
+    request.params.address = address?.toLowerCase()??"";
     request.params.rawSig = rawSig;
     request.params.timestamp = timestamp;
     request.generatedToken = generatedToken;
@@ -41,47 +41,42 @@ export class MediaAuthGuard implements CanActivate {
   }
   private extractFromCookie = req => {
     const cookieKey = config.isDevMode ? 'data_dev' : 'data_v2';
-    // console.log('cookieKey', cookieKey);
     try {
-      const cookie = req.cookies[cookieKey];
-      // console.log('cookie', cookie);
+      const cookie = req.cookies[cookieKey]; 
       if (cookie) {
-        const parsedCookie = JSON.parse(cookie);
-        // console.log('Parsed cookie:', parsedCookie);
-        // Extract dynamic address
+        const parsedCookie = JSON.parse(cookie); 
         const address = Object.keys(parsedCookie).find(address => {
           return parsedCookie[address].isActive == true;
-        }); // Get the dynamic address key
+        }); 
         const { timestamp, sig } = parsedCookie[address];
         console.log({ address, timestamp, sig });
-        req.params.address = address.toLowerCase();
+        req.params.address = address?.toLowerCase()??"";
         req.params.timestamp = timestamp;
         req.params.rawSig = sig;
         req.params.isActive = sig;
-        return { address: address.toLowerCase(), timestamp, rawSig: sig };
+        return { address: address?.toLowerCase()??"", timestamp, rawSig: sig };
       }
-    } catch (error) {
+    }
+     catch (error) {
       console.error('Error parsing cookie:', error.message);
     }
   };
   private extractTokenFromHeader(request): string | null {
-    const authHeader = request.headers.authorization || '';
-    return authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
-  }
+      const authHeader = request.headers.authorization || '';
+      return authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+    }
 
   private extractParams(request): { address: string; rawSig: string; timestamp: number } {
     const address = request.query.address || request.body.address || request.params.address;
     const rawSig = request.query.sig || request.body.sig || request.params.sig;
-    const timestamp = request.query.timestamp || request.body.timestamp || request.params.timestamp;
-
+    const timestamp = request.query.timestamp || request.body.timestamp || request.params.timestamp; 
     // Check if the address, rawSig, or timestamp is invalid, then try to extract from the cookie
     if (!address || !rawSig || !timestamp) {
       const cookieParams = this.extractFromCookie(request); // Assuming this method returns an object { address, rawSig, timestamp }
       if (cookieParams) {
         return cookieParams; // Return the parameters from cookie
       }
-    }
-
+    } 
     return { address, rawSig, timestamp: Number(timestamp) };
   }
   private generateToken(address: string, rawSig: string, timestamp: number): string | null {
