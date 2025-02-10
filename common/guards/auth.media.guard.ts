@@ -25,15 +25,15 @@ export class MediaAuthGuard implements CanActivate {
       // Token is present; verify it
 
       const decodedToken = this.jwtService.verify(token, { secret: this.secretKey });
-      request.params.address = decodedToken.address.toLowerCase();
-      request.params.rawSig = decodedToken.rawSig;
-      request.params.timestamp = decodedToken.timestamp;
+      request.params.address = decodedToken?.address?.toLowerCase()??"";
+      request.params.rawSig = decodedToken?.rawSig??"";
+      request.params.timestamp = decodedToken?.timestamp??"";
       return true;
     }
     const { address, rawSig, timestamp } = this.extractParams(request);
     // Generate a new token
     const generatedToken = this.generateToken(address, rawSig, timestamp);
-    request.params.address = address.toLowerCase();
+    request.params.address = address?.toLowerCase()??"";
     request.params.rawSig = rawSig;
     request.params.timestamp = timestamp;
     request.generatedToken = generatedToken;
@@ -50,11 +50,11 @@ export class MediaAuthGuard implements CanActivate {
         }); 
         const { timestamp, sig } = parsedCookie[address];
         console.log({ address, timestamp, sig });
-        req.params.address = address.toLowerCase();
+        req.params.address = address?.toLowerCase()??"";
         req.params.timestamp = timestamp;
         req.params.rawSig = sig;
         req.params.isActive = sig;
-        return { address: address.toLowerCase(), timestamp, rawSig: sig };
+        return { address: address?.toLowerCase()??"", timestamp, rawSig: sig };
       }
     }
      catch (error) {
