@@ -121,11 +121,7 @@ export class NftService {
       await TokenModel.findOneAndUpdate({ _id: token._id }, { $set: { imageUrls: filteredUrls } });
       return res;
     }
-    //clg type video
-    console.log('type video');
-
-    const imageUrl = await this.cdnService.uploadFile(files[1].buffer, address, token.tokenId + '.jpg');
-    console.log('adding cron ');
+    const imageUrl = await this.cdnService.uploadFile(files[1].buffer, "images", token.tokenId + '.jpg'); 
     await this.jobService.addUploadAndTranscodeJob(
       files[0].buffer,
       address,
