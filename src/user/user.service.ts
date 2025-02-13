@@ -11,6 +11,7 @@ import { Feature } from 'models/Feature';
 import { Follow } from 'models/Follow';
 import { PPVTransactionModel } from 'models/PPVTransaction';
 import sharp from 'sharp';
+import { ActivityService } from 'src/activity/activity.service';
 import { CdnService } from 'src/cdn/cdn.service';
 
 const accountTemplate = {
@@ -41,6 +42,7 @@ const accountTemplate = {
 
 @Injectable()
 export class UserService {
+  private activityService:ActivityService=new ActivityService()
   constructor(private readonly cdnService:CdnService){}
   
   async getAccountInfo (req:Request, res:Response) {
@@ -165,6 +167,7 @@ async requestFollow  (address, following){
   following = normalizeAddress(following);
   if (address === following) throw new BadRequestException("Can't follow yourself");
   const updatedResult:any = await Follow.updateOne({ address, following }, {}, overrideOptions);
+  this.activityService.onFollowAndUnFollow({ address, following },true);
   if (updatedResult?.nModified > 0) throw new ConflictException("Already following user");
   return { result: updatedResult };
 };
@@ -172,7 +175,11 @@ async requestFollow  (address, following){
 async unFollow (address, following){
   following = normalizeAddress(following);
   const deletedResult = await Follow.deleteOne({ address, following });
-  if (deletedResult?.deletedCount > 0) return { result: true };
+  if (deletedResult?.deletedCount > 0){ 
+    this.activityService.onFollowAndUnFollow({ address, following },false);
+    
+   return { result: true}
+   };
   throw new ConflictException("Not following user");
 };
 

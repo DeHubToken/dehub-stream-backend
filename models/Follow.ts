@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-interface IFollow extends Document {
+export interface IFollow extends Document {
   address: string;
   following: string; // following address
 }

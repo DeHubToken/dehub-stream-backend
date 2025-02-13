@@ -17,9 +17,11 @@ import { UserService } from 'src/user/user.service';
 import { TokenModel } from 'models/Token';
 import Reaction from 'models/Reaction';
 import { CdnService } from 'src/cdn/cdn.service';
+import { ActivityService } from 'src/activity/activity.service';
 
 @Injectable()
 export class ReactionService {
+  private readonly activityService: ActivityService = new ActivityService();
   constructor(
     private readonly cdnService: CdnService,
 
@@ -315,7 +317,8 @@ export class ReactionService {
     const nftStreamItem = await TokenModel.findOne({ tokenId }, {}).lean();
     if (!nftStreamItem) throw new NotFoundException("Stream doesn't exist");
 
-    await VoteModel.create({ address: account, tokenId, vote: vote === 'true' ? true : false });
+    const voted= await VoteModel.create({ address: account, tokenId, vote: vote === 'true' ? true : false });
+    this.activityService.onLikeAndDisLike(voted)
     const updateTokenOption = {};
     updateTokenOption[vote === 'true' ? 'totalVotes.for' : 'totalVotes.against'] = 1;
     await TokenModel.updateOne({ tokenId }, { $inc: updateTokenOption }, overrideOptions);

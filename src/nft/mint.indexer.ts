@@ -2,7 +2,9 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { BigNumberish, ethers } from 'ethers';
 import ContractAbi from 'abis/StreamNft.json';
-import { TokenModel } from 'models/Token';
+import { PostActivityType, TokenDocument, TokenModel } from 'models/Token';
+import { AccountModel } from 'models/Account';
+import { ActivityModel } from 'models/activity';
 
 @Injectable()
 export class NftIndexer implements OnModuleInit {
@@ -28,7 +30,7 @@ export class NftIndexer implements OnModuleInit {
   private async pollTransferEvents() {
     try {
       const currentBlock = await this.provider.getBlockNumber();
-      
+
       // Define the filter for the Transfer events
       const filter = {
         address: process.env.DEFAULT_COLLECTION,
@@ -41,13 +43,13 @@ export class NftIndexer implements OnModuleInit {
       const logs = await this.provider.getLogs(filter);
 
       // Process each log
-      logs.forEach((log) => {
+      logs.forEach(log => {
         const decoded = this.nftContract.interface.parseLog(log);
         this.txEventListener(
           decoded.args[0], // `from` address
           decoded.args[1], // `to` address
           decoded.args[2], // `tokenId`
-          log
+          log,
         );
       });
 

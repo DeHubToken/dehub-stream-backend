@@ -1,13 +1,14 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { Document, Model, ObjectId } from 'mongoose';
 import Counter from './Counter';
+import { ActivityActionType, ActivityModel } from './activity';
 
 // Define the interface for the Subscription document
 export type SubscriptionDocument = Subscription & Document;
 
 @Schema({ timestamps: true }) // Automatically manage createdAt and updatedAt fields
 export class Subscription {
-  @Prop({  unique: true })
+  @Prop({ unique: true })
   id: string; // Unique subscription ID
 
   @Prop({ required: true, type: mongoose.Schema.Types.ObjectId, ref: 'Account' })
@@ -41,12 +42,10 @@ export class Subscription {
     price: number; // Payment amount
     paymentTimestamp: Date; // Payment timestamp
   };
- 
 }
 
 // Create the Subscription schema
 export const SubscriptionSchema = SchemaFactory.createForClass(Subscription);
- 
 
 // Pre-save hook for auto-incrementing the subscription ID
 SubscriptionSchema.pre('save', async function (next) {
@@ -63,6 +62,15 @@ SubscriptionSchema.pre('save', async function (next) {
       next(error);
     }
   } else {
+    // Log activity only if the subscription is active
+    if (this.active === true) {
+      await new ActivityModel({
+        planId: this.planId,
+        userId: this.userId,
+        type: ActivityActionType.PURCHASE_PLAN,
+      }).save();
+    }
+
     next();
   }
 });
@@ -72,7 +80,3 @@ export const SubscriptionModel: Model<SubscriptionDocument> = mongoose.model<Sub
   'Subscription',
   SubscriptionSchema,
 );
-
-
-
- 

@@ -1,28 +1,30 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ethers } from 'ethers';
+import { ActivityActionType, ActivityModel } from 'models/activity';
 import { PlansModel } from 'models/Plans';
 import { SubscriptionModel } from 'models/subscription';
-
-const tokenABI = [  
+import { ActivityService } from 'src/activity/activity.service';
+const tokenABI = [
   {
-    "anonymous": false,
-    "inputs": [
-      { "indexed": true, "internalType": "address", "name": "creator", "type": "address" },
-      { "indexed": false, "internalType": "uint256", "name": "id", "type": "uint256" },
-      { "indexed": false, "internalType": "uint256", "name": "duration", "type": "uint256" }
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: 'address', name: 'creator', type: 'address' },
+      { indexed: false, internalType: 'uint256', name: 'id', type: 'uint256' },
+      { indexed: false, internalType: 'uint256', name: 'duration', type: 'uint256' },
     ],
-    "name": "PlanCreated",
-    "type": "event"
-  }, {
-    "anonymous": false,
-    "inputs": [
-      { "indexed": true, "internalType": "address", "name": "subscriber", "type": "address" },
-      { "indexed": false, "internalType": "uint256", "name": "id", "type": "uint256" },
-      { "indexed": false, "internalType": "uint256", "name": "duration", "type": "uint256" }
+    name: 'PlanCreated',
+    type: 'event',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: 'address', name: 'subscriber', type: 'address' },
+      { indexed: false, internalType: 'uint256', name: 'id', type: 'uint256' },
+      { indexed: false, internalType: 'uint256', name: 'duration', type: 'uint256' },
     ],
-    "name": "SubscriptionBought",
-    "type": "event"
-  }
+    name: 'SubscriptionBought',
+    type: 'event',
+  },
 ];
 const { supportedNetworks, subscriptionCollectionAddress } = require('../../config/constants');
 
@@ -30,7 +32,8 @@ const { supportedNetworks, subscriptionCollectionAddress } = require('../../conf
 export class PlanEventListenerService implements OnModuleInit {
   private readonly logger = new Logger(PlanEventListenerService.name);
   private listeners: { [chainId: number]: ethers.Contract } = {};
-
+  private activityService :ActivityService= new ActivityService();;
+   
   async onModuleInit() {
     this.logger.log('--- Starting event listeners for all supported networks');
     // Set up listeners for each supported network directly without cron jobs.
@@ -139,8 +142,6 @@ export class PlanEventListenerService implements OnModuleInit {
         // Other durations (3 months, 6 months, 1 year, etc.)
         endDate.setMonth(endDate.getMonth() + duration);
       }
-
-      // Update the subscription with the calculated startDate, endDate, and mark it as active
       const updatedSubscription = await SubscriptionModel.findOneAndUpdate(
         { id: id.toString() },
         {
@@ -150,13 +151,15 @@ export class PlanEventListenerService implements OnModuleInit {
             active: true,
           },
         },
-        { new: true }, // Return the updated document
+        { new: true },
       );
 
       if (updatedSubscription) {
         this.logger.log(`Subscription updated with startDate and endDate for id: ${id.toString()}`);
+        this.activityService.onPlanPurchased(updatedSubscription)
       } else {
         this.logger.error(`Failed to update subscription with id: ${id.toString()}`);
+      
       }
     } catch (error) {
       this.logger.error(`Error processing SubscriptionBought event: ${error.message}`);
@@ -190,11 +193,11 @@ export class PlanEventListenerService implements OnModuleInit {
         },
         { new: true }, // Return the updated document
       );
-
       if (!plan) {
         this.logger.warn(`No plan found for id: ${id.toString()} on chainId: ${chainId}`);
       } else {
         this.logger.log(`Plan updated successfully for id: ${id.toString()} on chainId: ${chainId}`);
+        this.activityService.onPlanPublished(plan);
       }
     } catch (error) {
       this.logger.error(`Error processing PlanCreated event: ${error.message}`);
