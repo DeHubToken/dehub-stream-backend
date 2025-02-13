@@ -377,8 +377,8 @@ export class NftService {
         case 'live':
           const liveQuery: any = {
             status: owner
-              ? { $in: [StreamStatus.LIVE, StreamStatus.SCHEDULED, StreamStatus.ENDED] }
-              : { $in: [StreamStatus.LIVE, StreamStatus.SCHEDULED] },
+              ? { $in: [StreamStatus.LIVE, StreamStatus.SCHEDULED, StreamStatus.ENDED, StreamStatus.OFFLINE] }
+              : { $in: [StreamStatus.LIVE, StreamStatus.SCHEDULED, StreamStatus.OFFLINE] },
           };
 
           if (search) {

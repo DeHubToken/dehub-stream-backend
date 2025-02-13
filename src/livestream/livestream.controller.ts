@@ -72,4 +72,16 @@ export class LivestreamController {
   getStreamAtivities(@Param('streamId') streamId: string) {
     return this.livestreamService.getStreamActivities(streamId);
   }
+
+  @UseGuards(AuthGuard)
+  @Post(':streamId/like')
+  likeStream(@Req() req, @Param('streamId') streamId: string) {
+    const address = req.params.address;
+    return this.livestreamService.likeStream(streamId, address);
+  }
+
+  @Post('webhook')
+  handleWebhook(@Body() data: any) {
+    return this.livestreamService.handleWebhook(data);
+  }
 }

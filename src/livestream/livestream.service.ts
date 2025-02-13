@@ -110,6 +110,79 @@ export class LivestreamService {
     return true;
   }
 
+  async handleWebhook(data: any) {
+    const { event, stream } = data;
+
+    const existingStream = await this.livestreamModel.findOne({
+      playbackId: stream.playbackId,
+    });
+
+    if (!existingStream) {
+      console.error(`Stream not found for playbackId: ${stream.playbackId}`);
+      return;
+    }
+
+    switch (event) {
+      case 'stream.started':
+        await this.handleStreamStart(existingStream, stream);
+        break;
+
+      case 'stream.idle':
+        await this.handleStreamIdle(existingStream, stream);
+        break;
+    }
+
+    return true;
+  }
+
+  private async handleStreamStart(existingStream: StreamDocument, webhookStream: any) {
+    const updates = {
+      status: StreamStatus.LIVE,
+      startedAt: new Date(),
+      isActive: true,
+    };
+
+    await this.livestreamModel.findByIdAndUpdate(existingStream._id, updates, { new: true });
+
+    this.chatGateway.server.to(`stream:${existingStream._id}`).emit(LivestreamEvents.StartStream, {
+      streamId: existingStream._id,
+      status: StreamStatus.LIVE,
+      startedAt: updates.startedAt,
+    });
+
+    await this.recordActivity(existingStream._id as string, StreamActivityType.START, {
+      address: existingStream.address,
+    });
+  }
+
+  private async handleStreamIdle(existingStream: StreamDocument, webhookStream: any) {
+    const duration = existingStream.startedAt
+      ? Math.floor((Date.now() - existingStream.startedAt.getTime()) / 1000)
+      : 0;
+
+    const updates = {
+      status: StreamStatus.ENDED,
+      endedAt: new Date(),
+      isActive: false,
+      duration,
+    };
+
+    await this.livepeerService.deleteStream(existingStream.livepeerId);
+
+    this.chatGateway.server.to(`stream:${existingStream._id}`).emit(LivestreamEvents.EndStream, {
+      streamId: existingStream._id,
+      status: StreamStatus.ENDED,
+      endedAt: updates.endedAt,
+      duration,
+    });
+
+    await this.recordActivity(existingStream._id as string, StreamActivityType.END, {
+      address: existingStream.address,
+    });
+
+    await this.livestreamModel.findByIdAndUpdate(existingStream._id, updates, { new: true });
+  }
+
   async endStream(streamId: string, address: string) {
     const stream = await this.livestreamModel.findById(streamId).exec();
 
@@ -161,9 +234,6 @@ export class LivestreamService {
     // Update Redis viewer count
     await this.redis.incr(`stream:${streamId}:viewers`);
 
-    // this.chatGateway.server.emit(LivestreamEvents.JoinStream, { viewer });
-    // this.eventEmitter.emit('stream.joined', { viewer });
-
     return viewer;
   }
 
@@ -180,8 +250,6 @@ export class LivestreamService {
       await this.redis.decr(`stream:${streamId}:viewers`);
 
       await this.recordActivity(streamId, StreamActivityType.LEFT, { address });
-
-      // this.eventEmitter.emit('stream.left', { viewer });
     }
   }
 
@@ -237,6 +305,9 @@ export class LivestreamService {
     if (!stream) {
       throw new NotFoundException('Stream not found');
     }
+    if (stream.status !== StreamStatus.LIVE) {
+      throw new NotFoundException('Stream is not live');
+    }
 
     const likeKey = `likesRecord.${address}`;
 
@@ -261,6 +332,10 @@ export class LivestreamService {
     if (!updatedStream) {
       throw new NotFoundException('Stream not found during update');
     }
+
+    this.chatGateway.server.to(`stream:${streamId}`).emit(LivestreamEvents.LikeStream, {
+      ...updatedStream,
+    });
 
     return updatedStream;
   }
@@ -437,7 +512,7 @@ export class LivestreamService {
   async getLiveStreams(limit = 20, offset = 0) {
     const liveStreamsWithAccounts = await this.livestreamModel.aggregate([
       {
-        $match: { status: { $in: [StreamStatus.LIVE, StreamStatus.SCHEDULED] } },
+        $match: { status: { $in: [StreamStatus.LIVE, StreamStatus.SCHEDULED, StreamStatus.OFFLINE] } },
       },
       {
         $sort: { startedAt: -1 },
