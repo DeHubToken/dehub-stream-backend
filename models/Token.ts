@@ -158,17 +158,17 @@ TokenSchema.index({ category: 1 });
 // Create and export the Token model
 export const TokenModel: Model<TokenDocument> = mongoose.model<TokenDocument>('tokens', TokenSchema);
 
-if (config.isDevMode) {
-  console.log('Running Dev Mode: NFT Mint Auto Enabled only in Dev Mode');
+// if (config.isDevMode) {
+//   console.log('Running Dev Mode: NFT Mint Auto Enabled only in Dev Mode');
 
-  setInterval(async () => {
-    console.log('Auto Minting...');
+//   setInterval(async () => {
+//     console.log('Auto Minting...');
 
-    const res = await TokenModel.findOneAndUpdate(
-      { status: { $ne: 'minted' } }, // Only update if not already minted
-      { $set: { status: 'minted' } },
-    );
+//     const res = await TokenModel.findOneAndUpdate(
+//       { status: { $ne: 'minted' } }, // Only update if not already minted
+//       { $set: { status: 'minted' } },
+//     );
 
-    console.log(`Minting completed. Affected count: `,res?1:0);
-  }, 1000 * 10);
-}
+//     console.log(`Minting completed. Affected count: `,res?1:0);
+//   }, 1000 * 10);
+// }
