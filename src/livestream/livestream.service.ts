@@ -24,6 +24,8 @@ import mongoose from 'mongoose';
 import { LivestreamEvents } from './enums/livestream.enum';
 import { ChatGateway } from './chat.gateway';
 import { LivepeerService } from './livepeer.service';
+import { CategoryModel } from 'models/Category';
+import { processCategories, removeDuplicatedElementsFromArray } from 'common/util/validation';
 
 @Injectable()
 export class LivestreamService {
@@ -73,37 +75,65 @@ export class LivestreamService {
   }
 
   async createStream(address: string, data: Partial<LiveStream>, thumbnail?: Express.Multer.File) {
-    const livepeerResponse = await this.livepeerService.createStream(data.title);
+    try {
+      const livepeerResponse = await this.livepeerService.createStream(data.title);
+      let categories = data.categories || [];
 
-    const stream = new this.livestreamModel({
-      title: data.title,
-      description: data.description,
-      address,
-      streamKey: livepeerResponse.streamKey,
-      livepeerId: livepeerResponse.id,
-      playbackId: livepeerResponse.playbackId,
-      status: StreamStatus.OFFLINE,
-      isActive: false,
-      categories: data.categories || [],
-      meta: livepeerResponse, // Store full Livepeer response in meta
-    });
+      if (categories.length > 0) {
+        categories = removeDuplicatedElementsFromArray(JSON.parse(categories as unknown as string)) || [];
 
-    // Step 3: Handle thumbnail upload
-    if (thumbnail) {
-      const fileExt = extname(thumbnail.originalname) || '.jpg';
-      const fileName = `${stream._id}${fileExt}`;
-      const uploadedThumbnail = await this.cdnService.uploadFile(thumbnail.buffer, 'live', `thumbnails/${fileName}`);
+        const existingCategories = await CategoryModel.find({
+          name: { $in: categories },
+        }).distinct('name');
 
-      stream.thumbnail = uploadedThumbnail;
+        const newCategories = categories.filter(category => !existingCategories.includes(category));
+
+        if (newCategories.length > 0) {
+          await CategoryModel.insertMany(newCategories.map(name => ({ name })));
+        }
+      }
+
+      const stream = new this.livestreamModel({
+        title: data.title,
+        description: data.description,
+        address,
+        streamKey: livepeerResponse.streamKey,
+        livepeerId: livepeerResponse.id,
+        playbackId: livepeerResponse.playbackId,
+        status: StreamStatus.OFFLINE,
+        isActive: false,
+        categories,
+        meta: livepeerResponse, // Store full Livepeer response in meta
+        settings: {
+          quality: '1080p',
+          chat: {
+            enabled: true,
+            followersOnly: false,
+            slowMode: 0,
+          },
+        },
+      });
+
+      // Step 3: Handle thumbnail upload
+      if (thumbnail) {
+        const fileExt = extname(thumbnail.originalname) || '.jpg';
+        const fileName = `${stream._id}${fileExt}`;
+        const uploadedThumbnail = await this.cdnService.uploadFile(thumbnail.buffer, 'live', `thumbnails/${fileName}`);
+
+        stream.thumbnail = uploadedThumbnail;
+      }
+
+      if (data.status === StreamStatus.SCHEDULED) {
+        stream.status = StreamStatus.SCHEDULED;
+        stream.scheduledFor = data.scheduledFor || new Date();
+      }
+
+      await stream.save();
+      return stream;
+    } catch (error) {
+      console.error('Error creating stream:', error);
+      throw new Error('Failed to create stream');
     }
-
-    if (data.status === StreamStatus.SCHEDULED) {
-      stream.status = StreamStatus.SCHEDULED;
-      stream.scheduledFor = data.scheduledFor || new Date();
-    }
-
-    await stream.save();
-    return stream;
   }
 
   async startStream(address: string, data?: Partial<LiveStream>, streamId?: string, thumbnail?: Express.Multer.File) {
