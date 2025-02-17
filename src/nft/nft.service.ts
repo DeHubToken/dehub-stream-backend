@@ -213,13 +213,14 @@ export class NftService {
     return { res, token: tokenItem };
   }
 
-  async getStreamNfts(filter: any, skip: number, limit: number, sortOption = null, subscriber) {
+  async getStreamNfts(filter: any, skip: number, limit: number, sortOption = null, subscriber, pipeline = []) {
     try {
       const user: any = await AccountModel.findOne({ address: subscriber?.toLowerCase() });
       // if (!user?._id) {
       //   return { result: false, error: 'User not found or invalid' };
       // }
       const query = [
+        ...pipeline,
         { $match: filter },
 
         // Join plans collection
@@ -310,6 +311,7 @@ export class NftService {
             minterAvatarUrl: { $first: '$account.avatarImageUrl' },
             minterAboutMe: { $first: '$account.aboutMe' },
             minterStaked: { $first: '$balance.staked' },
+            reportCount: 1,
           },
         },
 
@@ -532,12 +534,37 @@ export class NftService {
           },
         });
       }
+
+      const pipeline =
+        sortMode === 'reports'
+          ? [
+            {
+              $lookup: {
+                from: 'feed_reports',
+                localField: 'tokenId',
+                foreignField: 'tokenId',
+                as: 'reports',
+              },
+            },
+            {
+              $match: {
+                'reports.0': { $exists: true },
+              },
+            },
+            {
+              $addFields: {
+                reportCount: { $size: "$reports" }, // Count the reports
+              },
+            },
+            ]
+          : [];
       const ret: any = await this.getStreamNfts(
         searchQuery['$match'],
         unit * page,
         unit * page + unit * 1,
         sortRule,
         address,
+        pipeline,
       );
       // Include userLike logic
       if (ret.length > 0) {
