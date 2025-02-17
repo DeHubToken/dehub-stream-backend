@@ -1,6 +1,21 @@
 import mongoose, { Document, Model } from 'mongoose';
 import { IDCounterModel } from './IDCounter'; // Adjust the path as needed
 import { NFT_NAME_PREFIX } from 'config/constants'; // Adjust the path as needed
+import { AccountModel } from './Account';
+import { ActivityActionType, ActivityModel } from './activity';
+import { config } from 'config';
+
+export const postType = {
+  video: 'video',
+  feedImages: 'feed-images',
+  feedSimple: 'feed-simple',
+};
+
+export const PostActivityType = {
+  [postType.feedImages]: ActivityActionType.UPLOAD_FEED_IMAGES,
+  [postType.video]: ActivityActionType.UPLOAD_VIDEO,
+  [postType.feedSimple]: ActivityActionType.UPLOAD_FEED_SIMPLE,
+};
 
 // Define the interface for the Token document
 export interface TokenDocument extends Document {
@@ -94,7 +109,7 @@ const TokenSchema = new mongoose.Schema<TokenDocument>(
       enum: ['video', 'feed-images', 'feed-simple'],
     },
     plans: {
-      type: [String],//hare is this Plans table plans.id  as array
+      type: [String], //hare is this Plans table plans.id  as array
       default: [],
     },
   },
@@ -142,3 +157,18 @@ TokenSchema.index({ category: 1 });
 
 // Create and export the Token model
 export const TokenModel: Model<TokenDocument> = mongoose.model<TokenDocument>('tokens', TokenSchema);
+
+// if (config.isDevMode) {
+//   console.log('Running Dev Mode: NFT Mint Auto Enabled only in Dev Mode');
+
+//   setInterval(async () => {
+//     console.log('Auto Minting...');
+
+//     const res = await TokenModel.findOneAndUpdate(
+//       { status: { $ne: 'minted' } }, // Only update if not already minted
+//       { $set: { status: 'minted' } },
+//     );
+
+//     console.log(`Minting completed. Affected count: `,res?1:0);
+//   }, 1000 * 10);
+// }

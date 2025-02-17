@@ -23,6 +23,8 @@ import { DmModule } from './dm/dm.module';
 import { LivestreamModule } from './livestream/livestream.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { config } from 'config';
+import { ActivityModule } from './activity/activity.module';
+import { FeedReportModule } from './feed-report/feed-report.module';
 
 @Module({
   imports: [
@@ -36,7 +38,7 @@ import { config } from 'config';
     EventEmitterModule.forRoot(),
     MongooseModule.forRoot(`mongodb://${config.mongo.host}:${config.mongo.port}/${config.mongo.dbName}`),
     UserModule, 
-    NftModule, NotificationModule, CdnModule, AuthModule, PlansModule,DmModule, ReactionModule, CategoryModule, LeaderboardModule, AssetModule, JobModule, ScheduleModule.forRoot(), LivestreamModule],
+    NftModule, NotificationModule, CdnModule, AuthModule,ActivityModule,FeedReportModule, PlansModule,DmModule, ReactionModule, CategoryModule, LeaderboardModule, AssetModule, JobModule, ScheduleModule.forRoot(), LivestreamModule],
   controllers: [AppController],
   providers: [AppService, StreamCronService,PlanEventListenerService],
 })

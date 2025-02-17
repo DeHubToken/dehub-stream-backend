@@ -17,9 +17,11 @@ import { UserService } from 'src/user/user.service';
 import { TokenModel } from 'models/Token';
 import Reaction from 'models/Reaction';
 import { CdnService } from 'src/cdn/cdn.service';
+import { ActivityService } from 'src/activity/activity.service';
 
 @Injectable()
 export class ReactionService {
+  private readonly activityService: ActivityService = new ActivityService();
   constructor(
     private readonly cdnService: CdnService,
 
@@ -89,6 +91,7 @@ export class ReactionService {
       commentId = commentId ? parseInt(commentId, 10) : undefined;
       const owner = await TokenModel.findOne({ tokenId: streamTokenId }, {}).lean();
       const result = await this.requestCommentFunc(address, streamTokenId, content, commentId, imageUrl);
+ 
       // notify owner
       if (owner.owner) {
         await this.notificationService.createNotificationfunc(normalizeAddress(owner?.owner), 'comment', {
@@ -279,8 +282,7 @@ export class ReactionService {
     if (commentId) {
       // reply
       const commentItem = await CommentModel.findOne({ id: commentId }, { tokenId: 1 }).lean();
-      if (commentItem?.tokenId != tokenId) return { result: false, error: 'invalid comment' };
-      console.log('imageUrl', imageUrl);
+      if (commentItem?.tokenId != tokenId) return { result: false, error: 'invalid comment' }; 
       const createdComment = await CommentModel.create({
         tokenId,
         address: account,
@@ -288,9 +290,11 @@ export class ReactionService {
         parentId: commentId,
         imageUrl,
       });
+      this.activityService.onComment(createdComment,true)
       await CommentModel.updateOne({ id: commentId }, { $push: { replyIds: createdComment.id } });
     } else {
-      await CommentModel.create({ tokenId, address: account, content, imageUrl });
+    const createdComment=  await CommentModel.create({ tokenId, address: account, content, imageUrl });
+      this.activityService.onComment(createdComment,false) 
     }
     // claim on chain
     // await payBounty(account, tokenId, RewardType.BountyForCommentor);
@@ -315,7 +319,8 @@ export class ReactionService {
     const nftStreamItem = await TokenModel.findOne({ tokenId }, {}).lean();
     if (!nftStreamItem) throw new NotFoundException("Stream doesn't exist");
 
-    await VoteModel.create({ address: account, tokenId, vote: vote === 'true' ? true : false });
+    const voted= await VoteModel.create({ address: account, tokenId, vote: vote === 'true' ? true : false });
+    this.activityService.onLikeAndDisLike(voted)
     const updateTokenOption = {};
     updateTokenOption[vote === 'true' ? 'totalVotes.for' : 'totalVotes.against'] = 1;
     await TokenModel.updateOne({ tokenId }, { $inc: updateTokenOption }, overrideOptions);
