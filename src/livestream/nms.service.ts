@@ -1,3 +1,4 @@
+// depreciated
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import NodeMediaServer from 'node-media-server';
 import { CdnService } from 'src/cdn/cdn.service';

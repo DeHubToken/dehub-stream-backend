@@ -1,3 +1,4 @@
+// TODO: Make this work with mux
 import { WebSocketGateway, WebSocketServer, SubscribeMessage, MessageBody, ConnectedSocket } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 // import { ChatService } from './chat.service';
@@ -57,17 +58,12 @@ export class ChatGateway {
     }
 
     // Handle streamer disconnect
-    const activeStream = await this.livestreamService.getActiveStreamByUser(user.address);
-    if (activeStream) {
-      console.log(`User ${user.address} was livestreaming. Checking for reconnection...`);
+    // const activeStream = await this.livestreamService.getActiveStreamByUser(user.address);
+    // if (activeStream) {
+    //   console.log(`User ${user.address} was livestreaming. Checking for reconnection...`);
 
-      // setTimeout(async () => {
-      // if (!this.isUserStillConnected(user.id)) {
-      //   console.log(`User ${user.address} did not reconnect. Ending livestream.`);
-      await this.handleEndStream(client, { streamId: activeStream.id });
-      // }
-      // }, 5000);
-    }
+    //   await this.handleEndStream(client, { streamId: activeStream.id });
+    // }
 
     // Handle viewers leaving streams
     const activeViewStreams = await this.livestreamService.getStreamsByViewer(user.address);
@@ -76,53 +72,53 @@ export class ChatGateway {
     }
   }
 
-  @UseGuards(WsAuthGuard)
-  @SubscribeMessage(LivestreamEvents.StreamData)
-  async handleStreamData(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: { streamId: string; chunk: ArrayBuffer },
-  ) {
-    const { streamId, chunk } = data;
-    const user = client.data.user;
-    try {
-      if (!chunk) {
-        throw new Error('No chunk data provided.');
-      }
-      const stream = await this.livestreamService.getStream(streamId);
-      if (!stream) {
-        throw new Error('Stream not found.');
-      }
+  // @UseGuards(WsAuthGuard)
+  // @SubscribeMessage(LivestreamEvents.StreamData)
+  // async handleStreamData(
+  //   @ConnectedSocket() client: Socket,
+  //   @MessageBody() data: { streamId: string; chunk: ArrayBuffer },
+  // ) {
+  //   const { streamId, chunk } = data;
+  //   const user = client.data.user;
+  //   try {
+  //     if (!chunk) {
+  //       throw new Error('No chunk data provided.');
+  //     }
+  //     const stream = await this.livestreamService.getStream(streamId);
+  //     if (!stream) {
+  //       throw new Error('Stream not found.');
+  //     }
 
-      if (stream.status !== StreamStatus.LIVE && stream.status !== StreamStatus.ENDED) {
-        throw new Error('Stream is not live.');
-      }
+  //     if (stream.status !== StreamStatus.LIVE && stream.status !== StreamStatus.ENDED) {
+  //       throw new Error('Stream is not live.');
+  //     }
 
-      if (stream.address.toString() !== user.address) {
-        throw new Error('You are not the owner of this stream.');
-      }
+  //     if (stream.address.toString() !== user.address) {
+  //       throw new Error('You are not the owner of this stream.');
+  //     }
 
-      const buffer = Buffer.from(chunk);
-      await this.hlsService.handleStreamChunk(streamId, buffer);
-    } catch (error) {
-      console.error('Stream processing error:', error);
-      this.server.to(`stream:${streamId}`).emit(LivestreamEvents.StreamError, {
-        message: 'Failed to process stream data',
-        error: error.message,
-      });
-    }
-  }
+  //     const buffer = Buffer.from(chunk);
+  //     await this.hlsService.handleStreamChunk(streamId, buffer);
+  //   } catch (error) {
+  //     console.error('Stream processing error:', error);
+  //     this.server.to(`stream:${streamId}`).emit(LivestreamEvents.StreamError, {
+  //       message: 'Failed to process stream data',
+  //       error: error.message,
+  //     });
+  //   }
+  // }
 
-  @UseGuards(WsAuthGuard)
-  @SubscribeMessage(LivestreamEvents.StartStream)
-  async handleStartStream(@ConnectedSocket() client: Socket, @MessageBody() data: { streamId: string }) {
-    console.log('Starting stream with websocket');
-    await client.join(`stream:${data.streamId}`);
-    await this.livestreamService.startStream(client.data.user.address, { status: StreamStatus.LIVE }, data.streamId);
-    // await this.hlsService.cleanupStream(data.streamId);
-    // this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.StartStream, {
-    //   streamId: data.streamId,
-    // });
-  }
+  // @UseGuards(WsAuthGuard)
+  // @SubscribeMessage(LivestreamEvents.StartStream)
+  // async handleStartStream(@ConnectedSocket() client: Socket, @MessageBody() data: { streamId: string }) {
+  //   console.log('Starting stream with websocket');
+  //   await client.join(`stream:${data.streamId}`);
+  //   await this.livestreamService.startStream(client.data.user.address, { status: StreamStatus.LIVE }, data.streamId);
+  //   // await this.hlsService.cleanupStream(data.streamId);
+  //   // this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.StartStream, {
+  //   //   streamId: data.streamId,
+  //   // });
+  // }
 
   @UseGuards(WsAuthGuard)
   @SubscribeMessage(LivestreamEvents.EndStream)
@@ -139,18 +135,16 @@ export class ChatGateway {
   @UseGuards(WsAuthGuard)
   @SubscribeMessage(LivestreamEvents.JoinRoom)
   async handleJoinRoom(@ConnectedSocket() client: Socket, @MessageBody() data: { streamId: string }) {
-    this.server.socketsJoin(`stream:${data.streamId}`);
+    await client.join(`stream:${data.streamId}`);
   }
 
   @UseGuards(WsAuthGuard)
   @SubscribeMessage(LivestreamEvents.JoinStream)
   async handleJoinStream(@ConnectedSocket() client: Socket, @MessageBody() data: { streamId: string }) {
-    console.log('Joining');
+    console.log(' Joining strean');
     const user = client.data.user;
     await client.join(`stream:${data.streamId}`);
     await this.livestreamService.addViewer(data.streamId, user.address);
-
-    this.server.socketsJoin(`stream:${data.streamId}`);
 
     this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.JoinStream, {
       viewerCount: await this.livestreamService.getViewerCount(data.streamId),
@@ -171,7 +165,7 @@ export class ChatGateway {
 
     this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.LeaveStream, {
       viewerCount: await this.livestreamService.getViewerCount(data.streamId),
-      address: user.address,
+      user: { address: user.address, username: user.username || user.address },
     });
 
     // Emit viewer count update
@@ -195,19 +189,19 @@ export class ChatGateway {
     });
   }
 
-  @UseGuards(WsAuthGuard)
-  @SubscribeMessage(LivestreamEvents.LikeStream)
-  async handleLikeStream(@ConnectedSocket() client: Socket, @MessageBody() data: { streamId: string }) {
-    const user = client.data.user;
-    const like = await this.livestreamService.likeStream(data.streamId, user.address);
-    await this.chatService.likeStream(data.streamId, user.address);
+  // @UseGuards(WsAuthGuard)
+  // @SubscribeMessage(LivestreamEvents.LikeStream)
+  // async handleLikeStream(@ConnectedSocket() client: Socket, @MessageBody() data: { streamId: string }) {
+  //   const user = client.data.user;
+  //   const like = await this.livestreamService.likeStream(data.streamId, user.address);
+  //   await this.chatService.likeStream(data.streamId, user.address);
 
-    this.server.emit(LivestreamEvents.LikeStream, { streamId: data.streamId });
-    // this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.LikeStream, {
-    //   ...like,
-    //   user: { address: user.address, username: user.username || user.address },
-    // });
-  }
+  //   this.server.emit(LivestreamEvents.LikeStream, { streamId: data.streamId });
+  //   // this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.LikeStream, {
+  //   //   ...like,
+  //   //   user: { address: user.address, username: user.username || user.address },
+  //   // });
+  // }
 
   private async restoreUserSession(client: Socket, user: any) {
     const activeStream = await this.livestreamService.getActiveStreamByUser(user.address);

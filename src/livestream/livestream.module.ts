@@ -11,6 +11,8 @@ import { CdnModule } from 'src/cdn/cdn.module';
 import { HlsService } from './hls.service';
 import { NmsStreamingService } from './nms.service';
 import { ChatGateway } from './chat.gateway';
+import { MuxService } from './mux.service';
+import { LivepeerService } from './livepeer.service';
 
 @Module({
   imports: [
@@ -23,8 +25,8 @@ import { ChatGateway } from './chat.gateway';
     RedisModule.forRoot({ url:'localhost:6379', type: 'single'})
   ],
   controllers: [LivestreamController],
-  providers: [LivestreamService, StreamChatService, HlsService, ChatGateway
-    // , NmsStreamingService
+  providers: [LivestreamService, StreamChatService, HlsService, ChatGateway, LivepeerService
+    // , NmsStreamingService, MuxService
   ],
   exports: [LivestreamService, StreamChatService, ChatGateway]
 })

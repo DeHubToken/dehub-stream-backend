@@ -146,8 +146,17 @@ const isValidSearch = (searchStr: string): boolean => {
 };
 
 const removeDuplicatedElementsFromArray = <T>(arr: T[]): T[] | undefined => {
+  console.log(arr)
   if (arr?.length > 0) return arr?.filter((item, index) => arr?.indexOf(item) === index);
   return undefined;
+};
+
+export const processCategories = (categories: string[]): string[] => {
+  if (!Array.isArray(categories)) return [];
+  
+  return [...new Set(categories)]
+    .map(category => category.trim())
+    .filter(category => category.length > 0);
 };
 
 const isUserCanAddNewCategory = async (address: string): Promise<boolean> => {
