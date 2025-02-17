@@ -250,6 +250,15 @@ export class LivestreamService {
       joinedAt: new Date(),
     });
 
+    await this.livestreamModel.findByIdAndUpdate(streamId, {
+      $push: {
+        viewers: {
+          $each: [viewer._id],
+          $position: 0,
+        },
+      },
+    });
+
     await this.recordActivity(streamId, StreamActivityType.JOINED, { address });
 
     stream.totalViews += 1;
@@ -364,7 +373,7 @@ export class LivestreamService {
     }
 
     this.chatGateway.server.to(`stream:${streamId}`).emit(LivestreamEvents.LikeStream, {
-      ...updatedStream,
+      likes: updatedStream.toObject().likes,
     });
 
     return updatedStream;
@@ -401,12 +410,20 @@ export class LivestreamService {
           description: 1,
           thumbnail: 1,
           streamUrl: 1,
+          livepeerId: 1,
+          // streamKey: 1,
+          playbackId: 1,
           status: 1,
           startedAt: 1,
           endedAt: 1,
           scheduledFor: 1,
           categories: 1,
           address: 1,
+          likes: 1,
+          peakViewers: 1,
+          totalViews: 1,
+          activities: 1,
+          viewers: 1,
           account: {
             username: 1,
             displayName: 1,
@@ -491,7 +508,7 @@ export class LivestreamService {
           thumbnail: 1,
           streamUrl: 1,
           livepeerId: 1,
-          streamKey: 1,
+          // streamKey: 1,
           playbackId: 1,
           status: 1,
           startedAt: 1,
@@ -580,6 +597,8 @@ export class LivestreamService {
           scheduledFor: 1,
           categories: 1,
           address: 1,
+          likes: 1,
+          peakViewers: 1,
           account: {
             username: 1,
             displayName: 1,

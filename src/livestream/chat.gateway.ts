@@ -141,7 +141,7 @@ export class ChatGateway {
   @UseGuards(WsAuthGuard)
   @SubscribeMessage(LivestreamEvents.JoinStream)
   async handleJoinStream(@ConnectedSocket() client: Socket, @MessageBody() data: { streamId: string }) {
-    console.log('Joining');
+    console.log(' Joining strean');
     const user = client.data.user;
     await client.join(`stream:${data.streamId}`);
     await this.livestreamService.addViewer(data.streamId, user.address);
@@ -165,7 +165,7 @@ export class ChatGateway {
 
     this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.LeaveStream, {
       viewerCount: await this.livestreamService.getViewerCount(data.streamId),
-      address: user.address,
+      user: { address: user.address, username: user.username || user.address },
     });
 
     // Emit viewer count update
