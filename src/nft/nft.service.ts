@@ -38,12 +38,14 @@ import { StreamActivityType, StreamStatus } from 'config/constants';
 import { InjectModel } from '@nestjs/mongoose';
 import { LiveStream, StreamDocument } from 'models/LiveStream';
 import { Model } from 'mongoose';
+import { ActivityService } from 'src/activity/activity.service';
 
 const signer = new ethers.Wallet(process.env.SIGNER_KEY || '');
 
 @Injectable()
 export class NftService {
   private redisClient: Redis;
+  private activityService: ActivityService = new ActivityService();
   constructor(
     private readonly cdnService: CdnService,
     private readonly jobService: JobService,
@@ -102,7 +104,7 @@ export class NftService {
       postType,
       plans,
     );
-
+    this.activityService.onMint(token);
     if (postType == 'feed-simple') {
       return res;
     }
@@ -121,11 +123,7 @@ export class NftService {
       await TokenModel.findOneAndUpdate({ _id: token._id }, { $set: { imageUrls: filteredUrls } });
       return res;
     }
-    //clg type video
-    console.log('type video');
-
-    const imageUrl = await this.cdnService.uploadFile(files[1].buffer, address, token.tokenId + '.jpg');
-    console.log('adding cron ');
+    const imageUrl = await this.cdnService.uploadFile(files[1].buffer, 'images', token.tokenId + '.jpg');
     await this.jobService.addUploadAndTranscodeJob(
       files[0].buffer,
       address,
@@ -215,13 +213,14 @@ export class NftService {
     return { res, token: tokenItem };
   }
 
-  async getStreamNfts(filter: any, skip: number, limit: number, sortOption = null, subscriber) {
+  async getStreamNfts(filter: any, skip: number, limit: number, sortOption = null, subscriber, pipeline = []) {
     try {
       const user: any = await AccountModel.findOne({ address: subscriber?.toLowerCase() });
       // if (!user?._id) {
       //   return { result: false, error: 'User not found or invalid' };
       // }
       const query = [
+        ...pipeline,
         { $match: filter },
 
         // Join plans collection
@@ -312,6 +311,7 @@ export class NftService {
             minterAvatarUrl: { $first: '$account.avatarImageUrl' },
             minterAboutMe: { $first: '$account.aboutMe' },
             minterStaked: { $first: '$balance.staked' },
+            reportCount: 1,
           },
         },
 
@@ -352,26 +352,26 @@ export class NftService {
       const postFilter = {};
       const contentFilter = {
         video: {
-          $or: [{postType:{ $nin: ['feed-simple','feed-images'] } }],
+          $or: [{ postType: { $nin: ['feed-simple', 'feed-images'] } }],
         },
         'feed-all': {
-          $or: [{postType:'feed-simple' },{ postType:'feed-images' }],
+          $or: [{ postType: 'feed-simple' }, { postType: 'feed-images' }],
         },
         feed: {
-          $or: [{postType:'feed-simple' },{ postType:'feed-images' }],
+          $or: [{ postType: 'feed-simple' }, { postType: 'feed-images' }],
         },
-        'feed-images': {postType: 'feed-images' },
-        'feed-simple': {postType: 'feed-simple' },
+        'feed-images': { postType: 'feed-images' },
+        'feed-simple': { postType: 'feed-simple' },
       };
       if (contentFilter[postType]) {
         Object.assign(postFilter, contentFilter[postType]);
       }
       // postFilter['transcodingStatus'] = 'done';  // Uncomment if needed
-      console.log('sortMode', { sortMode, postType, searchQuery,postFilter }); 
+      console.log('sortMode', { sortMode, postType, searchQuery, postFilter });
       let sortRule: any = { createdAt: -1 };
       searchQuery['$match'] = {
         $and: [{ status: 'minted' }, { $or: [{ isHidden: false }, { isHidden: { $exists: false } }] }, postFilter],
-      }; 
+      };
       console.log('Range - sotMode - unit - page - search', range, sortMode, unit, page, search);
       switch (sortMode) {
         case 'live':
@@ -478,7 +478,7 @@ export class NftService {
       if (owner) searchQuery['$match']['$and'].push({ owner: owner.toLowerCase() });
       if (category) {
         searchQuery['$match']['$and'].push({ category: { $elemMatch: { $eq: category } } });
-      } 
+      }
       // Remove `$and` if it's empty to avoid unnecessary filtering
       if (searchQuery['$match']['$and'].length === 0) {
         delete searchQuery['$match']['$and'];
@@ -489,10 +489,10 @@ export class NftService {
           idList = idList.map(e => '0x' + e);
           searchQuery['$match'] = { id: { $in: idList } };
         }
-      } 
+      }
       if ((verifiedOnly + '').toLowerCase() === 'true' || verifiedOnly === '1') {
         searchQuery['$match'] = { ...searchQuery['$match'], verified: true };
-      } 
+      }
       if (search) {
         if (!isValidSearch(search)) return res.json({ result: [] });
         var re: any = new RegExp(search, 'gi');
@@ -534,14 +534,39 @@ export class NftService {
           },
         });
       }
+
+      const pipeline =
+        sortMode === 'reports'
+          ? [
+            {
+              $lookup: {
+                from: 'feed_reports',
+                localField: 'tokenId',
+                foreignField: 'tokenId',
+                as: 'reports',
+              },
+            },
+            {
+              $match: {
+                'reports.0': { $exists: true },
+              },
+            },
+            {
+              $addFields: {
+                reportCount: { $size: "$reports" }, // Count the reports
+              },
+            },
+            ]
+          : [];
       const ret: any = await this.getStreamNfts(
         searchQuery['$match'],
         unit * page,
         unit * page + unit * 1,
         sortRule,
         address,
+        pipeline,
       );
-      // Include userLike logic 
+      // Include userLike logic
       if (ret.length > 0) {
         for (let nft of ret) {
           const userLike = await VoteModel.findOne({ tokenId: nft?.tokenId, address: address?.toLowerCase() });
@@ -894,8 +919,8 @@ export class NftService {
       }
       // console.log('Token found in database:', token);
 
-      const isValidAcc = isValidAccount(address, timestamp,sig );
-      console.log("sig Data",{address, sig, timestamp,isValidAcc})
+      const isValidAcc = isValidAccount(address, timestamp, sig);
+      console.log('sig Data', { address, sig, timestamp, isValidAcc });
       const isOwner = (token?.owner && address && token?.owner?.toLowerCase() === address?.toLowerCase()) ?? false;
       // console.log('Is owner:', isOwner);
 
