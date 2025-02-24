@@ -27,7 +27,6 @@ export class LiveStream {
   @Prop({ unique: true })
   livepeerId: string;
 
-  // @Prop({ required: true })
   @Prop()
   playbackId: string;
 
@@ -49,9 +48,6 @@ export class LiveStream {
   @Prop([String])
   categories?: string[];
 
-  //   @Prop([String])
-  //   tags?: string[];
-
   @Prop({ type: mongoose.Schema.Types.Mixed })
   settings?: Record<string, any>;
 
@@ -70,20 +66,14 @@ export class LiveStream {
   @Prop({ type: mongoose.Schema.Types.Mixed, default: {} })
   likesRecord: Record<string, boolean>;
 
-  // @Prop({ default: 0 })
-  // totalTips: number;
+  @Prop({ default: 0 })
+  totalTips: number;
 
   @Prop({ default: 0 })
   duration: number;
 
   @Prop({ type: String, required: true })
   address: string;
-
-  //   @Prop({ type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Comment' }] })
-  //   comments: Comment[];
-
-  //   @Prop({ type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Reaction' }] })
-  //   reactions: Reaction[];
 
   @Prop({ type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'StreamActivity' }] })
   activities: StreamActivity[];

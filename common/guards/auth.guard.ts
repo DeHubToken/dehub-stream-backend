@@ -11,7 +11,7 @@ export class AuthGuard implements CanActivate {
 
   constructor() {
     this.jwtService = new JwtService({ secret: process.env.JWT_SECRET_KEY || 'your_secret_key' })
-    this.expireSecond = process.env.NODE_ENV === 'development' ? 60 * 60 * 2 : 60 * 60 * 24; // 2 hours in dev, 24 hours in prod
+    this.expireSecond = process.env.NODE_ENV === 'development' ? 60 * 60 * 24 : 60 * 60 * 24; // 2 hours in dev, 24 hours in prod
     this.secretKey = process.env.JWT_SECRET_KEY || 'your_secret_key';
     console.info(
       `🔹 Signature expires in ${this.expireSecond / 3600} hr | Environment: ${process.env.NODE_ENV}`
