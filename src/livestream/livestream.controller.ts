@@ -80,6 +80,28 @@ export class LivestreamController {
     return this.livestreamService.likeStream(streamId, address);
   }
 
+  @UseGuards(AuthGuard)
+  @Post(':streamId/gift')
+  async giftStream(
+    @Req() req,
+    @Param('streamId') streamId: string,
+    @Body()
+    giftData: {
+      transactionHash: string;
+      tokenId: string;
+      amount: number;
+      recipient: string;
+      tokenAddress: string;
+      delay: number;
+      message?: string;
+      selectedTier?: string;
+      timestamp: number;
+    },
+  ) {
+    const address = req.params.address;
+    return this.livestreamService.handleGift(streamId, address, giftData);
+  }
+
   @Post('webhook')
   handleWebhook(@Body() data: any) {
     return this.livestreamService.handleWebhook(data);

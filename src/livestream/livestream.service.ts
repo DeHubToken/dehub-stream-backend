@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   forwardRef,
   Inject,
   Injectable,
@@ -93,6 +94,7 @@ export class LivestreamService {
         }
       }
 
+      console.log('settings', data.settings, data.settings?.['minTip'], Number(data.settings?.['minTip']));
       const stream = new this.livestreamModel({
         title: data.title,
         description: data.description,
@@ -105,12 +107,13 @@ export class LivestreamService {
         categories,
         meta: livepeerResponse, // Store full Livepeer response in meta
         settings: {
-          quality: '1080p',
+          // quality: '1080p',
           chat: {
-            enabled: true,
+            enabled: data.settings?.['enableChat'] || true,
             followersOnly: false,
             slowMode: 0,
           },
+          minTip: Number(data.settings?.['minTip']) || 500,
         },
       });
 
@@ -379,61 +382,72 @@ export class LivestreamService {
     return updatedStream;
   }
 
+  async handleGift(
+    streamId: string,
+    senderAddress: string,
+    giftData: {
+      transactionHash: string;
+      tokenId: string;
+      amount: number;
+      recipient: string;
+      tokenAddress: string;
+      delay: number;
+      message?: string;
+      selectedTier?: string;
+      timestamp: number;
+    },
+  ) {
+    const stream = await this.livestreamModel.findById(streamId);
+    if (!stream) throw new NotFoundException('Stream not found');
+    if (stream.status !== StreamStatus.LIVE) {
+      throw new BadRequestException('Stream is not live');
+    }
+
+    // if (senderAddress.toLowerCase() !== giftData.sender.toLowerCase()) {
+    //   throw new ForbiddenException('Sender address mismatch');
+    // }
+
+    // Update stream total tips
+    const updates = {
+      $inc: { totalTips: giftData.amount },
+    };
+
+    const activityMeta = {
+      address: senderAddress,
+      transactionHash: giftData.transactionHash,
+      amount: giftData.amount,
+      tokenAddress: giftData.tokenAddress,
+      message: giftData.message,
+      selectedTier: giftData.selectedTier,
+      delay: giftData.delay,
+    };
+
+    const activity = await this.recordActivity(streamId, StreamActivityType.TIP, activityMeta);
+
+    // Update the stream
+    const updatedStream = await this.livestreamModel.findByIdAndUpdate(streamId, updates, { new: true });
+
+    if (giftData.delay > 0) {
+      setTimeout(() => {
+        this.chatGateway.server.to(`stream:${streamId}`).emit(LivestreamEvents.TipStreamer, {
+          gift: activity,
+        });
+      }, giftData.delay * 1000); // Convert seconds to milliseconds
+    } else {
+      this.chatGateway.server.to(`stream:${streamId}`).emit(LivestreamEvents.TipStreamer, {
+        gift: activity,
+      });
+    }
+
+    return updatedStream;
+  }
+
   private generateStreamKey(): string {
     return crypto.randomBytes(12).toString('hex');
   }
 
   private async cleanupStream(streamId: string) {
     // Additional cleanup as needeed
-  }
-
-  async getAugmentedLiveStreams() {
-    const liveStreamsWithAccounts = await this.livestreamModel.aggregate([
-      {
-        $lookup: {
-          from: AccountModel.collection.name, // Name of the Account collection
-          localField: 'address', // Field in LiveStream to match
-          foreignField: 'address', // Field in Account to match
-          as: 'account', // Alias for the joined data
-        },
-      },
-      {
-        $addFields: {
-          account: {
-            $arrayElemAt: ['$account', 0], // Flatten the account array (since $lookup returns an array)
-          },
-        },
-      },
-      {
-        $project: {
-          title: 1,
-          description: 1,
-          thumbnail: 1,
-          streamUrl: 1,
-          livepeerId: 1,
-          // streamKey: 1,
-          playbackId: 1,
-          status: 1,
-          startedAt: 1,
-          endedAt: 1,
-          scheduledFor: 1,
-          categories: 1,
-          address: 1,
-          likes: 1,
-          peakViewers: 1,
-          totalViews: 1,
-          activities: 1,
-          viewers: 1,
-          account: {
-            username: 1,
-            displayName: 1,
-            avatarImageUrl: 1,
-          },
-        },
-      },
-    ]);
-
-    return liveStreamsWithAccounts;
   }
 
   async getActiveStreamByUser(userAddress: string) {
@@ -508,7 +522,7 @@ export class LivestreamService {
           thumbnail: 1,
           streamUrl: 1,
           livepeerId: 1,
-          // streamKey: 1,
+          totalTips: 1,
           playbackId: 1,
           status: 1,
           startedAt: 1,
@@ -521,6 +535,7 @@ export class LivestreamService {
           totalViews: 1,
           activities: 1,
           viewers: 1,
+          settings: 1,
           account: {
             username: 1,
             displayName: 1,
@@ -599,6 +614,8 @@ export class LivestreamService {
           address: 1,
           likes: 1,
           peakViewers: 1,
+          totalViews: 1,
+          totalTips: 1,
           account: {
             username: 1,
             displayName: 1,
