@@ -316,7 +316,7 @@ export class NftService {
         },
 
         // Sort, skip, and limit
-        { $sort: sortOption || { createdAt: -1 } },
+        { $sort: sortOption ?? { createdAt: -1 } },
         { $skip: skip },
         { $limit: limit },
       ];
@@ -332,6 +332,7 @@ export class NftService {
   async getFilteredNfts(req: Request, res: Response) {
     try {
       let {
+        sort,
         search,
         page,
         unit,
@@ -346,6 +347,9 @@ export class NftService {
         address,
         postType = 'video', // Add address to the destructured query parameters
       }: any = req.query;
+      
+      let pipeline = [];
+
       const searchQuery: any = {};
       if (!unit) unit = 20;
       if (unit > 100) unit = 100;
@@ -414,51 +418,10 @@ export class NftService {
           return res.send({ result: augmentedLiveStreams });
           break;
         case 'trends':
-          if (range) {
-            let fromDate = new Date();
-            switch (range) {
-              case 'day':
-                fromDate.setDate(fromDate.getDate() - 1);
-                break;
-              case 'week':
-                fromDate.setDate(fromDate.getDate() - 7);
-                break;
-              case 'month':
-                fromDate.setMonth(fromDate.getMonth() - 1);
-                break;
-              case 'year':
-                fromDate.setFullYear(fromDate.getFullYear() - 1);
-                break;
-            }
-            searchQuery['$match']['createdAt'] = { $gt: fromDate };
-          }
-          // else {
-          // searchQuery['$match']['createdAt'] = { $gt: new Date(Date.now() - config.recentTimeDiff) };
-          // }
-          sortRule = { views: -1 };
+          sortRule = { views: -1, likes: -1, createdAt: -1 };
           break;
         case 'new':
-          if (range) {
-            let fromDate = new Date();
-            switch (range) {
-              case 'day':
-                fromDate.setDate(fromDate.getDate() - 1);
-                break;
-              case 'week':
-                fromDate.setDate(fromDate.getDate() - 7);
-                break;
-              case 'month':
-                fromDate.setMonth(fromDate.getMonth() - 1);
-                break;
-              case 'year':
-                fromDate.setFullYear(fromDate.getFullYear() - 1);
-                break;
-            }
-            searchQuery['$match']['createdAt'] = { $gt: fromDate };
-          }
-          // else {
-          // searchQuery['$match']['createdAt'] = { $gt: new Date(Date.now() - config.recentTimeDiff) };
-          // }
+          sortRule = { createdAt: -1 };
           break;
         case 'mostLiked':
           sortRule = { likes: -1 };
@@ -471,7 +434,44 @@ export class NftService {
           break;
         case 'locked':
           searchQuery['$match'][`streamInfo.${streamInfoKeys.isLockContent}`] = true;
-          break;
+          break;  
+        default:
+          
+          if (sort) {
+            switch (sort) {
+              case 'views':
+                sortRule = { views: -1, likes: -1, createdAt: -1 };
+                break;
+                case 'new':
+                  sortRule = { createdAt: -1, views: -1, likes: -1 };
+                  break;
+                }
+              }
+              console.log("default sortMode", sortMode,sort,sortRule);
+      }
+      // console.log('before', JSON.stringify(searchQuery, null, 1));
+
+      if (range) {
+        let fromDate = new Date();
+        console.log('fromDate A:', fromDate);
+        if (!searchQuery['$match']['$and']) {
+          searchQuery['$match']['$and'] = [];
+        }
+        switch (range) {
+          case 'day':
+            fromDate.setDate(fromDate.getDate() - 1);
+            break;
+          case 'week':
+            fromDate.setDate(fromDate.getDate() - 7);
+            break;
+          case 'month':
+            fromDate.setMonth(fromDate.getMonth() - 1);
+            break;
+          case 'year':
+            fromDate.setFullYear(fromDate.getFullYear() - 1);
+            break;
+        }
+        searchQuery['$match']['$and'].push({ createdAt: { $gt: fromDate.toISOString() } });
       }
       if (!page) page = 0;
       if (minter) searchQuery['$match']['$and'].push({ minter: minter.toLowerCase() });
@@ -535,29 +535,30 @@ export class NftService {
         });
       }
 
-      const pipeline =
-        sortMode === 'reports'
-          ? [
-            {
-              $lookup: {
-                from: 'feed_reports',
-                localField: 'tokenId',
-                foreignField: 'tokenId',
-                as: 'reports',
-              },
+      if (sortMode == 'reports') {
+        pipeline = [
+          ...pipeline,
+          {
+            $lookup: {
+              from: 'feed_reports',
+              localField: 'tokenId',
+              foreignField: 'tokenId',
+              as: 'reports',
             },
-            {
-              $match: {
-                'reports.0': { $exists: true },
-              },
+          },
+          {
+            $match: {
+              'reports.0': { $exists: true },
             },
-            {
-              $addFields: {
-                reportCount: { $size: "$reports" }, // Count the reports
-              },
+          },
+          {
+            $addFields: {
+              reportCount: { $size: '$reports' }, // Count the reports
             },
-            ]
-          : [];
+          },
+        ];
+      }
+
       const ret: any = await this.getStreamNfts(
         searchQuery['$match'],
         unit * page,
