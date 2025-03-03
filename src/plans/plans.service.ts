@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { addProperty, reqParam } from 'common/util/auth';
 import { durations } from 'config/constants';
 import { Request, Response } from 'express';
 import { AccountModel } from 'models/Account';
 import { PlansModel } from 'models/Plans';
 import { SubscriptionModel } from 'models/subscription';
+import { ActivityService } from 'src/activity/activity.service';
 
 const planTemplate = {
   id: 1,
@@ -22,6 +23,8 @@ const planTemplate = {
 
 @Injectable()
 export class PlansService {
+  private readonly logger = new Logger(PlansService.name);
+  private activityService: ActivityService = new ActivityService();
   constructor() {}
 
   // GET single plan by ID
@@ -34,7 +37,9 @@ export class PlansService {
       }
       return res.status(200).json({ plan });
     } catch (error) {
-      return res.status(500).json({ error: 'Error retrieving plan', details: error });
+      return res
+        .status(500)
+        .json({ error: 'Error retrieving plan', details: error });
     }
   }
 
@@ -47,7 +52,9 @@ export class PlansService {
       const plans = await PlansModel.find(obj, planTemplate);
       return res.status(200).json({ plans });
     } catch (error) {
-      return res.status(500).json({ error: 'Error retrieving plans', details: error });
+      return res
+        .status(500)
+        .json({ error: 'Error retrieving plans', details: error });
     }
   }
 
@@ -69,12 +76,18 @@ export class PlansService {
       duration: obj.duration,
     });
     if (isExist) {
-      return res.status(409).json({ error: 'Plan Already Exist!', msg: 'Plan Already Exist!' });
+      return res
+        .status(409)
+        .json({ error: 'Plan Already Exist!', msg: 'Plan Already Exist!' });
     }
     obj.address = obj.address.toLowerCase();
-    const user: any = await AccountModel.findOne({ address: obj.address }).select('_id');
+    const user: any = await AccountModel.findOne({
+      address: obj.address,
+    }).select('_id');
     if (!user) {
-      return res.status(409).json({ error: 'Account not Found!', msg: 'Account not Found!' });
+      return res
+        .status(409)
+        .json({ error: 'Account not Found!', msg: 'Account not Found!' });
     }
 
     obj.userId = user._id;
@@ -97,13 +110,21 @@ export class PlansService {
 
     try {
       // Find the plan by ID and update with the new data
-      const updatedPlan = await PlansModel.findOneAndUpdate({ id: `${id}` }, obj, { new: true });
+      const updatedPlan = await PlansModel.findOneAndUpdate(
+        { id: `${id}` },
+        obj,
+        { new: true },
+      );
       if (!updatedPlan) {
         return res.status(404).json({ error: 'Plan not found for update' });
       }
-      return res.status(200).json({ msg: 'Plan updated successfully', plan: updatedPlan });
+      return res
+        .status(200)
+        .json({ msg: 'Plan updated successfully', plan: updatedPlan });
     } catch (error) {
-      return res.status(500).json({ error: 'Error updating plan', details: error });
+      return res
+        .status(500)
+        .json({ error: 'Error updating plan', details: error });
     }
   }
   async createSubscription(req: Request, res: Response) {
@@ -113,7 +134,9 @@ export class PlansService {
     addProperty(req, obj, 'account');
     try {
       // Check if user exists
-      const user = await AccountModel.findOne({ address: obj.account?.toLowerCase() });
+      const user = await AccountModel.findOne({
+        address: obj.account?.toLowerCase(),
+      });
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
@@ -127,7 +150,7 @@ export class PlansService {
       }
 
       // Find the duration object from the durations array based on the plan's duration
-      const duration = durations.find(d => d.value === plan.duration);
+      const duration = durations.find((d) => d.value === plan.duration);
       if (!duration) {
         return res.status(400).json({ error: 'Invalid plan duration' });
       }
@@ -139,7 +162,9 @@ export class PlansService {
         active: true,
       });
       if (activeSubscription) {
-        return res.status(400).json({ error: 'User already has an active subscription to this plan' });
+        return res.status(400).json({
+          error: 'User already has an active subscription to this plan',
+        });
       }
 
       // Add default startDate if not present
@@ -181,7 +206,9 @@ export class PlansService {
         data: subscription,
       });
     } catch (error) {
-      return res.status(500).json({ error: 'Error creating subscription', details: error.message });
+      return res
+        .status(500)
+        .json({ error: 'Error creating subscription', details: error.message });
     }
   }
   // DELETE a plan by ID
@@ -194,7 +221,9 @@ export class PlansService {
       }
       return res.status(200).json({ msg: 'Plan deleted successfully' });
     } catch (error) {
-      return res.status(500).json({ error: 'Error deleting plan', details: error });
+      return res
+        .status(500)
+        .json({ error: 'Error deleting plan', details: error });
     }
   }
   async getSubscription(req: Request, res: Response) {
@@ -214,9 +243,126 @@ export class PlansService {
     obj.address = obj?.address?.toLowerCase();
     const user = await AccountModel.findOne(obj);
     console.log('user', user);
-    const subscription = await SubscriptionModel.find({ userId: user._id, active: true })
+    const subscription = await SubscriptionModel.find({
+      userId: user._id,
+      active: true,
+    })
       // .populate('userId')  // Populates the Account details
       .populate('planId'); // Populates the Plan details
     return res.status(200).json({ subscription });
+  }
+  async webhookPlanCreate(req: Request, res: Response) {
+    const planId = reqParam(req, 'planId');
+    const isSuccess = reqParam(req, 'isSuccess');
+    const chainId = reqParam(req, 'chainId');
+    const address = reqParam(req, 'address');
+
+    const plan = await PlansModel.findOneAndUpdate(
+      {
+        id: planId,
+        'chains.chainId': chainId, // Match the chainId in the chains array
+        address: address.toLowerCase(), // Match the creator address (lowercased)
+      },
+      {
+        $set: {
+          'chains.$.status': isSuccess, // Set status to true (active)
+          'chains.$.isPublished': isSuccess, // Set isPublished to true
+        },
+      },
+      { new: true }, // Return the updated document
+    );
+    if (!plan) {
+      this.logger.warn(
+        `No plan found for id: ${planId.toString()} on chainId: ${chainId}`,
+      );
+      return res.status(404).json({ error: 'Plan not found' });
+    } else {
+      this.logger.log(
+        `Plan updated successfully for id: ${planId.toString()} on chainId: ${chainId}`,
+      );
+      this.activityService.onPlanPublished(plan);
+      return res.status(200).json({ message: 'Plan Successful Created' });
+    }
+  }
+  async webhookPlanPurchased(req: Request, res: Response) {
+    const subId = reqParam(req, 'subId');
+    const isSuccess = reqParam(req, 'isSuccess');
+    const hash = reqParam(req, 'hash');
+
+    if (isSuccess === false) {
+      return res.status(400).json({ error: 'Transaction failed' });
+    }
+    // Find the subscription by id
+    const subscription = await SubscriptionModel.findOne({
+      id: subId.toString(),
+    });
+
+    if (!subscription) {
+      this.logger.error(`Subscription not found for id: ${subId.toString()}`);
+      return;
+    }
+
+    if (subscription.active) {
+      this.logger.error(
+        `Subscription already active for id: ${subId.toString()}`,
+      );
+      return res.status(400).json({ error: 'Subscription already active' });
+    }
+
+    if (subscription.active && subscription.endDate < new Date()) {
+      this.logger.error(`Subscription expired for id: ${subId.toString()}`);
+      return res.status(400).json({ error: 'Subscription expired' });
+    }
+    // Find the plan associated with the subscription
+    const plan = await PlansModel.findById(subscription.planId);
+
+    if (!plan) {
+      this.logger.error(
+        `Plan not found for planId: ${subscription.planId.toString()}`,
+      );
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+
+    // Set startDate as the current date
+    const startDate = new Date();
+
+    // Calculate endDate based on plan duration
+    let endDate = new Date(startDate); // Make a copy of the start date
+
+    const duration = plan.duration;
+    if (duration === 1) {
+      // 1 month expiration
+      endDate.setMonth(endDate.getMonth() + 1);
+    } else if (duration === 999) {
+      // Lifetime plan (999 years expiration)
+      endDate.setFullYear(endDate.getFullYear() + 999);
+    } else {
+      // Other durations (3 months, 6 months, 1 year, etc.)
+      endDate.setMonth(endDate.getMonth() + duration);
+    }
+    const updatedSubscription = await SubscriptionModel.findOneAndUpdate(
+      { id: subId.toString() },
+      {
+        $set: {
+          startDate: startDate,
+          endDate: endDate,
+          active: true,
+        },
+      },
+      { new: true },
+    );
+
+    if (updatedSubscription) {
+      this.logger.log(
+        `Subscription updated with startDate and endDate for id: ${subId.toString()}`,
+      );
+      this.activityService.onPlanPurchased(updatedSubscription);
+      return res.status(200).json({ message: 'Subscription Successful' });
+    } else {
+      this.logger.error(
+        `Failed to update subscription with id: ${subId.toString()}`,
+      );
+      return res.status(404).json({ error: 'Failed to update subscription' });
+    }
   }
 }
