@@ -595,6 +595,7 @@ export enum StreamActivityType {
   REACTION = 'REACTION',
   JOINED = 'JOINED',
   LEFT = 'LEFT',
+  TIP = 'TIP',
 }
 
 export enum LiveReactionType {

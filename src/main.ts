@@ -10,7 +10,7 @@ import methodOverride from 'method-override';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { AllExceptionsFilter } from 'common/filters/allexceptions';
 import { SocketIoAdapter } from 'common/adapters/socket-io.adapters';
-import { config } from 'config';
+import  {config}  from 'config';
 import * as socketIO from 'socket.io';
 import { createServer } from 'http';
 import { addUserToOnlineList, getOnlineUsers, removeUserFromOnlineList } from 'common/util/socket';

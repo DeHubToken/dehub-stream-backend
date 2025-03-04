@@ -18,7 +18,7 @@ import { BullModule } from '@nestjs/bull';
 import { ScheduleModule } from '@nestjs/schedule';
 import { StreamCronService } from './job/stream-cron.service';
 import { PlansModule } from './plans/plans.module';
-import { PlanEventListenerService } from './job/plans.listener';
+// import { PlanEventListenerService } from './job/plans.listener';
 import { DmModule } from './dm/dm.module';
 import { LivestreamModule } from './livestream/livestream.module';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -41,7 +41,9 @@ import { BuySellCryptoModule } from './crypto-payment/buy-sell-crypto.module';
     UserModule, 
     NftModule, NotificationModule, CdnModule, AuthModule,ActivityModule,FeedReportModule, PlansModule,DmModule, ReactionModule, CategoryModule, LeaderboardModule, AssetModule, JobModule, ScheduleModule.forRoot(), LivestreamModule, BuySellCryptoModule],
   controllers: [AppController],
-  providers: [AppService, StreamCronService,PlanEventListenerService],
+  providers: [AppService, StreamCronService,
+    // PlanEventListenerService
+  ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
