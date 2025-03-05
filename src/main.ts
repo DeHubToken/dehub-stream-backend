@@ -15,6 +15,7 @@ import * as socketIO from 'socket.io';
 import { createServer } from 'http';
 import { addUserToOnlineList, getOnlineUsers, removeUserFromOnlineList } from 'common/util/socket';
 import { json } from 'express';
+import * as bodyParser from 'body-parser';
 // import { DMSocketController } from './dm/dm.socket.controller';
 
 // WebSocket logic
@@ -36,7 +37,17 @@ const webSockets = (socket: any, io: socketIO.Server) => {
 };
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
+
+  app.use(
+    bodyParser.json({
+      verify: (req: any, res, buf: Buffer, encoding: string) => {
+        if (req.originalUrl === '/api/webhook') {
+          req.rawBody = buf;
+        }
+      },
+    }),
+  );
 
   app.use(cookieParser());
   app.use(cors());

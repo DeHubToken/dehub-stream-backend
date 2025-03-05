@@ -20,6 +20,9 @@ importers:
       '@ethersproject/providers':
         specifier: ^5.7.2
         version: 5.7.2
+      '@moonpay/moonpay-node':
+        specifier: ^0.2.9
+        version: 0.2.9
       '@mux/mux-node':
         specifier: ^9.0.1
         version: 9.0.1
@@ -1586,6 +1589,9 @@ packages:
 
   '@mongodb-js/saslprep@1.1.9':
     resolution: {integrity: sha512-tVkljjeEaAhCqTzajSdgbQ6gE6f3oneVwa3iXR6csiEwXXOFsiC6Uh9iAjAhXPtqa/XMDHWjjeNH/77m/Yq2dw==}
+
+  '@moonpay/moonpay-node@0.2.9':
+    resolution: {integrity: sha512-I7YhWWda5CHSYvuwuANWXRb+2a7jZ20ojNEamMR6lHz5C9jgYfTpkMu2KxH9NQ/1aSFTgDGBugJOYBOoq99UPQ==}
 
   '@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.3':
     resolution: {integrity: sha512-QZHtlVgbAdy2zAqNA9Gu1UpIuI8Xvsd1v8ic6B2pZmeFnFcMWiPLfWXh7TVw4eGEZ/C9TH281KwhVoeQUKbyjw==}
@@ -8163,6 +8169,8 @@ snapshots:
   '@mongodb-js/saslprep@1.1.9':
     dependencies:
       sparse-bitfield: 3.0.3
+
+  '@moonpay/moonpay-node@0.2.9': {}
 
   '@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.3':
     optional: true

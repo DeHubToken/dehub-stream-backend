@@ -25,6 +25,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { config } from 'config';
 import { ActivityModule } from './activity/activity.module';
 import { FeedReportModule } from './feed-report/feed-report.module';
+import { BuySellCryptoModule } from './crypto-payment/buy-sell-crypto.module';
 
 @Module({
   imports: [
@@ -38,7 +39,7 @@ import { FeedReportModule } from './feed-report/feed-report.module';
     EventEmitterModule.forRoot(),
     MongooseModule.forRoot(`mongodb://${config.mongo.host}:${config.mongo.port}/${config.mongo.dbName}`),
     UserModule, 
-    NftModule, NotificationModule, CdnModule, AuthModule,ActivityModule,FeedReportModule, PlansModule,DmModule, ReactionModule, CategoryModule, LeaderboardModule, AssetModule, JobModule, ScheduleModule.forRoot(), LivestreamModule],
+    NftModule, NotificationModule, CdnModule, AuthModule,ActivityModule,FeedReportModule, PlansModule,DmModule, ReactionModule, CategoryModule, LeaderboardModule, AssetModule, JobModule, ScheduleModule.forRoot(), LivestreamModule, BuySellCryptoModule],
   controllers: [AppController],
   providers: [AppService, StreamCronService,
     // PlanEventListenerService
