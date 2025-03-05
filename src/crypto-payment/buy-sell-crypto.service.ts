@@ -15,7 +15,7 @@ export class BuySellCryptoService {
       walletAddress,
       baseCurrencyAmount,
       baseCurrencyCode,
-      redirectURL: 'http://localhost:3000/buy-crypto',
+      redirectURL: `${process.env.MONPAY_REDIRECT_URL}/buy-crypto`,
     };
 
     try {
@@ -45,7 +45,7 @@ export class BuySellCryptoService {
       baseCurrencyAmount,
       quoteCurrencyCode,
       walletAddress,
-      redirectURL: 'http://localhost:3000/sell-crypto',
+      redirectURL:`${process.env.MONPAY_REDIRECT_URL}/sell-crypto`,
     };
 
     try {
