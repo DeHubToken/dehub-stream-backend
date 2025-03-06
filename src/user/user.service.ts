@@ -42,15 +42,15 @@ const accountTemplate = {
 
 @Injectable()
 export class UserService {
-  private activityService:ActivityService=new ActivityService()
-  constructor(private readonly cdnService:CdnService){}
-  
-  async getAccountInfo (req:Request, res:Response) {
+  private activityService: ActivityService = new ActivityService();
+  constructor(private readonly cdnService: CdnService) {}
+
+  async getAccountInfo(req: Request, res: Response) {
     /// walletAddress param can be username or address
-    let walletAddress:any = req.query.id || req.query.id || req.params?.id;
+    let walletAddress: any = req.query.id || req.query.id || req.params?.id;
     if (!walletAddress) return res.status(400).json({ error: 'Bad request: No wallet sent' });
     walletAddress = normalizeAddress(walletAddress);
-    let accountInfo:any = await AccountModel.findOne(
+    let accountInfo: any = await AccountModel.findOne(
       { $or: [{ address: walletAddress }, { username: walletAddress }] },
       accountTemplate,
     ).lean();
@@ -64,7 +64,7 @@ export class UserService {
       walletAddress = accountInfo?.address;
     } else {
       accountInfo = {};
-    } 
+    }
     const unlockedPPVStreams = await PPVTransactionModel.find(
       { address: walletAddress }, // No expiry
       // { address: walletAddress, createdAt: { $gt: new Date(Date.now() - config.availableTimeForPPVStream) } },
@@ -78,13 +78,118 @@ export class UserService {
     return res.json({ result: accountInfo });
   }
 
+  /** DON'T USE THIS FUNCTION
+   * Get user account details by address
+   * Optimized single function for fast lookups
+   */
+  async getUserDetails(address: string): Promise<any> {
+    if (!address) {
+      throw new Error('Address is required');
+    }
+
+    const normalizedAddress = normalizeAddress(address);
+
+    // Determine if this is an address or username
+    const isEthAddress = isAddress(normalizedAddress);
+
+    const accountInfo = await AccountModel.findOne(
+      isEthAddress
+        ? { address: normalizedAddress }
+        : { $or: [{ address: normalizedAddress }, { username: normalizedAddress }] },
+      {
+        _id: 1,
+        address: 1,
+        username: 1,
+        displayName: 1,
+        avatarImageUrl: 1,
+        coverImageUrl: 1,
+        aboutMe: 1,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ).lean();
+
+    if (!accountInfo) {
+      return null;
+    }
+
+    // Get all required data in parallel for best performance
+    const [balanceData, unlockedPPVStreams, likes, followings, followers] = await Promise.all([
+      Balance.find(
+        { address: accountInfo.address },
+        { chainId: 1, tokenAddress: 1, walletBalance: 1, staked: 1, _id: 0 },
+      ),
+
+      PPVTransactionModel.find({ address: accountInfo.address }, { streamTokenId: 1 }).distinct('streamTokenId'),
+
+      Feature.find({ address: accountInfo.address }, {}).distinct('tokenId'),
+
+      Follow.find({ address: accountInfo.address }, { following: 1 }).distinct('following'),
+
+      Follow.find({ following: accountInfo.address }, { address: 1 }).distinct('address'),
+    ]);
+
+    return {
+      ...accountInfo,
+      balanceData: balanceData.filter(e => e.walletBalance > 0 || e.staked > 0),
+      unlocked: unlockedPPVStreams,
+      likes,
+      followings,
+      followers,
+    };
+  }
+
+  /**
+   * Get just the essential user details (lightweight version)
+   * Perfect for embedding in other objects like meta
+   */
+  async getEssentialUserDetails(address: string): Promise<any> {
+    if (!address) {
+      return null;
+    }
+
+    const normalizedAddress = normalizeAddress(address);
+
+    const accountInfo = await AccountModel.findOne(
+      { address: normalizedAddress },
+      {
+        _id: 1,
+        address: 1,
+        username: 1,
+        displayName: 1,
+        avatarImageUrl: 1,
+        followers: 1,
+        createdAt: 1,
+        aboutMe: 1,
+      },
+    ).lean();
+
+    if (!accountInfo) {
+      return null;
+    }
+
+    // Get staked balance - the only balance we need for essentials
+    const stakedBalance = await Balance.findOne(
+      {
+        address: normalizedAddress,
+        tokenAddress: '0x680d3113caf77b61b510f332d5ef4cf5b41a761d',
+      },
+      { staked: 1 },
+    );
+
+    return {
+      ...accountInfo,
+      staked: stakedBalance?.staked || 0,
+    };
+  }
+
   async updateProfile(req: Request, res: Response, coverImage, avatarImage) {
     try {
       let address = reqParam(req, paramNames.address);
       address = normalizeAddress(address);
       const updateAccountOptions = {};
       let username = reqParam(req, userProfileKeys.username);
-  
+
       // Process editable profile keys
       Object.entries(editableProfileKeys).forEach(([, profileKey]) => {
         let reqVal = reqParam(req, profileKey);
@@ -92,7 +197,7 @@ export class UserService {
           try {
             if (!reqVal) return;
             reqVal = JSON.parse(reqVal);
-            Object.keys(reqVal).forEach((key) => {
+            Object.keys(reqVal).forEach(key => {
               if (!(Number(key) >= 1 && Number(key) <= 5)) delete reqVal[key];
             });
           } catch {
@@ -104,7 +209,7 @@ export class UserService {
         if (!reqVal && profileKey === 'username') return;
         updateAccountOptions[profileKey] = reqVal;
       });
-  
+
       // Validate and update username
       if (username) {
         username = username.toLowerCase();
@@ -112,33 +217,39 @@ export class UserService {
         if (validation.error) return res.json(validation);
         updateAccountOptions[userProfileKeys.username] = username;
       }
-    
+
       // File upload handling with cdnService
-      const coverImgFile = coverImage
-      const avatarImgFile = avatarImage
+      const coverImgFile = coverImage;
+      const avatarImgFile = avatarImage;
       // const convertImageBuffer = async(fileBuffer: Buffer):Promise<Buffer> => await sharp(fileBuffer).toFormat(targetFormat).toBuffer()
 
-      
       if (coverImgFile) {
-        const coverImagePath = await this.cdnService.uploadFile(coverImgFile.buffer ,"covers", normalizeAddress(address)+".jpg");
+        const coverImagePath = await this.cdnService.uploadFile(
+          coverImgFile.buffer,
+          'covers',
+          normalizeAddress(address) + '.jpg',
+        );
         updateAccountOptions[userProfileKeys.coverImageUrl] = coverImagePath;
-        console.log(coverImagePath)
+        console.log(coverImagePath);
       }
-  
+
       if (avatarImgFile) {
-        const avatarImagePath = await this.cdnService.uploadFile(avatarImgFile.buffer, "avatars", normalizeAddress(address)+".jpg");
+        const avatarImagePath = await this.cdnService.uploadFile(
+          avatarImgFile.buffer,
+          'avatars',
+          normalizeAddress(address) + '.jpg',
+        );
         updateAccountOptions[userProfileKeys.avatarImageUrl] = avatarImagePath;
-        
       }
-  
+
       // Update account in the database
       const updatedAccount = await AccountModel.findOneAndUpdate(
         { address: address.toLowerCase() },
         updateAccountOptions,
         overrideOptions,
       );
-      console.log(updatedAccount)
-  
+      console.log(updatedAccount);
+
       // Set a default username if necessary
       if (updatedAccount.displayName && !updatedAccount.username) {
         username = updatedAccount.displayName.toLowerCase().replace(' ', '_');
@@ -154,7 +265,7 @@ export class UserService {
           }
         }
       }
-  
+
       return res.json({ result: true });
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -162,105 +273,102 @@ export class UserService {
     }
   }
 
-
-async requestFollow  (address, following){
-  following = normalizeAddress(following);
-  if (address === following) throw new BadRequestException("Can't follow yourself");
-  const updatedResult:any = await Follow.updateOne({ address, following }, {}, overrideOptions);
-  this.activityService.onFollowAndUnFollow({ address, following },true);
-  if (updatedResult?.nModified > 0) throw new ConflictException("Already following user");
-  return { result: updatedResult };
-};
-
-async unFollow (address, following){
-  following = normalizeAddress(following);
-  const deletedResult = await Follow.deleteOne({ address, following });
-  if (deletedResult?.deletedCount > 0){ 
-    this.activityService.onFollowAndUnFollow({ address, following },false);
-    
-   return { result: true}
-   };
-  throw new ConflictException("Not following user");
-};
-
-async getFollowing (address){
-  address = normalizeAddress(address);
-  const followes = Follow.find({ address }, { following: 1 }).distinct('following');
-  return followes;
-};
-
-async getFollowers (address) {
-  address = normalizeAddress(address);
-  const followes = Follow.find({ following: address }, { address: 1 }).distinct('address');
-  return followes;
-};
-
-async getUsernames() {
-  try {
-    const result = await AccountModel.find({}, { username: 1 }).distinct('username');
-    return { result };
-  } catch (error) {
-    console.error('-----request getUsernames error', error);
-    throw new Error('Failed to fetch usernames');
+  async requestFollow(address, following) {
+    following = normalizeAddress(following);
+    if (address === following) throw new BadRequestException("Can't follow yourself");
+    const updatedResult: any = await Follow.updateOne({ address, following }, {}, overrideOptions);
+    this.activityService.onFollowAndUnFollow({ address, following }, true);
+    if (updatedResult?.nModified > 0) throw new ConflictException('Already following user');
+    return { result: updatedResult };
   }
-}
 
-async publicAccountData (req:Request, res:Response) {
-  const addressList = reqParam(req, 'addressList');
-  if (!addressList || addressList.length < 1)
-    return res.status(400).json({ result: false, error: 'Bad Request: Address List is required' });
-  try {
-    const accountTemplate = {
-      _id: 0,
-      address: 1,
-      username: 1,
-      displayName: 1,
-      avatarImageUrl: 1,
-    };
-    return res.json({ result: await AccountModel.find({ address: { $in: addressList } }, accountTemplate) });
-  } catch (err) {
-    console.log('-----public account data', err);
-    return res.status(500).json({ result: false, error: err.message || 'Could not fetch account data' });
+  async unFollow(address, following) {
+    following = normalizeAddress(following);
+    const deletedResult = await Follow.deleteOne({ address, following });
+    if (deletedResult?.deletedCount > 0) {
+      this.activityService.onFollowAndUnFollow({ address, following }, false);
+
+      return { result: true };
+    }
+    throw new ConflictException('Not following user');
   }
-}
 
-async getNumberOfUsers() {
-  try {
-    const userCount = await AccountModel.countDocuments({});
-    return { result: userCount };
-  } catch (error) {
-    console.error('Error getting user count:', error.message);
-    throw new Error('Internal Server Error');
+  async getFollowing(address) {
+    address = normalizeAddress(address);
+    const followes = Follow.find({ address }, { following: 1 }).distinct('following');
+    return followes;
   }
-}
 
-async searchUsers(req:Request, res:Response) {
-  try {
+  async getFollowers(address) {
+    address = normalizeAddress(address);
+    const followes = Follow.find({ following: address }, { address: 1 }).distinct('address');
+    return followes;
+  }
+
+  async getUsernames() {
+    try {
+      const result = await AccountModel.find({}, { username: 1 }).distinct('username');
+      return { result };
+    } catch (error) {
+      console.error('-----request getUsernames error', error);
+      throw new Error('Failed to fetch usernames');
+    }
+  }
+
+  async publicAccountData(req: Request, res: Response) {
+    const addressList = reqParam(req, 'addressList');
+    if (!addressList || addressList.length < 1)
+      return res.status(400).json({ result: false, error: 'Bad Request: Address List is required' });
+    try {
+      const accountTemplate = {
+        _id: 0,
+        address: 1,
+        username: 1,
+        displayName: 1,
+        avatarImageUrl: 1,
+      };
+      return res.json({ result: await AccountModel.find({ address: { $in: addressList } }, accountTemplate) });
+    } catch (err) {
+      console.log('-----public account data', err);
+      return res.status(500).json({ result: false, error: err.message || 'Could not fetch account data' });
+    }
+  }
+
+  async getNumberOfUsers() {
+    try {
+      const userCount = await AccountModel.countDocuments({});
+      return { result: userCount };
+    } catch (error) {
+      console.error('Error getting user count:', error.message);
+      throw new Error('Internal Server Error');
+    }
+  }
+
+  async searchUsers(req: Request, res: Response) {
+    try {
       const { searchParam } = req.query;
 
-      const filter:any = {};
+      const filter: any = {};
       if (searchParam) {
-          filter.username = { $regex: searchParam, $options: "i" }; 
+        filter.username = { $regex: searchParam, $options: 'i' };
       }
-      const users = await AccountModel.find(filter).limit(10)
+      const users = await AccountModel.find(filter).limit(10);
       return res.send({ result: users });
-  } catch (error) {
+    } catch (error) {
       console.error('Error searching for users:', error.message);
       return res.status(500).json({ error: error.message || 'Internal Server Error' });
+    }
   }
-}
 
-async isValidUsername(address: string, username: string) {
-  try {
-    const normalizedAddress = normalizeAddress(address);
-    const normalizedUsername = normalizeAddress(username);
-    const validationResult = await isValidUsername(normalizedAddress, normalizedUsername);
-    return { result: validationResult };
-  } catch (error) {
-    console.error('-----validate username error', error);
-    throw new Error('Could not validate username');
+  async isValidUsername(address: string, username: string) {
+    try {
+      const normalizedAddress = normalizeAddress(address);
+      const normalizedUsername = normalizeAddress(username);
+      const validationResult = await isValidUsername(normalizedAddress, normalizedUsername);
+      return { result: validationResult };
+    } catch (error) {
+      console.error('-----validate username error', error);
+      throw new Error('Could not validate username');
+    }
   }
-}
-
-
 }
