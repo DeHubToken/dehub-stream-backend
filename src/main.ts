@@ -42,7 +42,7 @@ async function bootstrap() {
   app.use(
     bodyParser.json({
       verify: (req: any, res, buf: Buffer, encoding: string) => {
-        if (req.originalUrl === '/api/webhook') {
+        if (req.originalUrl === '/api/moonpay/webhook') {
           req.rawBody = buf;
         }
       },

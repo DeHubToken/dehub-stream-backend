@@ -31,9 +31,10 @@ export class BuySellCryptoController {
     }
   }
 
-  @Post('/webhook')
+  @Post('/moonpay/webhook')
   async moonpayWebhook(@Req() req: Request & { rawBody?: Buffer }, @Headers('moonpay-signature') signatureHeader: string, @Res() res: Response) {
     try {
+
       const rawBody = req.rawBody || Buffer.from('');
 
       const isValid = await this.buySellCryptoService.verifyMoonpayWebhookSignature(
