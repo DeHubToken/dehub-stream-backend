@@ -41,7 +41,6 @@ export class BuySellCryptoController {
         rawBody,
         signatureHeader,
       );
-
       if (!isValid) {
         return res.status(HttpStatus.BAD_REQUEST).send('Invalid signature');
       }
