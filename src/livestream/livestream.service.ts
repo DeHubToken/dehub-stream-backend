@@ -27,6 +27,8 @@ import { ChatGateway } from './chat.gateway';
 import { LivepeerService } from './livepeer.service';
 import { CategoryModel } from 'models/Category';
 import { processCategories, removeDuplicatedElementsFromArray } from 'common/util/validation';
+import { Balance } from 'models/Balance';
+import { normalizeAddress } from 'common/util/format';
 
 @Injectable()
 export class LivestreamService {
@@ -42,17 +44,55 @@ export class LivestreamService {
     private livepeerService: LivepeerService,
   ) {}
 
+  async getEssentialUserDetails(address: string): Promise<any> {
+    if (!address) {
+      return null;
+    }
+
+    const normalizedAddress = normalizeAddress(address);
+
+    const accountInfo = await AccountModel.findOne(
+      { address: normalizedAddress },
+      {
+        _id: 1,
+        address: 1,
+        username: 1,
+        displayName: 1,
+        avatarImageUrl: 1,
+        followers: 1,
+        createdAt: 1,
+        aboutMe: 1,
+      },
+    ).lean();
+
+    if (!accountInfo) {
+      return null;
+    }
+
+    const stakedBalance = await Balance.findOne(
+      {
+        address: normalizedAddress,
+        tokenAddress: '0x680d3113caf77b61b510f332d5ef4cf5b41a761d',
+      },
+      { staked: 1 },
+    );
+
+    return {
+      ...accountInfo,
+      staked: stakedBalance?.staked || 0,
+    };
+  }
+
   async recordActivity(streamId: string, status: StreamActivityType, meta: Record<string, any> = {}) {
     const stream = await this.livestreamModel.findById(streamId);
     if (!stream) throw new NotFoundException('Stream not found');
     if (stream.status !== StreamStatus.LIVE) return;
     if (meta?.address) {
-      const account = await AccountModel.findOne({ address: meta?.address });
+      const account = await this.getEssentialUserDetails(meta.address);
+      const { _id, ...details } = account;
       meta = {
         ...meta,
-        username: account.username,
-        displayName: account.displayName,
-        avatarImageUrl: account.avatarImageUrl,
+        ...details,
       };
     }
     const activity = await this.streamActivityModel.create({
