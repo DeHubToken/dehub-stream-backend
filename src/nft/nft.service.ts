@@ -123,6 +123,10 @@ export class NftService {
       await TokenModel.findOneAndUpdate({ _id: token._id }, { $set: { imageUrls: filteredUrls } });
       return res;
     }
+    if (postType == 'live') {
+      await this.cdnService.uploadFile(files[0].buffer, 'images', token.tokenId + '.jpg');
+      return res;
+    }
     const imageUrl = await this.cdnService.uploadFile(files[1].buffer, 'images', token.tokenId + '.jpg');
     await this.jobService.addUploadAndTranscodeJob(
       files[0].buffer,
@@ -347,7 +351,7 @@ export class NftService {
         address,
         postType = 'video', // Add address to the destructured query parameters
       }: any = req.query;
-      
+
       let pipeline = [];
 
       const searchQuery: any = {};
@@ -434,20 +438,19 @@ export class NftService {
           break;
         case 'locked':
           searchQuery['$match'][`streamInfo.${streamInfoKeys.isLockContent}`] = true;
-          break;  
+          break;
         default:
-          
           if (sort) {
             switch (sort) {
               case 'views':
                 sortRule = { views: -1, likes: -1, createdAt: -1 };
                 break;
-                case 'new':
-                  sortRule = { createdAt: -1, views: -1, likes: -1 };
-                  break;
-                }
-              }
-              console.log("default sortMode", sortMode,sort,sortRule);
+              case 'new':
+                sortRule = { createdAt: -1, views: -1, likes: -1 };
+                break;
+            }
+          }
+          console.log('default sortMode', sortMode, sort, sortRule);
       }
       // console.log('before', JSON.stringify(searchQuery, null, 1));
 

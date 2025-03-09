@@ -42,7 +42,7 @@ export class LivestreamService {
     private readonly chatGateway: ChatGateway,
     @InjectRedis() private readonly redis: Redis,
     private livepeerService: LivepeerService,
-  ) {}
+  ) { }
 
   async getEssentialUserDetails(address: string): Promise<any> {
     if (!address) {
@@ -156,6 +156,8 @@ export class LivestreamService {
           minTip: Number(data.settings?.['minTip']) || 500,
           tipDelay: Number(data.settings?.['tipDelay']) || 0,
         },
+        tokenId: data.tokenId || "",
+        streamInfo: JSON.parse(data.streamInfo) || {},
       });
 
       // Step 3: Handle thumbnail upload

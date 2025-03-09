@@ -7,6 +7,7 @@ import { config } from 'config';
 
 export const postType = {
   video: 'video',
+  live: 'live',
   feedImages: 'feed-images',
   feedSimple: 'feed-simple',
 };
@@ -14,6 +15,7 @@ export const postType = {
 export const PostActivityType = {
   [postType.feedImages]: ActivityActionType.UPLOAD_FEED_IMAGES,
   [postType.video]: ActivityActionType.UPLOAD_VIDEO,
+  [postType.live]: ActivityActionType.CREATE_LIVE,
   [postType.feedSimple]: ActivityActionType.UPLOAD_FEED_SIMPLE,
 };
 

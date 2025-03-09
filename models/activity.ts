@@ -5,6 +5,7 @@ export const ActivityActionType = {
   UPLOAD_FEED_SIMPLE: 'upload-feed-simple',
   UPLOAD_FEED_IMAGES: 'upload-feed-images',
   UPLOAD_VIDEO: 'upload_video',
+  CREATE_LIVE: 'CREATE_LIVE',
   CREATE_PLAN: 'create-plan',
   PLAN_PUBLISHED: 'plan-published',
   PURCHASE_PLAN: 'purchase-plan',
