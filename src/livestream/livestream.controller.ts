@@ -92,7 +92,6 @@ export class LivestreamController {
       amount: number;
       recipient: string;
       tokenAddress: string;
-      delay: number;
       message?: string;
       selectedTier?: string;
       timestamp: number;

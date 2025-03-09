@@ -154,6 +154,7 @@ export class LivestreamService {
             slowMode: 0,
           },
           minTip: Number(data.settings?.['minTip']) || 500,
+          tipDelay: Number(data.settings?.['tipDelay']) || 0,
         },
       });
 
@@ -431,7 +432,6 @@ export class LivestreamService {
       amount: number;
       recipient: string;
       tokenAddress: string;
-      delay: number;
       message?: string;
       selectedTier?: string;
       timestamp: number;
@@ -459,7 +459,7 @@ export class LivestreamService {
       tokenAddress: giftData.tokenAddress,
       message: giftData.message,
       selectedTier: giftData.selectedTier,
-      delay: giftData.delay,
+      // delay: giftData.delay,
     };
 
     const activity = await this.recordActivity(streamId, StreamActivityType.TIP, activityMeta);
@@ -467,12 +467,12 @@ export class LivestreamService {
     // Update the stream
     const updatedStream = await this.livestreamModel.findByIdAndUpdate(streamId, updates, { new: true });
 
-    if (giftData.delay > 0) {
+    if (stream.settings.tipDelay > 0) {
       setTimeout(() => {
         this.chatGateway.server.to(`stream:${streamId}`).emit(LivestreamEvents.TipStreamer, {
           gift: activity,
         });
-      }, giftData.delay * 1000); // Convert seconds to milliseconds
+      }, stream.settings.tipDelay * 1000); // Convert seconds to milliseconds
     } else {
       this.chatGateway.server.to(`stream:${streamId}`).emit(LivestreamEvents.TipStreamer, {
         gift: activity,

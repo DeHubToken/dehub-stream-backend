@@ -83,6 +83,9 @@ export class LiveStream {
 
   @Prop({ type: mongoose.Schema.Types.Mixed })
   meta?: Record<string, any>; // Extras
+
+  // merging with Tokens
+  tokenId: string;
 }
 
 export const LiveStreamSchema = SchemaFactory.createForClass(LiveStream);

@@ -80,6 +80,7 @@ export class NFTController {
     if (postType != 'feed-simple' && (!files || files.length === 0)) {
       return res.status(400).json({ message: 'No files provided for minting' });
     }
+
     const { address, name, description, streamInfo, chainId, category, plans = null } = req.body;
 
     try {
@@ -95,6 +96,7 @@ export class NFTController {
       );
       return res.json(nft);
     } catch (error) {
+      console.error('Failed to mint NFT:', error);
       return res.status(500).json({ message: 'Failed to mint NFT', error: error.message });
     }
   }

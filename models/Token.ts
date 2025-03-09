@@ -106,7 +106,7 @@ const TokenSchema = new mongoose.Schema<TokenDocument>(
     postType: {
       type: String,
       default: 'video',
-      enum: ['video', 'feed-images', 'feed-simple'],
+      enum: ['video', 'feed-images', 'feed-simple', 'live'],
     },
     plans: {
       type: [String], //hare is this Plans table plans.id  as array
