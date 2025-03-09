@@ -85,7 +85,7 @@ export class LiveStream {
   meta?: Record<string, any>; // Extras
 
   // merging with Tokens
-  tokenId: string;
+  tokenId?: string;
 }
 
 export const LiveStreamSchema = SchemaFactory.createForClass(LiveStream);
