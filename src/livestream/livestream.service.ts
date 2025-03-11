@@ -42,7 +42,7 @@ export class LivestreamService {
     private readonly chatGateway: ChatGateway,
     @InjectRedis() private readonly redis: Redis,
     private livepeerService: LivepeerService,
-  ) { }
+  ) {}
 
   async getEssentialUserDetails(address: string): Promise<any> {
     if (!address) {
@@ -116,6 +116,9 @@ export class LivestreamService {
   }
 
   async createStream(address: string, data: Partial<LiveStream>, thumbnail?: Express.Multer.File) {
+    if (!data.tokenId) {
+      throw new BadRequestException('Minted TokenId is required');
+    }
     try {
       const livepeerResponse = await this.livepeerService.createStream(data.title);
       let categories = data.categories || [];
@@ -154,9 +157,10 @@ export class LivestreamService {
             slowMode: 0,
           },
           minTip: Number(data.settings?.['minTip']) || 500,
-          tipDelay: Number(data.settings?.['tipDelay']) || 0,
+          // tipDelay: Number(data.settings?.['tipDelay']) || 0,
         },
-        tokenId: data.tokenId || "",
+        streamDelay: data?.streamDelay || 0,
+        tokenId: Number(data.tokenId),
         streamInfo: JSON.parse(data.streamInfo) || {},
       });
 
@@ -469,17 +473,17 @@ export class LivestreamService {
     // Update the stream
     const updatedStream = await this.livestreamModel.findByIdAndUpdate(streamId, updates, { new: true });
 
-    if (stream.settings.tipDelay > 0) {
-      setTimeout(() => {
-        this.chatGateway.server.to(`stream:${streamId}`).emit(LivestreamEvents.TipStreamer, {
-          gift: activity,
-        });
-      }, stream.settings.tipDelay * 1000); // Convert seconds to milliseconds
-    } else {
-      this.chatGateway.server.to(`stream:${streamId}`).emit(LivestreamEvents.TipStreamer, {
-        gift: activity,
-      });
-    }
+    // if (stream.settings.tipDelay > 0) {
+    //   setTimeout(() => {
+    //     this.chatGateway.server.to(`stream:${streamId}`).emit(LivestreamEvents.TipStreamer, {
+    //       gift: activity,
+    //     });
+    //   }, stream.settings.tipDelay * 1000); // Convert seconds to milliseconds
+    // } else {
+    this.chatGateway.server.to(`stream:${streamId}`).emit(LivestreamEvents.TipStreamer, {
+      gift: activity,
+    });
+    // }
 
     return updatedStream;
   }
@@ -578,6 +582,8 @@ export class LivestreamService {
           activities: 1,
           viewers: 1,
           settings: 1,
+          tokenId: 1,
+          streamInfo: 1,
           account: {
             username: 1,
             displayName: 1,
@@ -658,6 +664,8 @@ export class LivestreamService {
           peakViewers: 1,
           totalViews: 1,
           totalTips: 1,
+          tokenId: 1,
+          streamInfo: 1,
           account: {
             username: 1,
             displayName: 1,

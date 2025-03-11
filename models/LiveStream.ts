@@ -84,9 +84,12 @@ export class LiveStream {
   @Prop({ type: mongoose.Schema.Types.Mixed })
   meta?: Record<string, any>; // Extras
 
+  @Prop({ default: 0 })
+  streamDelay: number;
+
   // merging with Tokens
   @Prop()
-  tokenId?: string;
+  tokenId?: number;
 
   @Prop({ type: mongoose.Schema.Types.Mixed, default: {} })
   streamInfo: any;
