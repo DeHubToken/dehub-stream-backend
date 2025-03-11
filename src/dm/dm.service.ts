@@ -105,32 +105,54 @@ export class DMService {
   async searchUserOrGroup(req: Request, res: Response) {
     try {
       const query: string = reqParam(req, 'q');
-
+    
       console.log(query);
-
-      const users = await AccountModel.find(
+    
+      const users = await AccountModel.aggregate([
         {
-          $or: [
-            { username: { $regex: query, $options: 'i' } }, // Case-insensitive regex match
-            { address: { $regex: query?.toLowerCase() || '' } }, // Partial match for address
-          ],
+          $match: {
+            $or: [
+              { username: { $regex: query, $options: 'i' } }, // Case-insensitive regex match
+              { address: { $regex: query?.toLowerCase() || '' } }, // Partial match for address
+            ],
+          },
         },
         {
-          username: 1,
-          _id: 1,
-          address: 1,
-          avatarImageUrl: 1,
+          $lookup: {
+            from: 'dm_settings', // Ensure this matches the actual collection name
+            localField: 'address',
+            foreignField: 'address',
+            as: 'dmSetting',
+          },
         },
-      ).exec(); // Execute the query
-
+        {
+          $match: {
+            $or: [
+              { dmSetting: { $size: 0 } }, // No dmSetting found → allow user
+              { 'dmSetting.disables': { $not: { $in: ['NEW_DM', 'ALL'] } } }, // Not disabled
+            ],
+          },
+        },
+        {
+          $project: {
+            username: 1,
+            _id: 1,
+            address: 1,
+            avatarImageUrl: 1,
+            dmSetting:1
+          },
+        },
+      ]);
+    
       return res.status(200).json({ users });
     } catch (error) {
-      console.error('Error searching users or groups:', error);
+      console.error('Error searching users:', error);
       return res.status(500).json({
-        message: 'Failed to fetch users or groups',
+        message: 'Failed to fetch users',
         error: error.message,
       });
     }
+    
   }
   async createGroupChat(req: Request, res: Response) {
     try {
