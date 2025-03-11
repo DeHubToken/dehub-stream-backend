@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
 
-export   const singleMessagePipeline = messageId => {
+export const singleMessagePipeline = messageId => {
   return [
     // Match the specific message by _id
     {
@@ -9,8 +9,6 @@ export   const singleMessagePipeline = messageId => {
       },
     },
 
-
-  
     // Lookup sender details
     {
       $lookup: {
@@ -25,7 +23,7 @@ export   const singleMessagePipeline = messageId => {
               username: 1,
               address: 1,
               displayName: 1,
-              avatarImageUrl: 1, 
+              avatarImageUrl: 1,
             },
           },
         ],
@@ -68,9 +66,7 @@ export   const singleMessagePipeline = messageId => {
         msgType: { $first: '$msgType' },
         isRead: { $first: '$isRead' },
         isPaid: { $first: '$isPaid' },
-        failureReason: { $first: '$failureReason'
-
-         },
+        failureReason: { $first: '$failureReason' },
         mediaUrls: { $first: '$mediaUrls' },
         isUnLocked: { $first: '$isUnLocked' },
         purchaseOptions: { $push: '$purchaseOptions' }, // Push the restructured purchaseOptions array
@@ -82,11 +78,13 @@ export   const singleMessagePipeline = messageId => {
 };
 
 
-export   const conversationPipeline = user => [
+export const conversationPipeline = user => [
   // Sort messages by creation time in descending order
   { $sort: { createdAt: -1 } },
+
   ...dmTips,
   ...lastReportedMessageDate(user),
+  ...lastDeletedAllMessageDate(user),
   ...lookMessages,
   // Unwind the participants array to join details for each participant
   {
@@ -302,29 +300,36 @@ export const includeSenderDetailsAndAuthor = user => [
   },
 ];
 export const lookMessages = [
-  // Lookup messages based on the conversation and handle the case where lastReportedMessageDate is undefined
   {
     $lookup: {
       from: 'messages',
       localField: '_id',
       foreignField: 'conversation',
       as: 'messages',
-      let: { lastReportedMessageDate: '$lastReportedMessageDate' }, // Pass the field to the messages pipeline
+      let: {
+        lastReportedMessageDate: '$lastReportedMessageDate',
+        lastDeletedAllMessageDate: '$lastDeletedAllMessageDate',
+      },
       pipeline: [
         {
           $match: {
             $expr: {
-              $or: [
-                { $lte: ['$createdAt', '$$lastReportedMessageDate'] }, // Fetch messages created before the block timestamp
-                { $eq: ['$$lastReportedMessageDate', null] }, // Fetch all messages if no block timestamp exists
+              $and: [
+                { $or: [
+                    { $lte: ['$createdAt', '$$lastReportedMessageDate'] }, // Fetch messages before the block timestamp
+                    { $eq: ['$$lastReportedMessageDate', null] } // Fetch all if no block timestamp exists
+                ]},
+                { $gte: ['$createdAt', '$$lastDeletedAllMessageDate'] } // Exclude messages before delete all
               ],
             },
           },
-        }, // Sort the messages by creation time (newest first)
+        },
+        { $sort: { createdAt: -1 } }, // Sort the messages by creation time (newest first)
       ],
     },
   },
 ];
+
 
 export const lastReportedMessageDate = user => [
   // Lookup reports related to the conversation
@@ -367,7 +372,45 @@ export const lastReportedMessageDate = user => [
     },
   },
 ];
-export   const dmTips = [
+export const lastDeletedAllMessageDate = user => {
+  console.log('user', user);
+  return [
+    {
+      $addFields: {
+        lastDeletedAllMessageDate: {
+          $ifNull: [
+            {
+              $arrayElemAt: [
+                {
+                  $filter: {
+                    input: '$deletedForUsers',
+                    as: 'del',
+                    cond: { $eq: ['$$del.userId', user._id] }, // Match user's deleted entry
+                  },
+                },
+                0,
+              ],
+            },
+            null, // Default to null if no matching entry is found
+          ],
+        },
+      },
+    },
+    {
+      $addFields: {
+        lastDeletedAllMessageDate: {
+          $cond: {
+            if: { $ne: ['$lastDeletedAllMessageDate', null] }, // Ensure value is not null
+            then: '$lastDeletedAllMessageDate.deletedAt', // Extract deletedAt field
+            else: null,
+          },
+        },
+      },
+    },
+  ];
+};
+
+export const dmTips = [
   {
     $lookup: {
       from: 'dmtips',

@@ -54,8 +54,7 @@ export class Message extends Document {
     enum: ['msg', 'gif', 'media'],
     default: 'msg',
   })
-  msgType: 'msg' | 'media' | 'gif';
-
+  msgType: 'msg' | 'media' | 'gif'; 
   @Prop({ type: Boolean, default: false })
   isRead: boolean;
   @Prop({ type: Boolean, default: false })

@@ -4,23 +4,25 @@ import { MessageModel } from 'models/message/dm-messages';
 import { SocketEvent } from './types';
 import { DmModel } from 'models/message/DM';
 import { AccountModel } from 'models/Account';
-import Redis from 'ioredis'; 
-import {  UserReportModel } from 'models/user-report';
+import Redis from 'ioredis';
+import { UserReportModel } from 'models/user-report';
 import { singleMessagePipeline } from './pipline';
-import {config} from "../../config/index"
+import { config } from '../../config/index';
+import { DmSettingModel } from 'models/message/message.setting';
+import { getUsersBlockingAllChats, isAllowChat } from './util';
 @Injectable()
 export class DMSocketService {
   private dmNamespace: Namespace;
   private redisClient: Redis;
   constructor(dmNamespace) {
     this.dmNamespace = dmNamespace;
-    this.redisClient = new Redis({...config.redis,db:2});
+    this.redisClient = new Redis({ ...config.redis, db: 2 });
   }
 
   async getOnlineSocketsUsers(ids: string[]) {
     const users = await AccountModel.find({ _id: { $in: ids } }, { address: 1 }).lean();
 
-    const onlineUsers = await Promise.all(  
+    const onlineUsers = await Promise.all(
       users.map(async user => {
         const redisKey = `user:${user.address.toLowerCase()}`;
         const sessionData = await this.redisClient.get(redisKey);
@@ -34,9 +36,36 @@ export class DMSocketService {
     return onlineUsers.filter(Boolean); // Filter out null or undefined entries
   }
 
-  async sendMessage({ socket, req, session, blockList }: { socket: any; req: any; session: any; blockList: any }) {
+  async sendMessage({
+    socket,
+    req,
+    session,
+    blockList,
+    dm,
+  }: {
+    socket: any;
+    req: any;
+    session: any;
+    blockList: any;
+    dm: any;
+  }) {
     if (!socket || !req || !session) {
       return;
+    }
+
+    if (dm.conversationType == 'dm') {
+      const usersRestrictReceiveMsg = await getUsersBlockingAllChats(dm.id);
+      if (usersRestrictReceiveMsg) {
+        const [user, user2] = usersRestrictReceiveMsg;
+        if (user && (user._id == session.user._id || user2?._id == session.user._id)) {
+          socket.emit(SocketEvent.error, { msg: 'Please Enable DMs.' });
+        } else if (user && user._id != session.user._id) {
+          socket.emit(SocketEvent.error, {
+            msg: `${user?.username ?? user?.address} can't receive messages right now. Please try again later as Do Not Disturb mode is active.`,
+          });
+        }
+        return { req: null, socket: null, session: null, blockList: null };
+      }
     }
 
     const userId = session.user._id;
@@ -58,7 +87,7 @@ export class DMSocketService {
         },
       ];
     }
-    const newMsg: any = await MessageModel.create(state); 
+    const newMsg: any = await MessageModel.create(state);
     const populatedMsg = await MessageModel.aggregate([
       {
         $match: { _id: newMsg._id }, // Match the newly created message
@@ -76,7 +105,7 @@ export class DMSocketService {
                 username: 1,
                 address: 1,
                 displayName: 1,
-                avatarImageUrl: 1, 
+                avatarImageUrl: 1,
               },
             },
           ],
@@ -86,18 +115,18 @@ export class DMSocketService {
         $project: {
           sender: { $first: '$senderDetails' }, // Extract the first (and only) matched sender
           conversation: 1,
-          content: 1, 
+          content: 1,
           msgType: 1,
-          isRead: 1, 
-          isUnLocked: 1,  
+          isRead: 1,
+          isUnLocked: 1,
           mediaUrls: 1,
           createdAt: 1,
           updatedAt: 1,
         },
       },
-    ]); 
+    ]);
     socket.emit(SocketEvent.sendMessage, { ...populatedMsg[0], author: 'me' });
-    const dm = await DmModel.findByIdAndUpdate(req.dmId, {
+    dm = await DmModel.findByIdAndUpdate(req.dmId, {
       $set: {
         lastMessageAt: new Date(),
       },
@@ -160,28 +189,33 @@ export class DMSocketService {
         msg: 'DM session exists',
         data: { ...existingDm, participants: [{ participant: user2, role: 'member' }] },
       });
-    } else {
-      // Prepare participants array
-      const participants = [
-        { participant: session.user._id, role: 'member' }, // Assign 'member' role to the initiator
-        { participant: userId2, role: 'member' }, // Assign 'member' role to the other user
-      ];
-
-      // If no DM session exists, create a new one
-      const newDm: any = new DmModel({
-        participants,
-        createdBy: session.user._id,
-        conversationType: 'dm',
-        lastMessageAt: new Date(),
-      });
-      // Save the new DM session to the database
-      await newDm.save();
-      // Emit the event to notify the client
-      socket.emit(SocketEvent.createAndStart, {
-        msg: 'Created new DM',
-        data: { ...newDm._doc, participants: [{ participant: user2, role: 'member' }] },
-      });
+      return;
     }
+    const user2Setting = await DmSettingModel.findOne({ address: user2?.address.toLowerCase() });
+
+    if (!isAllowChat(user2Setting?.address, ['NEW_DM', 'ALL'])) {
+      socket.emit(SocketEvent.error, { msg: 'User has restricted DM access' });
+    }
+    // Prepare participants array
+    const participants = [
+      { participant: session.user._id, role: 'member' }, // Assign 'member' role to the initiator
+      { participant: userId2, role: 'member' }, // Assign 'member' role to the other user
+    ];
+
+    // If no DM session exists, create a new one
+    const newDm: any = new DmModel({
+      participants,
+      createdBy: session.user._id,
+      conversationType: 'dm',
+      lastMessageAt: new Date(),
+    });
+    // Save the new DM session to the database
+    await newDm.save();
+    // Emit the event to notify the client
+    socket.emit(SocketEvent.createAndStart, {
+      msg: 'Created new DM',
+      data: { ...newDm._doc, participants: [{ participant: user2, role: 'member' }] },
+    });
   }
   async deleteMessage({ socket, req, session, blockList }: { socket: any; req: any; session: any; blockList: any }) {
     if (!socket || !req || !session) {
@@ -307,7 +341,10 @@ export class DMSocketService {
     blockList: any;
   }) {
     const userId = session?.user?._id;
-    const messageId = req.messageId;
+    const messageId = req?.messageId;
+    if (!messageId && !userId) {
+      return;
+    }
     const pipeline = [...singleMessagePipeline(messageId)];
     const validatedMessages = await MessageModel.aggregate(pipeline);
     const message = validatedMessages[0];

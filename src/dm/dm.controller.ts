@@ -193,4 +193,39 @@ export class DMController {
       });
     }
   }
+
+  @Post("/dm/user-status/:address")
+  async UserDMStatus(@Req() req: Request, @Res() res: Response){
+    try {
+      return await this.dmServices.updateDmUserStatus(req, res);
+    } catch (error) {
+      return res.status(500).json({
+        message: 'Failed to Disable Status',
+        error: error.message,
+      });
+    }
+  }
+  @Get("/dm/user-status/:address")
+  async getUserDMStatus(@Req() req: Request, @Res() res: Response){
+    try {
+      return await this.dmServices.getUserDMStatus(req, res);
+    } catch (error) {
+      return res.status(500).json({
+        message: 'Failed to Disable Status',
+        error: error.message,
+      });
+    }
+  }
+
+  @Post("/dm/delete-messages")
+  async deleteAllMessagesOneSide(@Req() req: Request, @Res() res: Response){
+    try {
+      return await this.dmServices.deleteAllMessagesOneSide(req, res);
+    } catch (error) {
+      return res.status(500).json({
+        message: 'Failed to Delete Messages',
+        error: error.message,
+      });
+    }
+  }
 }
