@@ -68,23 +68,15 @@ export class DM extends Document {
   createdBy: mongoose.Schema.Types.ObjectId;
 
   @Prop({
-    type: Map,
-    of: String,
-    default: function (this: DM) {
-      const roles = new Map();
-      // Assign 'admin' role to the creator
-      roles.set(this.createdBy.toString(), 'admin');
-      // Assign 'member' role to all other participants by default
-      this.participants?.forEach(participant => {
-        if (participant.toString() !== this.createdBy.toString()) {
-          roles.set(participant.toString(), 'member');
-        }
-      });
-      return roles;
-    },
+    type: [
+      {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'Account', required: true },
+        deletedAt: { type: Date, required: true },
+      },
+    ],
+    default: [],
   })
-  roles: Map<string, string>;
-
+  deletedForUsers: { userId: mongoose.Schema.Types.ObjectId; deletedAt: Date }[];
   @Prop({ type: Date, default: Date.now })
   lastMessageAt: Date;
 }

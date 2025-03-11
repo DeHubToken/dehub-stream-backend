@@ -9,7 +9,8 @@ import { Types } from 'mongoose';
 import { DmModel } from 'models/message/DM';
 import { dmTips } from './pipline';
 import Redis from 'ioredis';
-import {config} from "../../config/index"
+import { config } from '../../config/index';
+import { getUsersBlockingAllChats } from './util';
 
 // interface Session {
 //   username: string;
@@ -20,7 +21,7 @@ import {config} from "../../config/index"
 
 @Injectable()
 export class DMSocketController {
-  private dmNamespace: Namespace; 
+  private dmNamespace: Namespace;
   private eventEmitter: EventEmitter2;
   private dmSocketService: any;
   private redisClient: Redis;
@@ -28,7 +29,7 @@ export class DMSocketController {
   constructor(private readonly io: Server) {
     this.dmNamespace = this.io.of('/dm');
     this.eventEmitter = EventManager.getInstance();
-    this.redisClient =new Redis({...config.redis,db:2});
+    this.redisClient = new Redis({ ...config.redis, db: 2 });
     this.listenEvents();
     this.bootstrap();
     this.listenEvents();
@@ -128,7 +129,6 @@ export class DMSocketController {
     }
   }
 
-
   async withSession(socket, req) {
     const userAddress = socket.handshake.query.address;
     const redisKey = `user:${userAddress?.toLowerCase()}`;
@@ -136,13 +136,11 @@ export class DMSocketController {
     return { req, socket, session: { user: session, redisClient: this.redisClient } };
   }
 
-
   async withRestrictedZone({ req, socket, session }) {
     const blockList = await this.dmSocketService.getBlockedUsersForConversation(req.dmId);
     const dm: any = await DmModel.findById(req.dmId, { _id: 1, conversationType: 1 });
     const userId = session.user._id;
-    let next = true;
-
+    let next = true; 
     if (blockList.length > 0 && dm.conversationType == 'dm') {
       socket.emit(SocketEvent.error, { msg: 'this chat was blocked' });
       next = false;
@@ -158,22 +156,18 @@ export class DMSocketController {
       });
     }
     if (!next) {
-      return { req: null, socket: null, session: null, blockList: null };
+      return { req: null, socket: null, session: null, blockList: null ,dm:null };
     }
- 
-    return { req, socket, session, blockList };
+
+    return { req, socket, session, blockList ,dm};
   }
 
   async listenEvents() {
     this.eventEmitter.on(EventEmitter.tipSend, async payload => {
       const { senderAddress, receiverAddress, dmId } = payload;
 
-      const senderSession = JSON.parse(
-        await this.redisClient.get(`user:${senderAddress?.toLowerCase()}`)
-      );
-      const receiverSession = JSON.parse(
-        await this.redisClient.get(`user:${receiverAddress?.toLowerCase()}`)
-      );
+      const senderSession = JSON.parse(await this.redisClient.get(`user:${senderAddress?.toLowerCase()}`));
+      const receiverSession = JSON.parse(await this.redisClient.get(`user:${receiverAddress?.toLowerCase()}`));
 
       const updatedDM = await DmModel.aggregate([
         {
@@ -201,5 +195,4 @@ export class DMSocketController {
       console.log('tip-updates-sent');
     });
   }
-
 }

@@ -16,6 +16,7 @@ import { DmTips } from 'models/message/tips';
 import { supportedTokens } from 'config/constants';
 import { EventEmitter, EventManager } from 'src/events/event-manager';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { DmSettingModel } from 'models/message/message.setting';
 @Injectable()
 export class DMService {
   eventEmitter: EventEmitter2;
@@ -25,7 +26,7 @@ export class DMService {
     // Access the shared EventEmitter instance
   ) {
     this.eventEmitter = EventManager.getInstance();
-  } 
+  }
   private checkIsAdmin(participants, adminId) {
     return participants.some(p => {
       const key2 = p.participant.toString();
@@ -37,35 +38,121 @@ export class DMService {
   private isUserInGroup(participants, userId) {
     return participants.some(p => p.participant.toString() === userId.toString());
   }
+  async updateDmUserStatus(req: Request, res: Response) {
+    try {
+      const address = reqParam(req, 'address')?.toLowerCase();
+      const status = reqParam(req, 'status');
+      const action = reqParam(req, 'action'); // "enable" or "disable"
+
+      if (!address) {
+        return res.status(400).json({ message: 'Address is required' });
+      }
+
+      if (!['NEW_DM', 'ALL', 'ACTIVE_ALL'].includes(status)) {
+        return res.status(400).json({ message: 'Invalid status' });
+      }
+
+      if (!['enable', 'disable'].includes(action)) {
+        return res.status(400).json({ message: "Invalid action, must be 'enable' or 'disable'" });
+      }
+
+      let updateQuery: any = {};
+
+      if (action === 'disable') {
+        if (status === 'ACTIVE_ALL') {
+          return res.status(400).json({ message: 'Cannot disable ACTIVE_ALL' });
+        }
+        updateQuery = { $set: { disables: [status] } }; // Replace any existing restrictions
+      } else {
+        updateQuery = { $set: { disables: [] } }; // Enable all DMs (clear all restrictions)
+      }
+
+      const updatedSetting = await DmSettingModel.findOneAndUpdate({ address }, updateQuery, {
+        new: true,
+        upsert: true,
+      });
+
+      return res.json({
+        message: `DM preferences updated: ${action}d ${status}`,
+        data: updatedSetting,
+      });
+    } catch (error) {
+      console.error('Error updating DM status:', error);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+
+  async getUserDMStatus(req: Request, res: Response) {
+    try {
+      const address = reqParam(req, 'address')?.toLowerCase();
+
+      if (!address) {
+        return res.status(400).json({ message: 'Address is required' });
+      }
+
+      const userDmSetting = await DmSettingModel.findOne({ address });
+
+      return res.json({
+        message: 'User DM status fetched successfully',
+        data: userDmSetting?.disables?.length ? userDmSetting.disables : ['ACTIVE_ALL'], // Default to ACTIVE_ALL if empty
+      });
+    } catch (error) {
+      console.error('Error fetching user DM status:', error);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+
   async searchUserOrGroup(req: Request, res: Response) {
     try {
       const query: string = reqParam(req, 'q');
-
+    
       console.log(query);
-
-      const users = await AccountModel.find(
+    
+      const users = await AccountModel.aggregate([
         {
-          $or: [
-            { username: { $regex: query, $options: 'i' } }, // Case-insensitive regex match
-            { address: { $regex: query?.toLowerCase() || '' } }, // Partial match for address
-          ],
+          $match: {
+            $or: [
+              { username: { $regex: query, $options: 'i' } }, // Case-insensitive regex match
+              { address: { $regex: query?.toLowerCase() || '' } }, // Partial match for address
+            ],
+          },
         },
         {
-          username: 1,
-          _id: 1,
-          address: 1,
-          avatarImageUrl: 1,
+          $lookup: {
+            from: 'dm_settings', // Ensure this matches the actual collection name
+            localField: 'address',
+            foreignField: 'address',
+            as: 'dmSetting',
+          },
         },
-      ).exec(); // Execute the query
-
+        {
+          $match: {
+            $or: [
+              { dmSetting: { $size: 0 } }, // No dmSetting found → allow user
+              { 'dmSetting.disables': { $not: { $in: ['NEW_DM', 'ALL'] } } }, // Not disabled
+            ],
+          },
+        },
+        {
+          $project: {
+            username: 1,
+            _id: 1,
+            address: 1,
+            avatarImageUrl: 1,
+            dmSetting:1
+          },
+        },
+      ]);
+    
       return res.status(200).json({ users });
     } catch (error) {
-      console.error('Error searching users or groups:', error);
+      console.error('Error searching users:', error);
       return res.status(500).json({
-        message: 'Failed to fetch users or groups',
+        message: 'Failed to fetch users',
         error: error.message,
       });
     }
+    
   }
   async createGroupChat(req: Request, res: Response) {
     try {
@@ -143,7 +230,7 @@ export class DMService {
         message: 'An error occurred while creating the group chat.',
       });
     }
-  } 
+  }
   async updateGroupChat(req: Request, res: Response) {
     try {
       // Parse input data
@@ -225,7 +312,7 @@ export class DMService {
         message: 'An error occurred while updating the group chat.',
       });
     }
-  } 
+  }
   async joinGroup(req: Request, res: Response) {
     try {
       // Parse input data
@@ -242,7 +329,7 @@ export class DMService {
       if (!group) {
         return res.status(404).json({ success: false, message: 'Group not found.' });
       }
-      console.log("isAdmin",isAdmin)
+      console.log('isAdmin', isAdmin);
       if (isAdmin) {
         const isAlreadyJoined = this.isUserInGroup(group.participants, user._id);
         if (isAlreadyJoined) return res.status(200).json({ success: false, message: 'Already in the group.' });
@@ -368,7 +455,6 @@ export class DMService {
     if (!user) {
       throw new Error('User not found');
     }
-
     const pipeline: any = [
       {
         $match: {
@@ -637,7 +723,7 @@ export class DMService {
         error: 'An error occurred while processing your request.',
       });
     }
-  } 
+  }
   async exitGroupUser(req: Request, res: Response) {
     const conversationId = reqParam(req, 'conversationId');
     const userAddress = reqParam(req, 'userAddress');
@@ -708,7 +794,7 @@ export class DMService {
       console.error('Error in exitGroupUser:', error);
       return res.status(500).json({ error: 'An internal error occurred' });
     }
-  } 
+  }
   async unBlockDm(req: Request, res: Response) {
     try {
       const conversationId = reqParam(req, 'conversationId'); // Get conversation ID from request
@@ -964,7 +1050,7 @@ export class DMService {
         error: error.message,
       });
     }
-  }  
+  }
   async updateTnx(req: Request, res: Response) {
     const { tnxId, dmId, status, tnxHash } = req.body;
 
@@ -1045,5 +1131,39 @@ export class DMService {
         error: error.message,
       });
     }
-  }  
+  }
+  async deleteAllMessagesOneSide(req: Request, res: Response) {
+    try {
+      const address = reqParam(req, 'address');
+      const dmId = reqParam(req, 'dmId');
+
+      if (!address || !dmId) {
+        return res.status(400).json({ success: false, message: 'Address and DM ID are required.' });
+      }
+
+      const user = await AccountModel.findOne({ address: address.toLowerCase() });
+
+      if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found.' });
+      }
+
+      // Soft delete messages for the user by updating or inserting `deletedForUsers`
+      await DmModel.updateOne(
+        { _id: dmId, 'deletedForUsers.userId': user._id }, // Check if already exists
+        { $set: { 'deletedForUsers.$.deletedAt': new Date() } }, // Update if exists
+        { upsert: false }, // Do not insert a new document if not found
+      );
+
+      // If the user was not found in `deletedForUsers`, add them
+      await DmModel.updateOne(
+        { _id: dmId, 'deletedForUsers.userId': { $ne: user._id } }, // Only add if not present
+        { $push: { deletedForUsers: { userId: user._id, deletedAt: new Date() } } },
+      );
+
+      return res.status(200).json({ success: true, message: 'Messages deleted for user (one-sided).' });
+    } catch (error) {
+      console.error('Error deleting messages:', error);
+      return res.status(500).json({ success: false, message: 'Internal server error.' });
+    }
+  }
 }
