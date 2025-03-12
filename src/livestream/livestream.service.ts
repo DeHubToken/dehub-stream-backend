@@ -156,7 +156,7 @@ export class LivestreamService {
             followersOnly: false,
             slowMode: 0,
           },
-          minTip: Number(data.settings?.['minTip']) || 500,
+          minTip: Number(data.settings?.['minTip']) || 1000,
           // tipDelay: Number(data.settings?.['tipDelay']) || 0,
         },
         streamDelay: data?.streamDelay || 0,
