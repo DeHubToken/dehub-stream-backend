@@ -38,7 +38,7 @@ export class AuthGuard implements CanActivate {
         request.params.rawSig = decodedToken.rawSig;
         request.params.timestamp = decodedToken.timestamp;
         return true;
-      } catch (error) {
+      } catch (error: any & { message: string }) {
         throw new UnauthorizedException('Invalid authorization token');
       }
     } else {

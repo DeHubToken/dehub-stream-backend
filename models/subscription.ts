@@ -7,7 +7,7 @@ import { ActivityActionType, ActivityModel } from './activity';
 export type SubscriptionDocument = Subscription & Document;
 
 @Schema({ timestamps: true }) // Automatically manage createdAt and updatedAt fields
-export class Subscription {
+export class Subscription extends Document{
   @Prop({ unique: true })
   id: string; // Unique subscription ID
 
@@ -58,7 +58,7 @@ SubscriptionSchema.pre('save', async function (next) {
       );
 
       this.id = counter.seq.toString(); // Assign auto-incremented ID
-    } catch (error) {
+    } catch (error:any) {
       next(error);
     }
   } else {

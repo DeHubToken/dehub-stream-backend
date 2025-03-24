@@ -82,7 +82,7 @@ export class NmsStreamingService implements OnModuleInit, OnModuleDestroy {
             }
           }
         }
-      } catch (error) {
+      } catch (error: any & { message: string }) {
         console.error('Error uploading segments:', error);
       }
     }, 1000);
@@ -92,7 +92,7 @@ export class NmsStreamingService implements OnModuleInit, OnModuleDestroy {
     const rtmpUrl = `rtmp://localhost:1935/live/${streamId}`;
     try {
       await this.pushToRtmp(rtmpUrl, chunk);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error pushing to RTMP:', error);
     }
   }

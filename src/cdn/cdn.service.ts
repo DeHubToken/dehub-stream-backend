@@ -106,7 +106,7 @@ export class CdnService {
         Bucket: process.env.DO_S3_SPACENAME,
         Key: keyg,
       }));
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       throw new Error(`Failed to delete file from DigitalOcean: ${error.message}`);
     }
   }

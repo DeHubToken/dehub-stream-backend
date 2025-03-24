@@ -145,7 +145,7 @@ TokenSchema.pre<TokenDocument>('save', async function (next) {
         doc.videoUrl = `videos/${doc.tokenId}`;
       }
       next();
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       next(error);
     }
   } else {

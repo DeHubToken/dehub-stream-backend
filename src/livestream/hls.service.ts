@@ -147,7 +147,7 @@ export class HlsService {
         // just delete man
         // fs.unlinkSync(filePath);
       }
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error(`[Stream ${streamId}] Error uploading segments:`, error);
     }
   }
@@ -221,7 +221,7 @@ export class HlsService {
       // Remove temporary files
       fs.rmSync(streamData.tempPath, { recursive: true, force: true });
       this.streams.delete(streamId);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error(`[Stream ${streamId}] Error during cleanup:`, error);
       throw error;
     }

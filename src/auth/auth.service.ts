@@ -22,7 +22,7 @@ export class AuthService {
         status: true,
         result: { address, lastLoginTimestamp: account.lastLoginTimestamp },
       });
-    } catch (e) {
+    } catch (e: any & { message: string }) {
       return res.status(500).json({ error: true, message: 'Sign Error' });
     }
   }

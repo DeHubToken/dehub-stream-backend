@@ -76,7 +76,7 @@ export class DMService {
         message: `DM preferences updated: ${action}d ${status}`,
         data: updatedSetting,
       });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error updating DM status:', error);
       return res.status(500).json({ message: 'Internal server error' });
     }
@@ -96,7 +96,7 @@ export class DMService {
         message: 'User DM status fetched successfully',
         data: userDmSetting?.disables?.length ? userDmSetting.disables : ['ACTIVE_ALL'], // Default to ACTIVE_ALL if empty
       });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error fetching user DM status:', error);
       return res.status(500).json({ message: 'Internal server error' });
     }
@@ -145,7 +145,7 @@ export class DMService {
       ]);
     
       return res.status(200).json({ users });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error searching users:', error);
       return res.status(500).json({
         message: 'Failed to fetch users',
@@ -223,7 +223,7 @@ export class DMService {
         message: 'Group chat created successfully!',
         data: dms[0],
       });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error creating group chat:', error);
       return res.status(500).json({
         success: false,
@@ -305,7 +305,7 @@ export class DMService {
         message: 'Group chat updated successfully!',
         data: updatedDms[0],
       });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error updating group chat:', error);
       return res.status(500).json({
         success: false,
@@ -372,7 +372,7 @@ export class DMService {
           message: 'User successfully joined the group.',
         });
       }
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error creating group chat:', error);
       return res.status(500).json({
         success: false,
@@ -443,7 +443,7 @@ export class DMService {
 
       // Send response
       return res.status(200).json({ messages: messages.reverse() });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error fetching messages:', error);
       return res.status(500).json({ error: 'Internal server error' });
     }
@@ -615,7 +615,7 @@ export class DMService {
         conversationId: conversationId,
         reportId: updatedReport._id,
       });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error in blockDm:', error);
       return res.status(500).json({
         error: 'An error occurred while processing your request.',
@@ -717,7 +717,7 @@ export class DMService {
         conversationId,
         success: false,
       });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error in blockGroupUser:', error);
       return res.status(500).json({
         error: 'An error occurred while processing your request.',
@@ -790,7 +790,7 @@ export class DMService {
         // Unauthorized action
         return res.status(403).json({ error: 'Unauthorized action' });
       }
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error in exitGroupUser:', error);
       return res.status(500).json({ error: 'An internal error occurred' });
     }
@@ -892,7 +892,7 @@ export class DMService {
         conversationId: conversationId,
         reportId: updatedReport._id,
       });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error in unBlockDm:', error);
       return res.status(500).json({
         error: 'An error occurred while processing your request.',
@@ -968,7 +968,7 @@ export class DMService {
       }
 
       return res.status(200).json(dm);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error fetching DM by Plan ID:', error);
       return res.status(500).json({ message: 'Internal Server Error' });
     }
@@ -1042,7 +1042,7 @@ export class DMService {
         success: true,
         data: savedMessage,
       });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       // Handle potential errors during save
       return res.status(500).json({
         success: false,
@@ -1123,7 +1123,7 @@ export class DMService {
           message: 'Tip Sent Confirmed.',
         });
       }
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       // Handle errors
       return res.status(500).json({
         success: false,
@@ -1161,7 +1161,7 @@ export class DMService {
       );
 
       return res.status(200).json({ success: true, message: 'Messages deleted for user (one-sided).' });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error deleting messages:', error);
       return res.status(500).json({ success: false, message: 'Internal server error.' });
     }

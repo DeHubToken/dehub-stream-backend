@@ -92,7 +92,7 @@ export class PlanEventListenerService implements OnModuleInit {
       });
 
       this.logger.log(`Listening for SubscriptionBought and PlanCreated events on ${networkName}`);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       this.logger.error(`Error setting up listener for ${networkName}: ${error.message}`);
     }
   }
@@ -161,7 +161,7 @@ export class PlanEventListenerService implements OnModuleInit {
         this.logger.error(`Failed to update subscription with id: ${id.toString()}`);
       
       }
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       this.logger.error(`Error processing SubscriptionBought event: ${error.message}`);
     }
   }
@@ -199,7 +199,7 @@ export class PlanEventListenerService implements OnModuleInit {
         this.logger.log(`Plan updated successfully for id: ${id.toString()} on chainId: ${chainId}`);
         this.activityService.onPlanPublished(plan);
       }
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       this.logger.error(`Error processing PlanCreated event: ${error.message}`);
     }
   }

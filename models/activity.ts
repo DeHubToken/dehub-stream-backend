@@ -10,7 +10,7 @@ export const ActivityActionType = {
   PLAN_PUBLISHED: 'plan-published',
   PURCHASE_PLAN: 'purchase-plan',
   LIKE: 'like',
-  DIS_LIKE:'dis-like',
+  DIS_LIKE: 'dis-like',
   FOLLOW: 'follow',
   REPLY_ON_POST: 'reply-on-post',
   COMMENT_ON_POST: 'comment-on-post',
@@ -21,7 +21,7 @@ export const ActivityActionType = {
 export type ActivityDocument = Activity & Document;
 
 @Schema({ timestamps: true })
-export class Activity {
+export class Activity extends Document {
   @Prop({ required: false })
   tokenId?: number;
 
@@ -37,8 +37,6 @@ export class Activity {
     enum: Object.values(ActivityActionType),
     required: true,
   })
-
-  
   type: string;
 }
 

@@ -180,7 +180,7 @@ export class LivestreamService {
 
       await stream.save();
       return stream;
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error creating stream:', error);
       throw new Error('Failed to create stream');
     }

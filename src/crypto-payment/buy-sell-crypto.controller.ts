@@ -13,7 +13,7 @@ export class BuySellCryptoController {
     try {
       const url = await this.buySellCryptoService.buyCrypto(req);
       return res.status(HttpStatus.OK).json({ url });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error generating MoonPay URL:', error);
       return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ error: 'Failed to generate MoonPay URL' });
     }
@@ -25,7 +25,7 @@ export class BuySellCryptoController {
       
       const url = await this.buySellCryptoService.sellCrypto(req);
       return res.status(HttpStatus.OK).json({ url });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error generating MoonPay URL:', error);
       return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ error: 'Failed to generate MoonPay URL' });
     }
@@ -50,7 +50,7 @@ export class BuySellCryptoController {
       await this.buySellCryptoService.saveTransactionDetails(eventData);
 
       return res.status(HttpStatus.OK).send('Webhook processed');
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error handling MoonPay webhook:', error);
       return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Webhook error');
     }

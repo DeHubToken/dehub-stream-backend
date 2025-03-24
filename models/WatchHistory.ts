@@ -4,7 +4,7 @@ import mongoose, { Document, Model } from 'mongoose';
 export type WatchHistoryDocument = WatchHistory & Document;
 
 @Schema({ timestamps: true })
-export class WatchHistory {
+export class WatchHistory extends Document {
   @Prop({ type: Number, index: true })
   tokenId: number;
 

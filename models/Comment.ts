@@ -7,7 +7,7 @@ export type CommentDocument = Comment & Document;
 
 // Define the Comment schema
 @Schema({ timestamps: true })
-export class Comment {
+export class Comment   extends Document {
   @Prop({ unique: true })
   id: string;
 
@@ -47,7 +47,7 @@ CommentSchema.pre<CommentDocument>('save', async function (next) {
 
       doc.id = counter?.seq ?? 0; // Fallback to 0 if counter is undefined
       next();
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       next(error);
     }
   } else {

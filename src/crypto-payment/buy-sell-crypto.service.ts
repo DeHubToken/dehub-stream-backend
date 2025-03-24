@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { AccountModel } from 'models/Account';
-import { TransactionModel } from 'models/PaymentTransactions';
+import { TransactionDocument, TransactionModel } from 'models/PaymentTransactions';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -30,7 +30,7 @@ export class BuySellCryptoService {
       });
       const signature = moonPayInstance.url.generateSignature(url);
       return `${url}&signature=${signature}`;
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error generating MoonPay URL:', error);
       throw new Error('Failed to generate MoonPay URL');
     }
@@ -61,7 +61,7 @@ export class BuySellCryptoService {
 
       const signature = moonPayInstance.url.generateSignature(url);
       return `${url}&signature=${signature}`;
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error generating MoonPay URL:', error);
       throw new Error('Failed to generate MoonPay URL');
     }
@@ -100,7 +100,7 @@ export class BuySellCryptoService {
       const computedSignature = hmac.digest('hex');
 
       return computedSignature === expectedSignature;
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return false;
     }
   }
@@ -146,7 +146,7 @@ export class BuySellCryptoService {
         }
       }
 
-      const existingTransaction = await TransactionModel.findOne({ transactionId });
+      const existingTransaction :TransactionDocument= await TransactionModel.findOne({ transactionId });
       if (existingTransaction) {
         if (existingTransaction.status !== status || (accountId && !existingTransaction.account)) {
           existingTransaction.status = status;
@@ -173,7 +173,7 @@ export class BuySellCryptoService {
         await newTransaction.save();
         console.log(`Saved new transaction ${transactionId} with status: ${status}`);
       }
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error saving transaction to database:', error);
     }
   }

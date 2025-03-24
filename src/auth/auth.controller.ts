@@ -14,7 +14,7 @@ export class AuthController {
       console.log("signinWithWallet")
       const result = await this.authService.signWithWallet(req,res);
       return res.json(result);
-    } catch (error) {
+    } catch (error:   any & { message: string }) {
       return res.status(500).json({ error: true, message: error.message });
     }
   }
@@ -25,7 +25,7 @@ export class AuthController {
     console.log("loginWithWallet")
     try {
       return await this.authService.login(req, res); 
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res.status(500).json({ error: true, message: error.message });
     }
   }

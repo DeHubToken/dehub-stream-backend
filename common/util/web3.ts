@@ -9,9 +9,9 @@ import erc1155ContractAbi from '../../abis/erc1155.json';
 import erc721ContractAbi from '../../abis/StreamNft.json';
 
 
-const getTokenByTokenAddress = (tokenAddress, chainId = 56) => supportedTokens.find(e => e.address.toLowerCase() === tokenAddress.toLowerCase() && e.chainId === chainId);
+const getTokenByTokenAddress = (tokenAddress:string, chainId = 56) => supportedTokens.find(e => e.address.toLowerCase() === tokenAddress.toLowerCase() && e.chainId === chainId);
 
-const getERC20TokenBalance = async (account, tokenAddress, chainId) => {
+const getERC20TokenBalance = async (account:string, tokenAddress:string, chainId:number) => {
     const network = supportedNetworks.find(e => e.chainId === chainId);
     const token = supportedTokens.find(e => e.address.toLowerCase() === tokenAddress.toLowerCase());
     if (!network || !token) return 0;
@@ -30,7 +30,7 @@ const makeAggregateCalldata = (callObjectArray) => {
             };
         });
         return calldata;
-    } catch (error) {
+    } catch (error: any & { message: string }) {
         console.log('makeAggregateCalldata', error);
         return [];
     }
@@ -52,7 +52,7 @@ const parseAggregateCalldata = (returnResult, callObjectArray) => {
             }
         });
         return returnData;
-    } catch (error) {
+    } catch (error: any & { message: string }) {
         console.log('parseAggregateCalldata');
         return {};
     }
@@ -77,7 +77,7 @@ const parseTryAggregateCalldata = (returnResult, callObjectArray) => {
             }
         })
         return returnData
-    } catch (error) {
+    } catch (error: any & { message: string }) {
         console.log('parseAggregateCalldata', error?.message)
         return {}
     }
@@ -111,7 +111,7 @@ const multiCallReading = async (multicallContract, callDataArray, fetchUnit = 50
             resultObject = { ...resultObject, ...resultParsed }
         }
         return resultObject;
-    } catch (error) {
+    } catch (error: any & { message: string }) {
         console.log(' ---multicall reading error', error.message)
     }
 }

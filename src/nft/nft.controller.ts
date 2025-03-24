@@ -18,7 +18,7 @@ export class NFTController {
   async getAllNfts(@Req() req: Request, @Res() res: Response) {
     try {
       return await this.nftServices.getAllNfts(req, res);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res.status(500).json({ message: 'Failed to fetch NFTs', error: error.message });
     }
   }
@@ -28,7 +28,7 @@ export class NFTController {
       console.log('GET NFT');
       
       return await this.nftServices.getFilteredNfts(req, res);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res.status(500).json({ message: 'Failed to fetch NFTs', error: error.message });
     }
   }
@@ -37,7 +37,7 @@ export class NFTController {
   async myNfts(@Req() req: Request, @Res() res: Response) {
     try {
       return await this.nftServices.getMyNfts(req, res);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res.status(500).json({ message: 'Failed to fetch NFTs', error: error.message });
     }
   }
@@ -46,7 +46,7 @@ export class NFTController {
   async changeVisibility(@Req() req: Request, @Res() res: Response) {
     try {
       return await this.nftServices.updateTokenVisibility(req, res);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res.status(500).json({ message: 'Failed to fetch NFTs', error: error.message });
     }
   }
@@ -55,7 +55,7 @@ export class NFTController {
   async watchhistory(@Req() req: Request, @Res() res: Response) {
     try {
       return await this.nftServices.getMyWatchedNfts(req, res);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res.status(500).json({ message: 'Failed to fetch NFTs', error: error.message });
     }
   }
@@ -63,7 +63,7 @@ export class NFTController {
   async getCat(@Res() res: Response) {
     try {
       return await this.nftServices.getCategories(res);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res.status(500).json({ message: 'Failed to fetch Categories', error: error.message });
     }
   }
@@ -95,7 +95,7 @@ export class NFTController {
         files,
       );
       return res.json(nft);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Failed to mint NFT:', error);
       return res.status(500).json({ message: 'Failed to mint NFT', error: error.message });
     }
@@ -111,7 +111,7 @@ export class NFTController {
   async nftinfo(@Req() req: Request, @Res() res: Response) {
     try {
       return await this.nftServices.getNftInfo(req, res);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res.status(500).json({ message: 'Failed to fetch NFTs', error: error.message });
     }
   }
@@ -122,7 +122,7 @@ export class NFTController {
   async nftImage(@Req() req: Request, @Res() res: Response) {
     try {
       return await this.nftServices.getNftImage(req, res);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res.status(500).json({ message: 'Failed to fetch NFTs', error: error.message });
     }
   }
@@ -130,7 +130,7 @@ export class NFTController {
   async unlockedNft(@Req() req: Request, @Res() res: Response) {
     try {
       return await this.nftServices.getUnlockedNfts(req, res);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res.status(500).json({ message: 'Failed to fetch NFTs', error: error.message });
     }
   }
@@ -154,7 +154,7 @@ export class NFTController {
       const savePost = await this.nftServices.savePost(tokenId,address)
       console.log('savePost:', savePost)
       res.json(savePost)
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res.status(500).json({
         message: 'Something went wrong while saving the post.',
         error: error.message,

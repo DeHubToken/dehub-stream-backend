@@ -48,7 +48,7 @@ ClaimTransactionSchema.pre<IClaimTransaction>('save', async function (next) {
         doc.id = counter.seq; // Set the incremented value
       }
       next(); // Call next() to proceed
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       next(error); // Pass error to next middleware
     }
   } else {

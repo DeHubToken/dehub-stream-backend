@@ -5,7 +5,7 @@ import mongoose, { Document } from 'mongoose';
 export type CategoryDocument = Category & Document;
 
 @Schema({ timestamps: true })
-export class Category {
+export class Category   extends Document {
   @Prop({ unique: true, required: true })
   name: string;
 
@@ -29,7 +29,7 @@ CategorySchema.pre<CategoryDocument>('save', async function (next) {
 
       doc.id = counter?.seq ?? 0; // Fallback to 0 if counter is undefined
       next();
-    } catch (error) {
+    } catch (error:any) {
       next(error);
     }
   } else {
@@ -40,5 +40,5 @@ CategorySchema.pre<CategoryDocument>('save', async function (next) {
 // Create a unique index on the name field
 CategorySchema.index({ name: 1 }, { unique: true });
 
-// Export the model type and schema
+// Export the model type and schema 
 export const CategoryModel = mongoose.model<CategoryDocument>('categories', CategorySchema);

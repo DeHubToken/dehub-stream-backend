@@ -10,7 +10,7 @@ export class FeedReportController {
   async addReport(@Req() req: Request, @Res() res: Response) {
     try {
       return await this.feedReportService.addReport(req, res);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res.status(500).json({
         message: 'Failed to get Activity',
         error: error.message,
@@ -21,7 +21,7 @@ export class FeedReportController {
   async fetchFeedReport(@Req() req: Request, @Res() res: Response) {
     try {
       return await this.feedReportService.fetchFeedReports(req, res);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res.status(500).json({
         message: 'Failed to get Activity',
         error: error.message,
@@ -33,7 +33,7 @@ export class FeedReportController {
     try {
       // Call the service to fetch reports using tokenId
       return await this.feedReportService.fetchReportByTokenId(req, res);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       // Handle errors
       return res.status(500).json({
         message: 'Failed to get Activity',

@@ -61,7 +61,7 @@ export class JobService {
       console.log(`Added ${validJobs.length} media upload jobs to the queue.`);
 
       return { msg: 'Bulk upload jobs added successfully', count: validJobs.length };
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error adding bulk media upload jobs:', error.message);
       throw error;
     }

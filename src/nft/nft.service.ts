@@ -583,9 +583,9 @@ export class NftService {
         await Promise.all(userSavedPromises);
       }
       res.send({ result: ret });
-    } catch (e) {
-      console.log('   ...', new Date(), ' -- index/tokens-search err: ', e);
-      res.status(500).send({ error: e.message });
+    } catch (error:any&{message:string}) {
+      console.log('   ...', new Date(), ' -- index/tokens-search err: ', error);
+      res.status(500).send({ error: error.message });
     }
   }
 
@@ -707,7 +707,7 @@ export class NftService {
 
       await payload.save();
       res.status(200).json({ message: 'Video added to liked videos' });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       res.status(500).json({ error: error.message });
     }
   }
@@ -729,11 +729,11 @@ export class NftService {
           }),
         );
         res.status(200).json({ result: updatedResult });
-      } catch (error) {
+      } catch (error: any & { message: string }) {
         res.status(500).json({ error: error.message });
       }
-    } catch (e) {
-      res.status(500).json({ error: e.message });
+    } catch (error:any&{message:string}) {
+      res.status(500).json({ error: error.message });
     }
   }
 
@@ -746,7 +746,7 @@ export class NftService {
       }
 
       res.status(200).json({ message: 'Liked Video deleted' });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       res.status(500).json({ error: error.message });
     }
   }
@@ -869,7 +869,7 @@ export class NftService {
         console.log('Feed saved successfully');
         return { status: 'success', message: 'Feed saved' };
       }
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.log('Error:', error);
       return { status: 'error', message: 'An error occurred', error: error.message };
     }
@@ -992,7 +992,7 @@ export class NftService {
       await this.cacheImage(`original-image-${tokenId}`, originalImage);
       res.set('Content-Type', 'image/jpg');
       return res.send(originalImage);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error in getNftImage:', error.message);
       res.status(500).json({ error: 'Internal server error', log: error });
     }
@@ -1044,7 +1044,7 @@ export class NftService {
       const tokenFilter = { tokenId };
       await TokenModel.updateOne(tokenFilter, { $inc: { views: 1 } });
       return { success: true };
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error recording video view:', error);
       throw new Error('Could not record video view');
     }

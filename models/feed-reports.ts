@@ -4,7 +4,7 @@ import mongoose, { Document } from 'mongoose';
 export type FeedReportsDocument = FeedReports & Document;
 
 @Schema({ timestamps: true })
-export class FeedReports {
+export class FeedReports  extends Document  {
   @Prop({ required: false })
   description: string;
 

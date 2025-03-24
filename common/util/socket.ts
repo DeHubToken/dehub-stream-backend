@@ -9,7 +9,7 @@ const initializeOnlineUsers = async () => {
     onlineUsersFromDB.forEach(user => {
       onlineUsers.add(user.address);
     });
-  } catch (error) {
+  } catch (error: any & { message: string }) {
     console.error('Error initializing onlineUsers:', error);
   }
 };

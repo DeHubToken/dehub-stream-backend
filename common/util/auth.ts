@@ -67,7 +67,7 @@ const isAuthorized = async (req, res, next) => {
       req.params.rawSig = decodedToken.rawSig;
       req.params.timestamp = decodedToken.timestamp;
       next();
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res.status(401).json({ error: 'Sig and address are required', msg: 'Invalid authorization token' });
     }
   } else {
