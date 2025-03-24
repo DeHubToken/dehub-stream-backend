@@ -138,9 +138,9 @@ export class ReactionService {
         await payload.save();
       }
       return res.json({});
-    } catch (err) {
-      console.log('-----request vote error', err);
-      return res.status(500).json({ result: false, error: err.message || 'Voting failed' });
+    } catch (error:any&{message:string}) {
+      console.log('-----request vote error', error);
+      return res.status(500).json({ result: false, error: error.message || 'Voting failed' });
     }
   }
 
@@ -175,8 +175,8 @@ export class ReactionService {
   //       });
   //     } else result = await this.userService.unFollow(address, following);
   //     return res.json(result);
-  //   } catch (err) {
-  //     console.log('-----request follow error', err);
+  //     } catch (error:any&{message:string}) {
+  //     console.log('-----request follow error', error);
   //     return res.status(500).json({ result: false, error: 'Following failed' });
   //   }
   // }
@@ -193,9 +193,9 @@ export class ReactionService {
     try {
       const result = await this.requestReactionFunc({ address, subjectId, reactionType, subjectType });
       return res.json(result);
-    } catch (err) {
-      console.log('-----request reaction error', err);
-      return res.status(500).json({ result: false, error: err.message || 'Reaction failed' });
+    } catch (error:any&{message:string}) {
+      console.log('-----request reaction error', error);
+      return res.status(500).json({ result: false, error: error.message || 'Reaction failed' });
     }
   }
 

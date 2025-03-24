@@ -11,6 +11,7 @@ export async function handleCategoryDuplication(category: string[]): Promise<str
     if (newCategories.length > 0) {
         await CategoryModel.insertMany(newCategories.map(name => ({ name })));
     }
+    //@ts-ignore
     return existingCategories;
 }
 

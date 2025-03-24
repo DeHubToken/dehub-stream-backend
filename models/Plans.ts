@@ -8,7 +8,7 @@ export type PlansDocument = Plans & Document;
 
 // Define the Plans schema
 @Schema({ timestamps: true }) // Automatically manage createdAt and updatedAt fields
-export class Plans {
+export class Plans extends Document {
   @Prop({ unique: true })
   id: string;
 
@@ -71,7 +71,7 @@ PlansSchema.pre('save', async function (next) {
       );
 
       this.id = counter.seq;
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return next(error);
     }
   } else if (this.isModified('chains') && this.chains.some(p => p.isPublished === true)) {
@@ -81,7 +81,7 @@ PlansSchema.pre('save', async function (next) {
         userId: this.userId,
         type: ActivityActionType.CREATE_PLAN
       }).save();
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return next(error);
     }
   }

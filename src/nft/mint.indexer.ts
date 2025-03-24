@@ -55,7 +55,7 @@ export class NftIndexer implements OnModuleInit {
 
       // Update the last block checked to the current block
       this.lastBlockChecked = currentBlock;
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error polling transfer events:', error);
     }
   }
@@ -82,7 +82,7 @@ export class NftIndexer implements OnModuleInit {
       } else {
         console.log(`### transfer: ${tokenId} ${from.toLowerCase()} -> ${toAddress}`);
       }
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error updating token record:', error);
     }
   }

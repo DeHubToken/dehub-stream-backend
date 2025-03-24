@@ -24,7 +24,7 @@ export class WsAuthGuard implements CanActivate {
         const details = await this.fetchUserDetails(decoded.address)
         client.data.user = {...decoded, ...details};
         return true;
-      } catch (error) {
+      } catch (error: any & { message: string }) {
         throw new UnauthorizedException('Invalid token');
       }
     } else {

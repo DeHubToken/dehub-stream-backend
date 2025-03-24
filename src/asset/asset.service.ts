@@ -37,7 +37,7 @@ export class AssetService {
   
     try {
       tokenId = parseInt(tokenId);
-    } catch (e) {
+    } catch (error:any&{message:string}) {
       throw new BadRequestException('Token Id must be a valid number');
     }
   
@@ -61,9 +61,9 @@ export class AssetService {
       try {
         const videoStat = fs.statSync(videoPath);
         fileSize = videoStat.size;
-      } catch (e) {
+      } catch (error:any&{message:string}) {
         console.error('----not video', tokenId);
-        throw new InternalServerErrorException(e.message || 'Video not found');
+        throw new InternalServerErrorException(error.message || 'Video not found');
       }
     }
   
@@ -377,7 +377,7 @@ export class AssetService {
         
         // Push the CDN URL to imageLinks
         imageLinks.push(imagePath);
-      } catch (error) {
+      } catch (error: any & { message: string }) {
         console.error('Error uploading image:', error);
         throw new InternalServerErrorException('Error uploading images');
       }

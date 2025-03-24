@@ -22,7 +22,7 @@ export class ReactionsController {
     try {
       const result = await this.reactionsService.getReactions(req,res);
       return res.json(result);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('-----request like error', error);
       return res.status(500).json({ result: false, error: 'Like request failed' });
     }
@@ -33,7 +33,7 @@ export class ReactionsController {
     try {
       const result = await this.reactionsService.requestLike(req,res);
       return res.json(result);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('-----request like error', error);
       return res.status(500).json({ result: false, error: 'Like request failed' });
     }
@@ -45,7 +45,7 @@ export class ReactionsController {
     try {
       const result = await this.reactionsService.requestTip(req,res);
       return res.json(result);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('-----request tip error', error);
       return res.status(500).json({ result: false, error: 'Tip request failed' });
     }
@@ -56,7 +56,7 @@ export class ReactionsController {
   async requestComment(@Req() req: Request, @Res() res: Response) {
     try { 
       return   await this.reactionsService.requestComment(req,res);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('-----request comment error', error);
       return res.status(500).json({ result: false, error: 'Comment request failed' });
     }
@@ -66,7 +66,7 @@ export class ReactionsController {
   async requestCommentImage(@Req() req: Request, @Res() res: Response, @UploadedFiles() files?: Express.Multer.File[]) {
     try { 
       return   await this.reactionsService.requestComment(req,res,files);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('-----request comment error', error);
       return res.status(500).json({ result: false, error: 'Comment request failed' });
     }
@@ -89,7 +89,7 @@ export class ReactionsController {
       
       const result = await this.reactionsService.handleRequestFollow(address, following, unFollowing);
       return res.json(result);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('-----request follow error', error);
       return res.status(500).json({ result: false, error: 'Follow request failed' });
     }
@@ -101,7 +101,7 @@ export class ReactionsController {
     try {
       const result = await this.reactionsService.requestReaction(req,res);
       return res.json(result);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('-----request follow error', error);
       return res.status(500).json({ result: false, error: 'Follow request failed' });
     }

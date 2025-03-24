@@ -57,7 +57,7 @@ export class MediaAuthGuard implements CanActivate {
         return { address: address?.toLowerCase()??"", timestamp, rawSig: sig };
       }
     }
-     catch (error) {
+     catch (error: any & { message: string }) {
       console.error('Error parsing cookie:', error.message);
     }
   };

@@ -220,7 +220,7 @@ export class StreamCronService implements OnModuleInit {
         updateData,
         overrideOptions,
       );
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       this.logger.error('--- token find error');
     }
     if (!updatedTokenItem) {

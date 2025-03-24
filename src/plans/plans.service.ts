@@ -36,7 +36,7 @@ export class PlansService {
         return res.status(404).json({ error: 'Plan not found' });
       }
       return res.status(200).json({ plan });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res
         .status(500)
         .json({ error: 'Error retrieving plan', details: error });
@@ -51,7 +51,7 @@ export class PlansService {
       console.log(obj);
       const plans = await PlansModel.find(obj, planTemplate);
       return res.status(200).json({ plans });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res
         .status(500)
         .json({ error: 'Error retrieving plans', details: error });
@@ -121,7 +121,7 @@ export class PlansService {
       return res
         .status(200)
         .json({ msg: 'Plan updated successfully', plan: updatedPlan });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res
         .status(500)
         .json({ error: 'Error updating plan', details: error });
@@ -205,7 +205,7 @@ export class PlansService {
         message: 'Subscription created successfully',
         data: subscription,
       });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res
         .status(500)
         .json({ error: 'Error creating subscription', details: error.message });
@@ -220,7 +220,7 @@ export class PlansService {
         return res.status(404).json({ error: 'Plan not found for deletion' });
       }
       return res.status(200).json({ msg: 'Plan deleted successfully' });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res
         .status(500)
         .json({ error: 'Error deleting plan', details: error });

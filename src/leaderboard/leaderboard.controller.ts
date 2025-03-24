@@ -9,7 +9,7 @@ export class LeaderboardController {
   async getUsernames(@Req() req: Request, @Res() res: Response) {
     try {
       return await this.leaderboardService.getLeaderboard(req,res);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res.status(500).json({ message: 'Failed to fetch usernames', error: error.message });
     }
   }

@@ -99,7 +99,7 @@ export class ChatGateway {
 
   //     const buffer = Buffer.from(chunk);
   //     await this.hlsService.handleStreamChunk(streamId, buffer);
-  //   } catch (error) {
+  //   } catch (error: any & { message: string }) {
   //     console.error('Stream processing error:', error);
   //     this.server.to(`stream:${streamId}`).emit(LivestreamEvents.StreamError, {
   //       message: 'Failed to process stream data',

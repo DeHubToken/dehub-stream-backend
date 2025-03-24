@@ -34,7 +34,7 @@ export class FeedReportService {
       });
       await newReport.save();
       return res.status(201).json({ message: 'Report added successfully', report: newReport });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res.status(500).json({ message: 'Error adding report', error: error.message });
     }
   }
@@ -54,7 +54,7 @@ export class FeedReportService {
         limit,
         reports,
       });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res.status(500).json({ message: 'Error fetching reports', error: error.message });
     }
   }
@@ -124,7 +124,7 @@ export class FeedReportService {
         totalReports,
         reports,
       });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res.status(500).json({ message: 'Error fetching reports', error: error.message });
     }
   }

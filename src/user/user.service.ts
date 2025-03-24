@@ -267,7 +267,7 @@ export class UserService {
       }
 
       return res.json({ result: true });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error updating profile:', error);
       return res.status(500).json({ message: 'Error updating profile', error: error.message });
     }
@@ -309,7 +309,7 @@ export class UserService {
     try {
       const result = await AccountModel.find({}, { username: 1 }).distinct('username');
       return { result };
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('-----request getUsernames error', error);
       throw new Error('Failed to fetch usernames');
     }
@@ -328,9 +328,9 @@ export class UserService {
         avatarImageUrl: 1,
       };
       return res.json({ result: await AccountModel.find({ address: { $in: addressList } }, accountTemplate) });
-    } catch (err) {
-      console.log('-----public account data', err);
-      return res.status(500).json({ result: false, error: err.message || 'Could not fetch account data' });
+    } catch (error:any&{message:string}) {
+      console.log('-----public account data', error);
+      return res.status(500).json({ result: false, error: error.message || 'Could not fetch account data' });
     }
   }
 
@@ -338,7 +338,7 @@ export class UserService {
     try {
       const userCount = await AccountModel.countDocuments({});
       return { result: userCount };
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error getting user count:', error.message);
       throw new Error('Internal Server Error');
     }
@@ -354,7 +354,7 @@ export class UserService {
       }
       const users = await AccountModel.find(filter).limit(10);
       return res.send({ result: users });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error searching for users:', error.message);
       return res.status(500).json({ error: error.message || 'Internal Server Error' });
     }
@@ -366,7 +366,7 @@ export class UserService {
       const normalizedUsername = normalizeAddress(username);
       const validationResult = await isValidUsername(normalizedAddress, normalizedUsername);
       return { result: validationResult };
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('-----validate username error', error);
       throw new Error('Could not validate username');
     }

@@ -66,7 +66,7 @@ export class DmQueueProcessor {
       });
 
       console.log('updatedMessage[0]:',updatedMessage[0])
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       // Handle upload failure
       console.error('Error processing media:', error);
       // Set the message upload status to failure and log the error reason
@@ -132,7 +132,7 @@ export class VideoQueueProcessor {
       await video.save();
 
       console.log('Video processed and uploaded:', url);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('Error processing video:', error);
       throw error; // Optionally handle error
     }
@@ -151,7 +151,7 @@ export class VideoQueueProcessor {
       try {
         const { uploadBuffer, uploadFileName } = await this.transcodeToMp4(buffer, filename, video);
         return await this.uploadAndSaveVideo(uploadBuffer, uploadFileName, video.tokenId);
-      } catch (error) {
+      } catch (error: any & { message: string }) {
         console.error('Error during transcoding:', error);
         video.transcodingStatus = 'failed';
         await video.save();

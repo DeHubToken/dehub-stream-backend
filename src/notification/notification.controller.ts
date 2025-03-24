@@ -20,7 +20,7 @@ export class NotificationsController {
   async getUnreadNotifications(@Req() req: Request, @Res() res: Response) {
     try {
       await this.notificationsService.getUnreadNotifications(req, res);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('-----Error fetching unread notifications:', error);
       return res.status(500).json({ error: 'Failed to fetch unread notifications' });
     }
@@ -34,7 +34,7 @@ export class NotificationsController {
   ) {
     try {
       await this.notificationsService.markNotificationAsRead(req, res);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.error('-----Error marking notification as read:', error);
       return res.status(500).json({ error: 'Failed to mark notification as read' });
     }

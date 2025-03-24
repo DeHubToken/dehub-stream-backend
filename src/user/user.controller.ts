@@ -12,7 +12,7 @@ export class UserController {
   async accountInfo(@Req() req: Request, @Res() res: Response) {
     try {
       return await this.userServices.getAccountInfo(req, res);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res.status(500).json({ message: 'Failed to fetch NFTs', error: error.message });
     }
   }
@@ -32,7 +32,7 @@ export class UserController {
 
       // Forward the request, including any uploaded files, to your service
       return await this.userServices.updateProfile(req, res, coverImage, avatarImage);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       console.log(error);
       return res.status(500).json({ message: 'Failed to update profile', error: error.message });
     }
@@ -43,7 +43,7 @@ export class UserController {
     try {
       const result = await this.userServices.getUsernames();
       return res.json(result);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res.status(500).json({ message: 'Failed to fetch usernames', error: error.message });
     }
   }
@@ -53,7 +53,7 @@ export class UserController {
     try {
       const result = await this.userServices.getNumberOfUsers();
       return res.json(result);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res.status(500).json({ message: 'Failed to fetch users count', error: error.message });
     }
   }
@@ -62,7 +62,7 @@ export class UserController {
   async searchUsers(@Req() req: Request, @Res() res: Response) {
     try {
       await this.userServices.searchUsers(req, res); 
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res.status(500).json({ message: 'Failed to search users', error: error.message });
     }
   }
@@ -74,7 +74,7 @@ export class UserController {
       console.log(req.query)
       const validation = await this.userServices.isValidUsername(address, username);
       return res.json(validation);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res.status(500).json({ message: 'Failed to validate username', error: error.message });
     }
   }

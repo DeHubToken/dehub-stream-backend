@@ -168,7 +168,7 @@ export class ActivityService {
       ]);
 
       return res.status(200).json(data);
-    } catch (error) {
+    } catch (error:  any & { message: string })  {
       console.error('Error fetching activity:', error);
       return res.status(500).json({ message: 'Failed to get Activity', error: error.message });
     }

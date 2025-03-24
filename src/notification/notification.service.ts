@@ -13,7 +13,7 @@ export class NotificationsService {
       const { userId, type, content } = req.body;
       await this.createNotificationfunc(userId, type, content);
       res.status(201).json({ message: 'Notification created successfully' });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       res.status(500).json({ error: error.message });
     }
   }
@@ -23,7 +23,7 @@ export class NotificationsService {
       const address = reqParam(req, paramNames.address);
       const result = await this.getNotificationsFunc(address);
       res.status(200).json({ result });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       res.status(500).json({ error: error.message });
     }
   }
@@ -33,7 +33,7 @@ export class NotificationsService {
       const notificationId = req.params.notificationId;
       await this.markNotificationAsReadFunc(notificationId);
       res.status(200).json({ message: 'Notification marked as read' });
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       res.status(500).json({ error: error.message });
     }
   }
@@ -135,7 +135,7 @@ export class NotificationsService {
   
         await notification.save();
       }
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       throw new Error(error.message);
     }
   }
@@ -146,7 +146,7 @@ export class NotificationsService {
       address = address.toLowerCase();
       const result:any = await Notification.find({ address, read: false }).limit(20).sort({ updatedAt: -1 });
       return result;
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       throw new Error(`Error getting notifications: ${error.message}`);
     }
   }
@@ -160,7 +160,7 @@ export class NotificationsService {
   
       notification.read = true;
       await notification.save();
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       throw new Error(`Error marking notification as read: ${error.message}`);
     }
   }

@@ -5,7 +5,7 @@ import mongoose, { Document, Model } from 'mongoose';
 export type AccountDocument = Account & Document;
 
 @Schema({ timestamps: true }) // Automatically manage createdAt and updatedAt fields
-export class Account {
+export class Account  extends Document  {
   @Prop({ unique: true, required: true })
   address: string; // Account address
 
@@ -81,4 +81,5 @@ export const AccountSchema = SchemaFactory.createForClass(Account);
 
 // Create an index on the address field for uniqueness
 AccountSchema.index({ address: 1 }, { unique: true });
-export const AccountModel: Model<AccountDocument> = mongoose.model<AccountDocument>('accounts', AccountSchema);
+ 
+export const AccountModel  = mongoose.model<AccountDocument>('accounts', AccountSchema);

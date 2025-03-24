@@ -39,4 +39,5 @@ export type TransactionDocument = PaymentTransaction & Document & {
 export const TransactionSchema = SchemaFactory.createForClass(PaymentTransaction);
 
 // Optionally, if you need a specific model type
+//@ts-ignore
 export const TransactionModel = mongoose.model<TransactionDocument>('paymentTransaction', TransactionSchema);

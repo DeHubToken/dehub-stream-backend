@@ -22,7 +22,7 @@ export class PlansController {
   async getPlan(@Req() req: Request, @Res() res: Response) {
     try {
       return await this.plansServices.getPlan(req, res);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res
         .status(500)
         .json({ message: 'Failed to fetch plan', error: error.message });
@@ -33,7 +33,7 @@ export class PlansController {
   async getPlans(@Req() req: Request, @Res() res: Response) {
     try {
       return await this.plansServices.getPlans(req, res);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res
         .status(500)
         .json({ message: 'Failed to fetch plans', error: error.message });
@@ -45,7 +45,7 @@ export class PlansController {
   async createPlan(@Req() req: Request, @Res() res: Response) {
     try {
       return await this.plansServices.createPlan(req, res);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res
         .status(500)
         .json({ message: 'Failed to create Plan', error: error.message });
@@ -56,7 +56,7 @@ export class PlansController {
   async updatePlan(@Req() req: Request, @Res() res: Response) {
     try {
       return await this.plansServices.updatePlan(req, res);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res
         .status(500)
         .json({ message: 'Failed to update Plan', error: error.message });
@@ -67,7 +67,7 @@ export class PlansController {
   async buyPlan(@Req() req: Request, @Res() res: Response) {
     try {
       return await this.plansServices.createSubscription(req, res);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res
         .status(500)
         .json({ message: 'Failed to update Plan', error: error.message });
@@ -77,7 +77,7 @@ export class PlansController {
   async getMySubscription(@Req() req: Request, @Res() res: Response) {
     try {
       return await this.plansServices.getMySubscription(req, res);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res
         .status(500)
         .json({ message: 'Failed to fetch plans', error: error.message });
@@ -88,7 +88,7 @@ export class PlansController {
   async getSubscription(@Req() req: Request, @Res() res: Response) {
     try {
       return await this.plansServices.getSubscription(req, res);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res
         .status(500)
         .json({ message: 'Failed to fetch plans', error: error.message });
@@ -100,7 +100,7 @@ export class PlansController {
   async webhookPlanCreate(@Req() req: Request, @Res() res: Response) {
     try {
       return await this.plansServices.webhookPlanCreate(req, res);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res
         .status(500)
         .json({ message: 'webhook Failed', error: error.message });
@@ -111,7 +111,7 @@ export class PlansController {
   async webhookPlanPurchased(@Req() req: Request, @Res() res: Response) {
     try {
       return await this.plansServices.webhookPlanPurchased(req, res);
-    } catch (error) {
+    } catch (error: any & { message: string }) {
       return res
         .status(500)
         .json({ message: 'webhook Failed', error: error.message });
