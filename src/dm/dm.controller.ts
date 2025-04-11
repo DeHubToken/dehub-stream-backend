@@ -86,6 +86,21 @@ export class DMController {
       });
     }
   }
+  @Post("/dm/group/info")
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'files', maxCount: 1 }, // Adjust the name and max count as per your requirement
+    ]),
+  )
+  async updateGroupInfo(@Req() req: Request, @Res() res: Response,@UploadedFiles() files: { files: Express.Multer.File[] }) {
+    try {
+      return await this.dmServices.updateGroupInfo(req, res,files);
+    } catch (error: any & { message: string }) {
+      return res.status(500).json({
+        message: 'Failed to create the group chat',
+        error: error.message,
+      });
+    }}
   @Post('/dm/group/join')
   async joinGroup(@Req() req: Request, @Res() res: Response) {
     try {

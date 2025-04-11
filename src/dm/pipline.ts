@@ -133,6 +133,8 @@ export const conversationPipeline = user => [
       _id: '$_id',
       conversationType: { $first: '$conversationType' },
       groupName: { $first: '$groupName' },
+      description: { $first: '$description' },
+      iconUrl: { $first: '$iconUrl' },
       participants: {
         $addToSet: {
           participant: {
@@ -159,6 +161,8 @@ export const conversationPipeline = user => [
       _id: 1,
       conversationType: 1,
       groupName: 1,
+      description:1,
+      iconUrl:1,
       participants: 1,
       lastMessageAt: 1,
       createdAt: 1,

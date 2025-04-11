@@ -54,7 +54,11 @@ export class DM extends Document {
     },
   })
   groupName: string;
-
+  @Prop({
+    type: String,
+    trim: true,
+  })
+  iconUrl: string;
   @Prop({
     type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Plan', required: false }],
   })
