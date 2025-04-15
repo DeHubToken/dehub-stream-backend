@@ -17,6 +17,7 @@ import { supportedTokens } from 'config/constants';
 import { EventEmitter, EventManager } from 'src/events/event-manager';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DmSettingModel } from 'models/message/message.setting';
+import { config } from 'config';
 @Injectable()
 export class DMService {
   eventEmitter: EventEmitter2;
@@ -105,9 +106,9 @@ export class DMService {
   async searchUserOrGroup(req: Request, res: Response) {
     try {
       const query: string = reqParam(req, 'q');
-    
+
       console.log(query);
-    
+
       const users = await AccountModel.aggregate([
         {
           $match: {
@@ -139,11 +140,11 @@ export class DMService {
             _id: 1,
             address: 1,
             avatarImageUrl: 1,
-            dmSetting:1
+            dmSetting: 1,
           },
         },
       ]);
-    
+
       return res.status(200).json({ users });
     } catch (error: any & { message: string }) {
       console.error('Error searching users:', error);
@@ -152,7 +153,6 @@ export class DMService {
         error: error.message,
       });
     }
-    
   }
   async createGroupChat(req: Request, res: Response) {
     try {
@@ -1164,6 +1164,58 @@ export class DMService {
     } catch (error: any & { message: string }) {
       console.error('Error deleting messages:', error);
       return res.status(500).json({ success: false, message: 'Internal server error.' });
+    }
+  }
+
+  async updateGroupInfo(req: Request, res: Response, files: { files: Express.Multer.File[] }) {
+    try {
+      const groupId = reqParam(req, 'groupId');
+      const newTitle = reqParam(req, 'groupName'); // Optional
+      const newDescription = reqParam(req, 'description'); // Optional
+
+      if (!groupId) {
+        return res.status(400).json({ success: false, message: 'Group ID is required.' });
+      }
+
+      const group = await DmModel.findById(groupId);
+      if (!group) {
+        return res.status(404).json({ success: false, message: 'Group not found.' });
+      }
+ 
+      if (files?.files[0]) {
+        // Extract the file extension
+        const originalExtension = files.files[0].originalname.split('.').pop(); // e.g., 'jpg', 'png'
+        // Sanitize filename just in case
+        const safeExtension = originalExtension?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+        // Generate filename with extension
+        const fileName = `${groupId}-${Date.now()}.${safeExtension}`;
+        console.log(fileName);
+        const imageUrl = await this.cdnService.uploadFile(files.files[0].buffer, config.dirDmAvatar, fileName); 
+        group.iconUrl = imageUrl;
+      }
+
+      // Update fields if provided
+      if (newTitle) group.groupName = newTitle;
+      if (newDescription) group.description = newDescription;
+
+      await group.save();
+
+      return res.status(200).json({
+        success: true,
+        message: 'Group info updated successfully.',
+        data: {
+          groupId: group._id,
+          groupName: group.groupName,
+          description: group.description,
+          icon: group.iconUrl,
+        },
+      });
+    } catch (error: any & { message: string }) {
+      console.error('Error updating group info:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'An error occurred while updating group information.',
+      });
     }
   }
 }

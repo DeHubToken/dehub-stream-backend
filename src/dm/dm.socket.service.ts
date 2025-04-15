@@ -195,6 +195,7 @@ export class DMSocketService {
 
     if (!isAllowChat(user2Setting?.address, ['NEW_DM', 'ALL'])) {
       socket.emit(SocketEvent.error, { msg: 'User has restricted DM access' });
+      return;
     }
     // Prepare participants array
     const participants = [

@@ -9,6 +9,7 @@ const config = {
   baseUrl: `http://127.0.0.1:${process.env.API_PORT || 9015}`,
   dirDmImages:  'dm-images',
   dirDmVideos:  'dm-videos',
+  dirDmAvatar:  'dm-avatars',
   dirFeedsImages:  'feed-images',
   devPort: 9002,
   devBaseUrl: 'http://127.0.0.1:9002',
