@@ -11,14 +11,15 @@ import erc721ContractAbi from '../../abis/StreamNft.json';
 
 const getTokenByTokenAddress = (tokenAddress:string, chainId = 56) => supportedTokens.find(e => e.address.toLowerCase() === tokenAddress.toLowerCase() && e.chainId === chainId);
 
-const getERC20TokenBalance = async (account:string, tokenAddress:string, chainId:number) => {
+const getERC20TokenBalance = async (account:string, tokenAddress:string, chainId:number) => { 
+    console.log("A")
     const network = supportedNetworks.find(e => e.chainId === chainId);
-    const token = supportedTokens.find(e => e.address.toLowerCase() === tokenAddress.toLowerCase());
-    if (!network || !token) return 0;
+    const token = supportedTokens.find(e => e.address.toLowerCase() === tokenAddress.toLowerCase());  
+    if (!network || !token) return 0; 
     const provider = new ethers.JsonRpcProvider(network.rpcUrls[0]);
     const tokenContract = new ethers.Contract(tokenAddress, erc20ContractAbi, provider);
-    const tokenBalance = await tokenContract.balanceOf(account);
-    return Number(ethers.formatUnits(tokenBalance, token.decimals));
+    const tokenBalance = await tokenContract.balanceOf(account);  
+    return Number(ethers.formatUnits(tokenBalance, await tokenContract.decimals()));
 }
 
 const makeAggregateCalldata = (callObjectArray) => {
