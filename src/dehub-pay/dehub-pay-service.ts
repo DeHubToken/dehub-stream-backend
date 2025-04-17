@@ -86,9 +86,9 @@ export class DehubPayService {
       }
       const timestep = Date.now(); // or your preferred unique timestamp
       const transaction = new DpayTnxModel({
-        sessionId: `temp+${Math.random()*100}-${timestep}`, // temp placeholder
+        sessionId: `temp+${Math.random() * 100}-${timestep}`, // temp placeholder
         amount,
-        tokenSymbol: 'dehub',
+        tokenSymbol: 'DHB',
         chainId,
         receiverId: user._id,
         status_stripe: 'init',
@@ -125,7 +125,7 @@ export class DehubPayService {
       const approxTokensToReceive = usdAmount / tokenPrice;
 
       const session = await this.stripe.checkout.sessions.create({
-        payment_method_types: ['card'],
+        payment_method_types: ['card', 'us_bank_account', 'ideal'],
         line_items: [
           {
             price_data: {
@@ -298,8 +298,11 @@ export class DehubPayService {
       createdAt: transaction.createdAt,
     };
   }
-  async updateTransactionStatus(sessionId: string, status_stripe: string): Promise<void> {
-    await DpayTnxModel.updateOne({ sessionId }, { $set: { status_stripe } });
+  async updateTransactionStatus(sessionId: string, status_stripe: string): Promise<any> {
+    if(status_stripe=="failed"){
+     return  DpayTnxModel.updateOne({ sessionId }, { $set: { status_stripe ,tokenSendStatus:"cancelled"} });
+    }
+    return await DpayTnxModel.updateOne({ sessionId }, { $set: { status_stripe } });
   }
   async getTransactionBySessionId(sessionId: string) {
     return DpayTnxModel.findOne({ sessionId });
@@ -308,4 +311,6 @@ export class DehubPayService {
   async updateTokenSendStatus(sessionId: string, updates: Partial<any>) {
     return DpayTnxModel.updateOne({ sessionId }, { $set: updates });
   }
+  async successCallBack(sid) {}
+  async cancelCallBack(sid) {}
 }

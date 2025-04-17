@@ -3,7 +3,7 @@ import { Request, Response } from 'express';
 import axios from 'axios';
 import { DehubPayService } from './dehub-pay-service';
 import { reqParam } from 'common/util/auth';
-import mongoose from 'mongoose'; 
+import mongoose from 'mongoose';
 import { DehubPayMiddleware } from './dehub-pay-middleware';
 
 @Controller()
@@ -132,5 +132,18 @@ export class DehubPayController {
         message: 'Failed to create checkout session',
       });
     }
+  }
+  @Get('/dpay/success')
+  async successCallBack(@Query('sid') sid: string, @Res() res: Response) {
+    try {
+      this.dehubPayService.successCallBack(sid);
+    } catch (error) {}
+  }
+
+  @Get('/dpay/cancel')
+  async cancelCallBack(@Query('sid') sid: string, @Res() res: Response) {
+    try {
+      this.dehubPayService.cancelCallBack(sid);
+    } catch (error) {}
   }
 }

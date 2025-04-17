@@ -37,8 +37,8 @@ export class DpayTnx {
   type: 'buy_token' | 'tip' | 'paid-dm' | 'subscription';
 
   // 🕑 For CRON: track token send status
-  @Prop({ enum: ['not_sent', 'sent', 'sending', 'failed'], default: 'not_sent' })
-  tokenSendStatus: 'not_sent' | 'sending' | 'sent' | 'failed';
+  @Prop({ enum: ['not_sent', 'sent', 'sending','cancelled', 'failed'], default: 'not_sent' })
+  tokenSendStatus: 'not_sent' | 'cancelled' | 'sending' | 'sent' | 'failed';
 
   // 🔁 Retry count to limit retries
   @Prop({ default: 0 })
