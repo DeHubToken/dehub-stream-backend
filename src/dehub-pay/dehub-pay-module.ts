@@ -1,29 +1,37 @@
-import { Module } from '@nestjs/common';
+// src/dehub-pay/dehub-pay.module.ts
+import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
 import { DehubPayController } from './dehub-pay-controller';
 import { DehubPayService } from './dehub-pay-service';
 import { DpayMonitor } from './dehub-pay-monitor';
-import { BullModule } from '@nestjs/bull'; // Import BullModule
+import { BullModule } from '@nestjs/bull';
 import { DpayTransactionProcessor } from './dpay-transaction.processor';
 import { config } from 'config';
-import { TokenTransferService } from './token-transfer.service';
+import { TokenTransferService } from './token-transfer.service'; 
+import { DehubPayMiddleware } from './dehub-pay-middleware';
 
 @Module({
   imports: [
-    // Register the Bull queue for transaction processing
     BullModule.registerQueue({
-      name: 'transactionQueue', // Name of the queue
+      name: 'transactionQueue',
       redis: {
-        ...config.redis, // Redis host (you can replace with your Redis server details)
-        db: 3, // Redis port
+        ...config.redis,
+        db: 3,
       },
     }),
   ],
   controllers: [DehubPayController],
   providers: [
-    DehubPayService, // DehubPayService for business logic
-    DpayMonitor, // DpayMonitor for cron jobs
-    DpayTransactionProcessor,TokenTransferService, // Processor for handling queued jobs
+    DehubPayService,
+    DpayMonitor,
+    DpayTransactionProcessor,
+    TokenTransferService,
   ],
-  exports: [DehubPayService], // Export DehubPayService to use in other modules
+  exports: [DehubPayService],
 })
-export class DehubPayModule {}
+export class DehubPayModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(DehubPayMiddleware)
+      .forRoutes({ path: 'dpay/checkout', method: RequestMethod.POST });
+  }
+}

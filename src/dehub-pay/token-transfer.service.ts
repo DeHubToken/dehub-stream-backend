@@ -24,7 +24,6 @@ export class TokenTransferService {
       .forEach(({ chainId, rpcUrls }) => {
         const id = typeof chainId === 'string' ? parseInt(chainId, 10) : chainId;
         const provider = new ethers.JsonRpcProvider(rpcUrls[0]);
-
         this.providers[id] = provider;
         this.wallets[id] = new ethers.Wallet(privateKey, provider);
       });
@@ -62,7 +61,6 @@ export class TokenTransferService {
       }
 
       const contract = new ethers.Contract(token.address, erc20ContractAbi, wallet);
-
       const decimals = await contract.decimals();
       const adjustedAmount = ethers.parseUnits(amount.toString(), decimals);
 

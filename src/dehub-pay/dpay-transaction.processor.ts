@@ -26,22 +26,22 @@ export class DpayTransactionProcessor {
       const transferDetails = await this.dehubPayService.getTransferDetailsBySessionId(sessionId);
       if (isPaid) {
         await this.dehubPayService.updateTransactionStatus(sessionId, 'success');
-        this.logger.log(`Transaction ${sessionId} marked as completed.`);
+        // this.logger.log(`Transaction ${sessionId} marked as completed.`);
 
-        if (transferDetails) {
-          const { receiverAddress, amount, tokenAddress, chainId } = transferDetails;
+        // if (transferDetails) {
+        //   const { receiverAddress, amount, tokenAddress, chainId } = transferDetails;
 
-          await this.transactionQueue.add('transferToken', {
-            sessionId,
-            receiverAddress,
-            amount,
-            tokenAddress,
-            chainId,
-          });
-          this.logger.log(`Scheduled transferToken job for sessionId: ${sessionId}`);
-        } else {
-          this.logger.warn(`No transfer details found for sessionId: ${sessionId}`);
-        }
+        //   await this.transactionQueue.add('transferToken', {
+        //     sessionId,
+        //     receiverAddress,
+        //     amount,
+        //     tokenAddress,
+        //     chainId,
+        //   });
+        //   this.logger.log(`Scheduled transferToken job for sessionId: ${sessionId}`);
+        // } else {
+        //   this.logger.warn(`No transfer details found for sessionId: ${sessionId}`);
+        // }
       } else {
         this.logger.log(`Transaction ${sessionId} is not completed yet.`);
 
@@ -69,7 +69,6 @@ export class DpayTransactionProcessor {
     const { sessionId, receiverAddress, amount: usdAmount, tokenAddress, chainId } = job.data;
     const MAX_RETRIES = 3;
     const RETRY_DELAY_MS = 1000 * 60;
-
     try {
       const network = supportedNetworks.find(net => net.chainId === chainId);
       if (!network) throw new Error(`Unsupported chainId: ${chainId}`);
@@ -83,7 +82,6 @@ export class DpayTransactionProcessor {
 
       await this.dehubPayService.updateTokenSendStatus(sessionId, {
         tokenSendStatus: 'sending',
-
         lastTriedAt: new Date(),
       });
 

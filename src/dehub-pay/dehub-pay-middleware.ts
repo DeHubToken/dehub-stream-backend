@@ -1,18 +1,14 @@
-import { Injectable, NestMiddleware, UnauthorizedException } from '@nestjs/common';
+// src/common/middleware/logger.middleware.ts
+import { Injectable, Logger, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
+import { DehubPayService } from './dehub-pay-service';
 
 @Injectable()
 export class DehubPayMiddleware implements NestMiddleware {
+  private readonly logger = new Logger(DehubPayMiddleware.name);
+  constructor(private readonly dehubPayService: DehubPayService) {}
   use(req: Request, res: Response, next: NextFunction) {
-    // Example: Log request method and URL
-    console.log(`[DehubPay] ${req.method} ${req.originalUrl}`);
-
-    // Example: Check for required API key header
-    const apiKey = req.headers['x-api-key'];
-    if (!apiKey || apiKey !== process.env.DEHUB_PAY_API_KEY) {
-      throw new UnauthorizedException('Missing or invalid API key');
-    }
-
+    //here code for
     next();
   }
 }

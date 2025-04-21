@@ -1,19 +1,24 @@
-import { Controller, Get, Req, Res, Query, HttpStatus, Post, Body, Logger, UseGuards } from '@nestjs/common';
+import { Controller, Get, Req, Res, Query, HttpStatus, Post, Body, Logger, UseGuards, Param } from '@nestjs/common';
 import { Request, Response } from 'express';
-import axios from 'axios';
 import { DehubPayService } from './dehub-pay-service';
 import { reqParam } from 'common/util/auth';
 import mongoose from 'mongoose';
 import { DehubPayMiddleware } from './dehub-pay-middleware';
+import { ChainId, supportedTokens } from 'config/constants';
+import { AuthGuard } from 'common/guards/auth.guard';
 
 @Controller()
 export class DehubPayController {
   private readonly logger = new Logger(DehubPayController.name);
   constructor(private readonly dehubPayService: DehubPayService) {}
   @Get('/dpay/price')
-  async getDehubPrice(@Query('currency') currency: string = 'usd', @Res() res: Response) {
+  async getDehubPrice(
+    @Query('currency') currency: string = 'usd',
+    @Query('chainId') chainId: number = 56,
+    @Res() res: Response,
+  ) {
     try {
-      const data = await this.dehubPayService.coingeckoGetPrice('dehub', currency);
+      const data = await this.dehubPayService.coingeckoGetPrice('dehub', currency, chainId);
       if (!data.price) {
         return res.status(HttpStatus.BAD_REQUEST).json({
           message: `Unsupported or invalid currency: ${currency}`,
@@ -31,7 +36,6 @@ export class DehubPayController {
       });
     }
   }
-
   @Get('/dpay/available/tokens')
   async getAvailableTokens(@Query('token') token: string = 'dehub', @Res() res: Response) {
     try {
@@ -48,7 +52,6 @@ export class DehubPayController {
       });
     }
   }
-
   @Get('/dpay/available/gas')
   async getAvailableGas(@Query('token') token: string = 'dehub', @Res() res: Response) {
     try {
@@ -65,7 +68,6 @@ export class DehubPayController {
       });
     }
   }
-
   @Get('/dpay/tnxs')
   async getTnx(@Req() req: Request, @Res() res: Response) {
     try {
@@ -84,12 +86,11 @@ export class DehubPayController {
       });
     }
   }
-
   @Post('/dpay/checkout')
-  @UseGuards(DehubPayMiddleware)
+  @UseGuards(AuthGuard)
   async checkout(
-    @Body('chainId') chainId: number = 97,
-    @Body('address') address: number = 0,
+    @Body('chainId') chainId: number = null,
+    @Body('address') address: string = null,
     @Body('receiverAddress') receiverAddress: number = 0,
     @Body('amount') amount: number = 0,
     @Body('tokensToReceive') tokensToReceive: number = 0,
@@ -133,17 +134,30 @@ export class DehubPayController {
       });
     }
   }
-  @Get('/dpay/success')
-  async successCallBack(@Query('sid') sid: string, @Res() res: Response) {
+  @Post('/dpay/webhook')
+  stripeWebHook(@Req() req: Request, @Res() res: Response) {
     try {
-      this.dehubPayService.successCallBack(sid);
-    } catch (error) {}
+      return this.dehubPayService.stripeWebHook(req, res);
+    } catch (error) {
+      throw new Error(error.message);
+    }
   }
-
-  @Get('/dpay/cancel')
-  async cancelCallBack(@Query('sid') sid: string, @Res() res: Response) {
+  @Post('dpay/create-onramp-session')
+  async createOnrampSession(@Req() req: Request, @Res() res: Response) {
     try {
-      this.dehubPayService.cancelCallBack(sid);
-    } catch (error) {}
+      return this.dehubPayService.createOnrampSession(req, res);
+    } catch (error) {
+      throw Error(error.message);
+    }
+  }
+  @Get('/dpay/price/:chainId')
+  async fetchPriceByChain(@Param('chainId') chainId: string, @Query('token') token = 'DHB', @Res() res: Response) {
+    const platform = await this.dehubPayService.getTokenContractAndPlatform(chainId, token);
+    const data = await this.dehubPayService.fetchPriceByChain(
+      platform.platformId,
+      platform.contractAddress,
+      platform.chain,
+    );
+    return res.status(200).json(data);
   }
 }

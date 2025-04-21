@@ -24,8 +24,8 @@ export class DpayTnx {
   @Prop({ required: true })
   chainId: number;
 
-  @Prop({ enum: ['init', 'pending', 'success', 'failed'], default: 'init' })
-  status_stripe: 'init' | 'pending' | 'success' | 'failed'; // Payment status
+  @Prop({ enum: ['init', 'pending', 'succeeded', 'failed'], default: 'init' })
+  status_stripe: 'init' | 'pending' | 'succeeded' | 'failed'; // Payment status
 
   @Prop()
   txnHash?: string;
@@ -37,8 +37,8 @@ export class DpayTnx {
   type: 'buy_token' | 'tip' | 'paid-dm' | 'subscription';
 
   // 🕑 For CRON: track token send status
-  @Prop({ enum: ['not_sent', 'sent', 'sending','cancelled', 'failed'], default: 'not_sent' })
-  tokenSendStatus: 'not_sent' | 'cancelled' | 'sending' | 'sent' | 'failed';
+  @Prop({ enum: ['not_sent', 'sent', 'processing', 'cancelled', 'failed'], default: 'not_sent' })
+  tokenSendStatus: 'not_sent' | 'cancelled' | 'processing' | 'sent' | 'failed';
 
   // 🔁 Retry count to limit retries
   @Prop({ default: 0 })
@@ -48,6 +48,10 @@ export class DpayTnx {
   // ✅ On successful send, store thiss
   @Prop()
   tokenSendTxnHash?: string;
+  @Prop()
+  intentId?: string;
+  @Prop({ default: false })
+  isIntentCreated?: Boolean;
   @Prop()
   approxTokensToReceive?: string;
   @Prop()
