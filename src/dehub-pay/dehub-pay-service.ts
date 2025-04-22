@@ -11,6 +11,7 @@ import mongoose from 'mongoose';
 import { Request, Response } from 'express';
 const defaultWalletAddress = '0xC8acD6eeeD02EA0dA142D57941E1102e81Cc0b77';
 import Stripe from 'stripe';
+import { first } from 'rxjs';
 
 @Injectable()
 export class DehubPayService {
@@ -24,6 +25,10 @@ export class DehubPayService {
     this.stripe = new Stripe(stripeSecretKey, {
       apiVersion: '2025-03-31.basil',
     });
+    // setInterval(() => {
+    //   this.getPendingEstimatedAmountToTransfer();
+    //   this.getSuccessAmountToTransferred();
+    // }, 5000);
   }
   async getTnxs(filter, cache = true) {
     try {
@@ -64,7 +69,7 @@ export class DehubPayService {
       ]);
 
       // Cache the result for 1 minute
-      await this.redisClient.setex(cacheKey, 60, JSON.stringify(transactions));
+      await this.redisClient.setex(cacheKey, 10, JSON.stringify(transactions));
 
       return transactions;
     } catch (error) {
@@ -528,5 +533,80 @@ export class DehubPayService {
       this.logger.error(error);
       throw new Error(error);
     }
+  }
+  async getPendingEstimatedAmountToTransfer() {
+    const pipeline: any = [
+      {
+        $match: {
+          tokenSendStatus: { $in: ['pending', 'processing'] },
+        },
+      },
+      {
+        $project: {
+          chainId: 1,
+          tokenSymbol: 1,
+          approxTokensToReceiveNum: { $toDouble: '$approxTokensToReceive' },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            chainId: '$chainId',
+            tokenSymbol: '$tokenSymbol',
+          },
+          chainId: { $first: '$chainId' },
+          tokenSymbol: { $first: '$tokenSymbol' },
+          total: { $sum: '$approxTokensToReceiveNum' },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          chainId: 1,
+          tokenSymbol: 1,
+          total: 1,
+        },
+      },
+    ];
+
+    return await DpayTnxModel.aggregate(pipeline);
+  }
+  async getSuccessAmountToTransferred() {
+    const pipeline: any = [
+      {
+        $match: {
+          tokenSendStatus: { $in: ['sent'] },
+        },
+      },
+      {
+        $project: {
+          chainId: 1,
+          tokenSymbol: 1,
+          approxTokensToSentNum: { $toDouble: '$approxTokensToSent' },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            chainId: '$chainId',
+            tokenSymbol: '$tokenSymbol',
+          },
+          chainId: { $first: '$chainId' },
+          tokenSymbol: { $first: '$tokenSymbol' },
+          total: { $sum: '$approxTokensToSentNum' },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          chainId: 1,
+          tokenSymbol: 1,
+          total: 1,
+        },
+      },
+    ];
+
+    const res = await DpayTnxModel.aggregate(pipeline);
+    return res;
   }
 }

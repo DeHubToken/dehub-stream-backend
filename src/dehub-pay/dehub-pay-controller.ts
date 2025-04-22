@@ -87,7 +87,7 @@ export class DehubPayController {
     }
   }
   @Post('/dpay/checkout')
-  @UseGuards(AuthGuard)
+  // @UseGuards(AuthGuard)
   async checkout(
     @Body('chainId') chainId: number = null,
     @Body('address') address: string = null,
@@ -152,12 +152,36 @@ export class DehubPayController {
   }
   @Get('/dpay/price/:chainId')
   async fetchPriceByChain(@Param('chainId') chainId: string, @Query('token') token = 'DHB', @Res() res: Response) {
-    const platform = await this.dehubPayService.getTokenContractAndPlatform(chainId, token);
-    const data = await this.dehubPayService.fetchPriceByChain(
-      platform.platformId,
-      platform.contractAddress,
-      platform.chain,
-    );
-    return res.status(200).json(data);
+    try {
+      const platform = await this.dehubPayService.getTokenContractAndPlatform(chainId, token);
+      const data = await this.dehubPayService.fetchPriceByChain(
+        platform.platformId,
+        platform.contractAddress,
+        platform.chain,
+      );
+      return res.status(200).json(data);
+    } catch (error) {
+      this.logger.error('[DehubPayController Error]', error);
+      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        message: error.message,
+      });
+    }
+  }
+
+  @Get('/dpay/total')
+  async fetchTotal(@Query('type') type = 'success', @Res() res: Response) {
+    try {
+      const obj = {
+        success: this.dehubPayService.getSuccessAmountToTransferred,
+        pending: this.dehubPayService.getPendingEstimatedAmountToTransfer,
+      }; 
+ 
+      return res.status(HttpStatus.OK).json(await obj[type]()??{});
+    } catch (error) {
+      this.logger.error('[DehubPayController Error]', error);
+      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        message: error.message,
+      });
+    }
   }
 }

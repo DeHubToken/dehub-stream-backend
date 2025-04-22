@@ -123,7 +123,6 @@ export class DpayTransactionProcessor {
           tokenSendRetryCount: retryCount + 1,
           lastTriedAt: new Date(),
         });
-
         await this.transactionQueue.add('transferToken', job.data, {
           delay: RETRY_DELAY_MS,
         });
