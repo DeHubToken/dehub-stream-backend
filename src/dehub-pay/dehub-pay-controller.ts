@@ -3,9 +3,7 @@ import { Request, Response } from 'express';
 import { DehubPayService } from './dehub-pay-service';
 import { reqParam } from 'common/util/auth';
 import mongoose from 'mongoose';
-import { DehubPayMiddleware } from './dehub-pay-middleware';
-import { ChainId, supportedTokens } from 'config/constants';
-import { AuthGuard } from 'common/guards/auth.guard';
+import { symbolToIdMap } from './constants';
 
 @Controller()
 export class DehubPayController {
@@ -18,7 +16,7 @@ export class DehubPayController {
     @Res() res: Response,
   ) {
     try {
-      const data = await this.dehubPayService.coingeckoGetPrice('dehub', currency, chainId);
+      const data = await this.dehubPayService.coingeckoGetPrice(symbolToIdMap['DHB'], currency, chainId);
       if (!data.price) {
         return res.status(HttpStatus.BAD_REQUEST).json({
           message: `Unsupported or invalid currency: ${currency}`,
@@ -72,12 +70,21 @@ export class DehubPayController {
   async getTnx(@Req() req: Request, @Res() res: Response) {
     try {
       const filter: any = {};
-      const address = reqParam(req, 'address');
       const sid = reqParam(req, 'sid');
       if (sid && sid.trim() !== '') {
-        filter['$or'] = [{ sessionId: sid }, { _id: new mongoose.Types.ObjectId(sid) }];
+        const orConditions = [];
+
+        if (mongoose.Types.ObjectId.isValid(sid)) {
+          orConditions.push({ _id: new mongoose.Types.ObjectId(sid) });
+        }
+
+        orConditions.push({ sessionId: sid });
+
+        filter['$or'] = orConditions;
       }
-      const data = await this.dehubPayService.getTnxs(filter);
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const data = await this.dehubPayService.getTnxsApi(filter, page, limit);
       return res.status(HttpStatus.OK).json(data);
     } catch (err) {
       console.error('[DehubPayController Fetch Error]', err.message);
@@ -91,6 +98,9 @@ export class DehubPayController {
   async checkout(
     @Body('chainId') chainId: number = null,
     @Body('address') address: string = null,
+    @Body('currency') currency: string = null,
+    @Body('tokenId') tokenId: string = 'DHB',
+    @Body('tokenSymbol') tokenSymbol: string = 'DHB',
     @Body('receiverAddress') receiverAddress: number = 0,
     @Body('amount') amount: number = 0,
     @Body('tokensToReceive') tokensToReceive: number = 0,
@@ -118,6 +128,9 @@ export class DehubPayController {
         amount,
         tokensToReceive,
         redirect,
+        tokenSymbol,
+        currency,
+        tokenId,
       });
 
       // Step 3: Return the session id and redirect URL
@@ -128,12 +141,49 @@ export class DehubPayController {
         tokenPrice: price,
       });
     } catch (err) {
+      console.error(err);
       this.logger.error('[DehubPayController Error]', err);
       return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         message: 'Failed to create checkout session',
       });
     }
   }
+  @Post('/dpay/tk/')
+  createTicket(
+    @Body('tnxId') chainId: number = null,
+    @Body('address') address: string = null,
+    @Body('description') description: string = null,
+    @Body('type') type: string = null,
+    @Body('requestType') requestType: string = null,
+    @Res() res: Response,
+  ) {
+    try {
+      // Ensure the data passed is valid before calling the service
+      if (!chainId || !address || !type || !description || !requestType) {
+        return res.status(400).json({ message: 'Missing required parameters.' });
+      }
+
+      // Pass the data to the service
+      const ticketData = {
+        chainId,
+        address,
+        description,
+        type,
+        requestType,
+      };
+
+      // Create the ticket using the service
+      const result = this.dehubPayService.createTicket(ticketData);
+
+      // Send a response back to the client
+      return res.status(201).json(result);
+    } catch (error) {
+      // Handle errors and send back a response
+      console.error(error);
+      return res.status(500).json({ message: 'An error occurred while creating the ticket.' });
+    }
+  }
+
   @Post('/dpay/webhook')
   stripeWebHook(@Req() req: Request, @Res() res: Response) {
     try {
@@ -174,9 +224,9 @@ export class DehubPayController {
       const obj = {
         success: this.dehubPayService.getSuccessAmountToTransferred,
         pending: this.dehubPayService.getPendingEstimatedAmountToTransfer,
-      }; 
- 
-      return res.status(HttpStatus.OK).json(await obj[type]()??{});
+      };
+
+      return res.status(HttpStatus.OK).json((await obj[type]()) ?? {});
     } catch (error) {
       this.logger.error('[DehubPayController Error]', error);
       return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({

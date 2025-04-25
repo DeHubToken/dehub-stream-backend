@@ -30,7 +30,6 @@ export class DpayMonitor implements OnModuleInit {
     try {
       const pendingTransactions = await this.dehubPayService.getTnxs(
         { status_stripe: 'pending', tokenSendStatus: 'not_sent' },
-        false,
       );
       const jobs = [];
 
@@ -56,10 +55,10 @@ export class DpayMonitor implements OnModuleInit {
     this.logger.log('Checking for Success transactions...');
 
     try {
-      const pendingTransactions = await this.dehubPayService.getTnxs(
-        { status_stripe: 'succeeded', tokenSendStatus: 'not_sent' },
-        false,
-      );
+      const pendingTransactions = await this.dehubPayService.getTnxs({
+        status_stripe: 'succeeded',
+        tokenSendStatus: 'not_sent',
+      });
       const jobs = [];
 
       for (const tx of pendingTransactions) {
@@ -82,7 +81,7 @@ export class DpayMonitor implements OnModuleInit {
 
       if (jobs.length) {
         await this.addJobsBulk(jobs);
-    const affected=    await DpayTnxModel.updateMany(
+        const affected = await DpayTnxModel.updateMany(
           {
             sessionId: { $in: jobs.map(job => job.data.sessionId) },
           },
@@ -90,7 +89,7 @@ export class DpayMonitor implements OnModuleInit {
             $set: { tokenSendStatus: 'processing' }, // or whatever field you want to update
           },
         );
-        console.log("affected",affected)
+        console.log('affected', affected);
         this.logger.log(`Queued ${jobs.length} success transaction(s) for token Transfer.`);
       }
     } catch (error) {
@@ -144,19 +143,3 @@ export class DpayMonitor implements OnModuleInit {
     this.logger.log('✅ All jobs cleared from transactionQueue.');
   }
 }
-
-// const transferDetails = await this.dehubPayService.getTransferDetailsBySessionId(sessionId);
-// if (transferDetails) {
-//   const { receiverAddress, amount, tokenAddress, chainId } = transferDetails;
-
-//   await this.transactionQueue.add('transferToken', {
-//     sessionId,
-//     receiverAddress,
-//     amount,
-//     tokenAddress,
-//     chainId,
-//   });
-//   this.logger.log(`Scheduled transferToken job for sessionId: ${sessionId}`);
-// } else {
-//   this.logger.warn(`No transfer details found for sessionId: ${sessionId}`);
-// }

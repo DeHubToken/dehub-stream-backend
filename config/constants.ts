@@ -227,6 +227,16 @@ const productionTokens = [
     label: 'DHB',
     symbol: 'DHB',
     customAbbreviation: 'dhb',
+    chainId: 97,//dev
+    address: '0xeb6ACdcfe1F13187126A504d56f7970bf6f3C5E1', //'0xeb6acdcfe1f13187126a504d56f7970bf6f3c5e1',
+    iconUrl: 'assets/icons/tokens/DHB.png',
+    decimals: 18,
+  },
+  {
+    value: 'dhb',
+    label: 'DHB',
+    symbol: 'DHB',
+    customAbbreviation: 'dhb',
     chainId: 8453,
     address: '0xD20ab1015f6a2De4a6FdDEbAB270113F689c2F7c',
     iconUrl: '/icons/DHB.png', // Update to relevant image URL if needed
@@ -440,6 +450,14 @@ const supportedChainIds = isDevMode
   ? [ChainId.BSC_TESTNET, ChainId.GORLI]
   : [ChainId.MAINNET, ChainId.BSC_MAINNET, ChainId.POLYGON_MAINNET];
 const mainNetworks = [
+  {
+    chainId: ChainId.BSC_TESTNET,
+    shortName: `bsctest`,
+    rpcUrls: [process.env.BSCTEST_RPC_ENDPOINT, process.env.BSCTEST_RPC_ENDPOINT],
+    startBlockNumber: 8708163,
+    graphUrl: 'https://api.thegraph.com/subgraphs/name/bscscan/bsc-testnet',
+    eventRpc: [`https://data-seed-prebsc-1-s1.bnbchain.org:8545`],
+  },
   {
     chainId: ChainId.BSC_MAINNET,
     shortName: `bsc`,

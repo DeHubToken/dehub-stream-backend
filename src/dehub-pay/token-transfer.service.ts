@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ethers } from 'ethers';
 import { ChainId, supportedTokens, supportedNetworks } from 'config/constants';
 import erc20ContractAbi from '../../abis/erc20.json';
+import { DehubPayService } from './dehub-pay-service';
 
 @Injectable()
 export class TokenTransferService {
@@ -9,15 +10,11 @@ export class TokenTransferService {
   private readonly providers: Record<number, ethers.JsonRpcProvider> = {};
   private readonly wallets: Record<number, ethers.Wallet> = {};
 
-  constructor() {
+  constructor(private readonly dehubPayService: DehubPayService) {
     const privateKey = process.env.DPWPK;
     if (!privateKey) throw new Error('DPWPK environment variable is not set');
 
-    const supportedChainIds = new Set([
-      ChainId.BSC_MAINNET,
-      ChainId.BSC_TESTNET,
-      ChainId.BASE_MAINNET,
-    ]);
+    const supportedChainIds = new Set([ChainId.BSC_MAINNET, ChainId.BSC_TESTNET, ChainId.BASE_MAINNET]);
 
     supportedNetworks
       .filter(n => supportedChainIds.has(n.chainId))
@@ -64,6 +61,33 @@ export class TokenTransferService {
       const decimals = await contract.decimals();
       const adjustedAmount = ethers.parseUnits(amount.toString(), decimals);
 
+      // Build transaction data manually
+      const txData = await contract.transfer.populateTransaction(to, adjustedAmount);
+
+      // Get the wallet's balance (native currency like ETH, MATIC)
+      const rawBalance = await provider.getBalance(wallet.address);
+      const formattedBalance = ethers.formatEther(rawBalance); // Convert to native currency (ETH/MATIC)
+
+      // Estimate gas using the provider
+      const estimatedGas = await provider.estimateGas({
+        from: wallet.address,
+        to: token.address,
+        data: txData.data,
+      });
+
+      // Convert rawBalance and estimatedGas to BigNumber for comparison
+
+      // Convert rawBalance and estimatedGas to FixedNumber for comparison
+      const rawBalanceFixed = ethers.FixedNumber.fromValue(rawBalance, 18); // 18 decimals for ETH/MATIC
+      const estimatedGasFixed = ethers.FixedNumber.fromValue(estimatedGas, 18); // Adjust decimals if necessary
+
+      // Check if the wallet has enough balance to cover the gas fee
+      if (estimatedGasFixed.gte(rawBalanceFixed)) {
+        throw new Error(
+          `Insufficient balance to cover gas fee. Balance: ${formattedBalance} ETH, Estimated Gas: ${ethers.formatUnits(estimatedGas, 'gwei')} Gwei`,
+        );
+      }
+      // Proceed with the transfer if sufficient balance
       const tx = await contract.transfer(to, adjustedAmount);
       await tx.wait();
 

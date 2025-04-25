@@ -49,6 +49,8 @@ export class DpayTnx {
   @Prop()
   tokenSendTxnHash?: string;
   @Prop()
+  currency: string;
+  @Prop()
   intentId?: string;
   @Prop({ default: false })
   isIntentCreated?: Boolean;

@@ -9,9 +9,11 @@ import { AccountModel } from 'models/Account';
 import { DpayTnxModel } from 'models/dpay/dpay-transactions';
 import mongoose from 'mongoose';
 import { Request, Response } from 'express';
-const defaultWalletAddress = '0xC8acD6eeeD02EA0dA142D57941E1102e81Cc0b77';
+
 import Stripe from 'stripe';
 import { first } from 'rxjs';
+import { defaultWalletAddress } from './constants';
+import { TicketModel } from 'models/dpay/ticket-model';
 
 @Injectable()
 export class DehubPayService {
@@ -25,20 +27,9 @@ export class DehubPayService {
     this.stripe = new Stripe(stripeSecretKey, {
       apiVersion: '2025-03-31.basil',
     });
-    // setInterval(() => {
-    //   this.getPendingEstimatedAmountToTransfer();
-    //   this.getSuccessAmountToTransferred();
-    // }, 5000);
   }
-  async getTnxs(filter, cache = true) {
+  async getTnxs(filter) {
     try {
-      // Check Redis cache first
-      const cacheKey = `transactions:${JSON.stringify(filter)}`;
-      const cachedTransactions = await this.redisClient.get(cacheKey);
-      if (cache && cachedTransactions) {
-        return JSON.parse(cachedTransactions);
-      }
-
       const transactions = await DpayTnxModel.aggregate([
         { $match: filter },
         { $sort: { createdAt: -1 } },
@@ -54,6 +45,7 @@ export class DehubPayService {
             txnHash: 1,
             note: 1,
             type: 1,
+            currency: 1,
             tokenSendStatus: 1,
             tokenSendRetryCount: 1,
             receiverAddress: 1,
@@ -68,21 +60,86 @@ export class DehubPayService {
         },
       ]);
 
-      // Cache the result for 1 minute
-      await this.redisClient.setex(cacheKey, 10, JSON.stringify(transactions));
-
       return transactions;
     } catch (error) {
       this.logger.error('Error fetching transactions:', error.message);
       throw new Error('Failed to fetch transactions');
     }
   }
-  async checkout({ chainId, address, receiverAddress, amount, tokensToReceive, redirect }) {
+  async getTnxsApi(filter, page = 1, limit = 10, cache = true) {
     try {
-      const { price: tokenPriceUSD } = await this.coingeckoGetPrice('dehub', 'usd');
-      if (!tokenPriceUSD) {
-        throw new Error(`Token price for dehub not found`);
+      const skip = (page - 1) * limit;
+      const cacheKey = `transactions:${JSON.stringify(filter)}:page:${page}:limit:${limit}`;
+
+      if (cache) {
+        const cached = await this.redisClient.get(cacheKey);
+        if (cached) {
+          return JSON.parse(cached);
+        }
       }
+
+      const [transactions, total] = await Promise.all([
+        DpayTnxModel.aggregate([
+          { $match: filter },
+          { $sort: { createdAt: -1 } },
+          { $skip: skip },
+          { $limit: limit },
+          {
+            $project: {
+              _id: 1,
+              sessionId: 1,
+              amount: 1,
+              tokenSymbol: 1,
+              tokenAddress: 1,
+              chainId: 1,
+              status_stripe: 1,
+              txnHash: 1,
+              note: 1,
+              type: 1,
+              currency: 1,
+              tokenSendStatus: 1,
+              tokenSendRetryCount: 1,
+              receiverAddress: 1,
+              tokenSendTxnHash: 1,
+              approxTokensToReceive: 1,
+              approxTokensToSent: 1,
+              lastTriedAt: 1,
+              createdAt: 1,
+              updatedAt: 1,
+              receiverId: 1,
+            },
+          },
+        ]),
+        DpayTnxModel.countDocuments(filter),
+      ]);
+
+      const result = {
+        tnxs: transactions,
+        total,
+        page,
+        limit,
+      };
+
+      await this.redisClient.setex(cacheKey, 60, JSON.stringify(result)); // 60 seconds cache
+
+      return result;
+    } catch (error) {
+      this.logger.error('Error fetching transactions:', error.message);
+      throw new Error('Failed to fetch transactions');
+    }
+  }
+  async checkout({
+    chainId,
+    address,
+    receiverAddress,
+    amount,
+    tokensToReceive,
+    redirect,
+    tokenSymbol,
+    currency,
+    tokenId,
+  }) {
+    try {
       const user = await AccountModel.findOne({ address: address.toLowerCase() });
       if (!user) {
         throw new Error('User not Found.');
@@ -91,7 +148,8 @@ export class DehubPayService {
       const transaction = new DpayTnxModel({
         sessionId: `temp+${Math.random() * 100}-${timestep}`, // temp placeholder
         amount,
-        tokenSymbol: 'DHB',
+        currency,
+        tokenSymbol,
         chainId,
         receiverId: user._id,
         status_stripe: 'init',
@@ -102,7 +160,14 @@ export class DehubPayService {
 
       await transaction.save();
 
-      const session = await this.createStripeSession('dehub', amount, transaction._id.toString(), redirect);
+      const session = await this.createStripeSession(
+        tokenSymbol,
+        tokenId,
+        currency,
+        amount,
+        transaction._id.toString(),
+        redirect,
+      );
       transaction.sessionId = session.id;
       transaction.status_stripe = 'pending';
       await transaction.save(); // Save updated fields
@@ -111,6 +176,70 @@ export class DehubPayService {
     } catch (error) {
       this.logger.error('Error during checkout process', error.message);
       throw error;
+    }
+  }
+  async createStripeSession(
+    token: string,
+    tokenId: string,
+    currency: string,
+    localAmount: number,
+    id: string,
+    redirect?: string,
+  ) {
+    try {
+      // Fetch token price from Coingecko or your pricing service
+      const { price: tokenPrice } = await this.coingeckoGetPrice(tokenId, currency);
+
+      if (!tokenPrice) {
+        throw new Error(`Failed to fetch price for ${token}`);
+      }
+
+      // Calculate approximate tokens user will receive
+      const approxTokensToReceive = localAmount / tokenPrice;
+      console.log('approxTokensToReceive', approxTokensToReceive);
+      const session = await this.stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency: currency,
+              product_data: {
+                name: `${token} Token Purchase`,
+                description: `Approx. ${approxTokensToReceive.toFixed(2)} ${token} tokens`,
+                images: ['https://dehub.io/icons/DHB.png'],
+              },
+              unit_amount: Math.round(localAmount * 100),
+            },
+            quantity: 1,
+          },
+        ],
+        mode: 'payment',
+        success_url: `${redirect ?? process.env.FRONT_END_URL}/dpay/tnx/${id}`,
+        cancel_url: `${redirect ?? process.env.FRONT_END_URL}/dpay/tnx/${id}`,
+        metadata: {
+          token,
+          id,
+          amount: localAmount.toString(),
+          approxTokensToReceive: approxTokensToReceive.toString(),
+        },
+        custom_text: {
+          submit: {
+            message: 'Click to confirm your token purchase',
+          },
+          terms_of_service_acceptance: {
+            message: "By continuing, you agree to DeHub's token terms and conditions.",
+          },
+        },
+        consent_collection: {
+          terms_of_service: 'required',
+        },
+      });
+
+      return session;
+    } catch (error) {
+      this.logger.error('Error creating Stripe session', error.message);
+      this.logger.error('Error creating Stripe session', error);
+      throw new Error('Failed to create Stripe checkout session');
     }
   }
   async stripeWebHook(request, res) {
@@ -177,53 +306,6 @@ export class DehubPayService {
       }
     }
   }
-  async createStripeSession(token: string, usdAmount: number, id: string, redirect?: string) {
-    try {
-      // Fetch token price from Coingecko or your pricing service
-      const { price: tokenPrice } = await this.coingeckoGetPrice(token, 'usd');
-
-      if (!tokenPrice) {
-        throw new Error(`Failed to fetch price for ${token}`);
-      }
-
-      // Calculate approximate tokens user will receive
-      const approxTokensToReceive = usdAmount / tokenPrice;
-
-      const session = await this.stripe.checkout.sessions.create({
-        payment_method_types: ['card', 'us_bank_account', 'ideal'],
-        line_items: [
-          {
-            price_data: {
-              currency: 'usd',
-              product_data: {
-                name: `${token} Token Purchase`,
-                description: `Approx. ${approxTokensToReceive.toFixed(2)} ${token} tokens`,
-                images: [
-                  // Replace this with your actual token image URL
-                  'https://dehub.io/icons/DHB.png',
-                ],
-              },
-              unit_amount: Math.round(usdAmount * 100), // Stripe needs value in cents
-            },
-            quantity: 1,
-          },
-        ],
-        mode: 'payment',
-        success_url: `${redirect ?? process.env.FRONT_END_URL}/dpay/tnx?sid=${id}`,
-        cancel_url: `${redirect ?? process.env.FRONT_END_URL}/dpay/tnx?sid=${id}`,
-        metadata: {
-          token,
-          usdAmount: usdAmount.toString(),
-          approxTokensToReceive: approxTokensToReceive.toString(),
-        },
-      });
-
-      return session;
-    } catch (error) {
-      this.logger.error('Error creating Stripe session', error.message);
-      throw new Error('Failed to create Stripe checkout session');
-    }
-  }
   async coingeckoGetPrice(tokenSymbol: string, currency: string, chainId?: number) {
     try {
       const cacheKey = `coingecko:price:${tokenSymbol}:${currency}`;
@@ -253,8 +335,9 @@ export class DehubPayService {
       throw error;
     }
   }
-  async getTokenContractAndPlatform(chainId: string, token: string) {
-    const numericChainId = parseInt(chainId, 10);
+  async getTokenContractAndPlatform(chainId: number | string, token: string) {
+    let numericChainId = typeof chainId !== 'number' ? parseInt(chainId, 10) : chainId;
+
     const platformMap: Record<number, string> = {
       [ChainId.BSC_MAINNET]: 'binance-smart-chain',
       [ChainId.BASE_MAINNET]: 'base',
@@ -292,13 +375,13 @@ export class DehubPayService {
       return { platform: platformId, price: 0, url };
     }
   }
-  async checkTokenAvailability(address: string = defaultWalletAddress) {
+  async checkTokenAvailability(address: string = defaultWalletAddress, options = { skipCache: false }) {
     try {
       const cacheKey = `tokenBalances:${address.toLowerCase()}`;
       const cachedBalances = await this.redisClient.get(cacheKey);
-      // if (cachedBalances) {
-      //   return JSON.parse(cachedBalances);
-      // }
+      if (!options.skipCache && cachedBalances) {
+        return JSON.parse(cachedBalances);
+      }
 
       const balancePromises = await Promise.all(
         supportedTokens
@@ -312,6 +395,7 @@ export class DehubPayService {
               const balance = await getERC20TokenBalance(address, token.address, token.chainId);
               return { chainId: token.chainId, symbol: token.symbol, balance };
             } catch (error) {
+              console.log(error);
               this.logger?.warn?.(`Error fetching ${token.symbol} balance on chain ${token.chainId}: ${error.message}`);
               return { chainId: token.chainId, symbol: token.symbol, balance: 0 };
             }
@@ -322,7 +406,7 @@ export class DehubPayService {
       const groupedBalances = this.groupBalancesByChain(results);
 
       // Cache the result for 1 hour
-      await this.redisClient.setex(cacheKey, 3600, JSON.stringify(groupedBalances));
+      await this.redisClient.setex(cacheKey, 60, JSON.stringify(groupedBalances));
 
       return groupedBalances;
     } catch (error) {
@@ -330,11 +414,11 @@ export class DehubPayService {
       throw new Error('Failed to check token availability');
     }
   }
-  async checkGasAvailability(address: string = defaultWalletAddress) {
+  async checkGasAvailability(address: string = defaultWalletAddress, options = { skipCache: false }) {
     try {
       const cacheKey = `gasBalances:${address.toLowerCase()}`;
       const cachedGasBalances = await this.redisClient.get(cacheKey);
-      if (cachedGasBalances) {
+      if (!options.skipCache && cachedGasBalances) {
         return JSON.parse(cachedGasBalances);
       }
 
@@ -355,7 +439,7 @@ export class DehubPayService {
       const formattedBalances = this.formatGasBalances(results);
 
       // Cache the result for 1 hour
-      await this.redisClient.setex(cacheKey, 3600, JSON.stringify(formattedBalances));
+      await this.redisClient.setex(cacheKey, 60, JSON.stringify(formattedBalances));
 
       return formattedBalances;
     } catch (error) {
@@ -449,14 +533,31 @@ export class DehubPayService {
 
     console.log('handlePaymentIntentSucceeded sessionId', sessionId);
   }
+  // Handling Payment Intent Failed
   async handlePaymentIntentFailed(intent) {
-    const sessionId = await this.getStripeSession(intent.id);
-    if (!sessionId) {
-      // throw Error('Session Id Required');
-      console.log('handlePaymentIntentFailed Session Id not Attached');
-    }
+    try {
+      const sessionId = await this.getStripeSession(intent.id);
+      if (!sessionId) {
+        console.log('handlePaymentIntentFailed: Session ID not found');
+        return;
+      }
 
-    console.log('handlePaymentIntentFailed sessionId', sessionId);
+      // Update transaction status to reflect failure
+      const tnx = await DpayTnxModel.findOneAndUpdate(
+        { sessionId },
+        {
+          $set: {
+            status_stripe: intent.status,
+            payment_status: 'failed', // Mark payment as failed
+            failure_reason: intent.last_payment_error?.message || 'Unknown error', // Include any failure reason
+          },
+        },
+        { new: true },
+      );
+      console.log('Payment Intent Failed', { sessionId, intent, tnx });
+    } catch (error) {
+      console.error('Error in handlePaymentIntentFailed:', error);
+    }
   }
   async handleChargeSucceeded(intent) {
     const sessionId = await this.getStripeSession(intent.id);
@@ -609,4 +710,46 @@ export class DehubPayService {
     const res = await DpayTnxModel.aggregate(pipeline);
     return res;
   }
+  async createTicket(ticketData: {
+    chainId: number;
+    address: string;
+    description: string;
+    type: string;
+    requestType: string;
+  }) {
+    try {
+      // Simulating some database or external API interaction
+      const { chainId, address, type, description, requestType } = ticketData;
+
+      // Example: Save the ticket data to the database or process it
+      const newTicket = await TicketModel.create({
+        chainId,
+        address,
+        type,
+        description,
+        requestType,
+        status: 'pending', // Example status
+        createdAt: new Date(),
+      });
+
+      // Return the created ticket or any relevant information
+      return newTicket;
+    } catch (error) {
+      // Handle errors (e.g., logging or throwing a custom error)
+      console.error('Error creating ticket:', error);
+      throw new Error('Failed to create ticket');
+    }
+  }
+
+  // async getTokenBehind(chainId: number, tokenSymbol: string) {
+  //   let tempChainId = chainId;
+  //   if (chainId === 97) {
+  //     tempChainId = 56;
+  //   }
+  //   const platform = await this.getTokenContractAndPlatform(tempChainId, tokenSymbol);
+  //   const tokens = await this.checkTokenAvailability(defaultWalletAddress, { skipCache: true });
+  //   const gas = await this.checkGasAvailability(defaultWalletAddress, { skipCache: true });
+  //   const data = await this.fetchPriceByChain(platform.platformId, platform.contractAddress, tempChainId);
+  //   return { ...data, tokens, gas, tokenSymbol };
+  // }
 }

@@ -12,7 +12,7 @@ import erc721ContractAbi from '../../abis/StreamNft.json';
 const getTokenByTokenAddress = (tokenAddress:string, chainId = 56) => supportedTokens.find(e => e.address.toLowerCase() === tokenAddress.toLowerCase() && e.chainId === chainId);
 
 const getERC20TokenBalance = async (account:string, tokenAddress:string, chainId:number) => { 
-    console.log("A")
+
     const network = supportedNetworks.find(e => e.chainId === chainId);
     const token = supportedTokens.find(e => e.address.toLowerCase() === tokenAddress.toLowerCase());  
     if (!network || !token) return 0; 

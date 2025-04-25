@@ -21,27 +21,11 @@ export class DpayTransactionProcessor {
     const { sessionId } = job.data;
 
     try {
-      this.logger.log(`Processing transaction with sessionId: ${sessionId}`); 
+      this.logger.log(`Processing transaction with sessionId: ${sessionId}`);
       const isPaid = await this.dehubPayService.verifyTransactionStatus(sessionId);
       const transferDetails = await this.dehubPayService.getTransferDetailsBySessionId(sessionId);
       if (isPaid) {
-        await this.dehubPayService.updateTransactionStatus(sessionId, 'success');
-        // this.logger.log(`Transaction ${sessionId} marked as completed.`);
-
-        // if (transferDetails) {
-        //   const { receiverAddress, amount, tokenAddress, chainId } = transferDetails;
-
-        //   await this.transactionQueue.add('transferToken', {
-        //     sessionId,
-        //     receiverAddress,
-        //     amount,
-        //     tokenAddress,
-        //     chainId,
-        //   });
-        //   this.logger.log(`Scheduled transferToken job for sessionId: ${sessionId}`);
-        // } else {
-        //   this.logger.warn(`No transfer details found for sessionId: ${sessionId}`);
-        // }
+        await this.dehubPayService.updateTransactionStatus(sessionId, 'succeeded');
       } else {
         this.logger.log(`Transaction ${sessionId} is not completed yet.`);
 
@@ -66,7 +50,7 @@ export class DpayTransactionProcessor {
 
   @Process({ name: 'transferToken', concurrency: 100 })
   async processTokenTransfer(job: Job) {
-    const { sessionId, receiverAddress, amount: usdAmount, tokenAddress, chainId } = job.data;
+    const { sessionId, receiverAddress, amount: amt, tokenAddress, chainId } = job.data;
     const MAX_RETRIES = 3;
     const RETRY_DELAY_MS = 1000 * 60;
     try {
@@ -74,7 +58,14 @@ export class DpayTransactionProcessor {
       if (!network) throw new Error(`Unsupported chainId: ${chainId}`);
 
       const { price: tokenPrice } = await this.dehubPayService.coingeckoGetPrice('dehub', 'usd');
-      const amount = usdAmount / tokenPrice;
+      // const platform = await this.dehubPayService.getTokenContractAndPlatform(chainId, token);
+      // const data = await this.dehubPayService.fetchPriceByChain(
+      //   platform.platformId,
+      //   platform.contractAddress,
+      //   platform.chain,
+      // );
+
+      const amount = amt / tokenPrice;
 
       this.logger.log(
         `Starting token transfer: sessionId=${sessionId}, receiverAddress=${receiverAddress}, amount=${amount}, token=${tokenAddress}, chainId=${chainId}`,
