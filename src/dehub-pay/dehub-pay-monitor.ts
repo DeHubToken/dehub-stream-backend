@@ -13,33 +13,75 @@ export class DpayMonitor implements OnModuleInit {
     private readonly dehubPayService: DehubPayService,
     @InjectQueue('transactionQueue') private readonly transactionQueue: Queue,
   ) {
-    // this.clearAllJobs(); // use in only dev
+    this.clearAllJobs(); // use in only dev
   }
 
   async onModuleInit() {
     this.logger.log('DpayMonitor initialized.');
   }
 
+  @Cron(CronExpression.EVERY_10_SECONDS)
+  async expireTheTnx() {
+    try {
+      const now = Math.floor(Date.now() / 1000);
+      const result = await DpayTnxModel.updateMany(
+        {
+          $or: [
+            {
+              status_stripe: { $in: ['pending', 'init'] },
+              tokenSendStatus: 'not_sent',
+              expires_at: { $lt: now },
+            },
+            {
+              status_stripe: { $exists: false }, // Handles missing status_stripe
+              tokenSendStatus: 'not_sent',
+              expires_at: { $lt: now },
+            },
+            {
+              expires_at: { $exists: false }, // Handles missing expires_at
+              status_stripe: { $in: ['pending', 'init'] },
+              tokenSendStatus: 'not_sent',
+            },
+          ],
+        },
+        {
+          $set: { status_stripe: 'expired' },
+        },
+      );
+
+      if (result.modifiedCount > 0) {
+        this.logger.log(`✅ Expired ${result.modifiedCount} transactions.`);
+      } else {
+        this.logger.log(`✅ No pending transactions found to expire.`);
+      }
+    } catch (error) {
+      this.logger.error('❌ Error expiring transactions:', error.message);
+    }
+  }
+
   /**
    * Cron job to monitor pending transactions every minute.
    */
-  @Cron(CronExpression.EVERY_MINUTE)
+  @Cron(CronExpression.EVERY_30_MINUTES)
   async monitorStripePendingTransactions() {
     this.logger.log('Checking for pending transactions...');
 
     try {
       const pendingTransactions = await this.dehubPayService.getTnxs(
-        { status_stripe: 'pending', tokenSendStatus: 'not_sent' },
+        {
+          status_stripe: 'pending',
+          tokenSendStatus: 'not_sent',
+          expires_at: { $gt: Math.floor(Date.now() / 1000) },
+        },
+        [],
       );
       const jobs = [];
 
       for (const tx of pendingTransactions) {
-        if (tx.status_stripe === 'pending') {
-          jobs.push({
-            name: 'verifyTransaction',
-            data: { sessionId: tx.sessionId },
-          });
-        }
+        jobs.push({
+          name: 'verifyTransaction',
+          data: { sessionId: tx.sessionId },
+        });
       }
 
       if (jobs.length) {
@@ -47,61 +89,95 @@ export class DpayMonitor implements OnModuleInit {
         this.logger.log(`Queued ${jobs.length} pending transaction(s) for verification.`);
       }
     } catch (error) {
+      this.logger.error('Error monitoring transactions:', error);
       this.logger.error('Error monitoring transactions:', error.message);
     }
   }
-  @Cron(CronExpression.EVERY_MINUTE)
+  @Cron(CronExpression.EVERY_10_SECONDS)
   async monitorStripeSuccessTransactions() {
     this.logger.log('Checking for Success transactions...');
 
     try {
-      const pendingTransactions = await this.dehubPayService.getTnxs({
-        status_stripe: 'succeeded',
-        tokenSendStatus: 'not_sent',
-      });
+      const pendingTransactions = await this.dehubPayService.getTnxs(
+        {
+          status_stripe: 'succeeded',
+          tokenSendStatus: { $in: ['not_sent'] },
+        },
+        [{ $limit: 1 }],
+      );
       const jobs = [];
-
       for (const tx of pendingTransactions) {
         if (tx.status_stripe === 'succeeded') {
-          jobs.push({
-            name: 'transferToken',
-            data: {
-              sessionId: tx.sessionId,
-              receiverAddress: tx.receiverAddress,
-              amount: tx.amount,
-              tokenAddress: tx.tokenAddress,
-              chainId: tx.chainId,
-            },
-            opts: {
-              jobId: `transferToken-${tx.sessionId}`, // unique identifier
-            },
-          });
-        }
-      }
+          try {
+            const tnx = await this.dehubPayService.stripeLatestChargeByIntentOrSessionId(tx.sessionId);
 
-      if (jobs.length) {
-        await this.addJobsBulk(jobs);
-        const affected = await DpayTnxModel.updateMany(
-          {
-            sessionId: { $in: jobs.map(job => job.data.sessionId) },
-          },
-          {
-            $set: { tokenSendStatus: 'processing' }, // or whatever field you want to update
-          },
-        );
-        console.log('affected', affected);
-        this.logger.log(`Queued ${jobs.length} success transaction(s) for token Transfer.`);
+            if (!tnx) {
+              return;
+            }
+            if (!tnx.net) {
+              return;
+            }
+            await this.dehubPayService.updateTransaction(tx.sessionId, {
+              fee: tnx.fee / 100,
+              net: tnx.net / 100,
+              exchange_rate: tnx.exchange_rate,
+              tokenSendStatus: 'processing',
+            });
+            this.addJobsBulk([
+              {
+                name: 'transferToken',
+                data: {
+                  id: tx._id,
+                },
+                opts: {
+                  jobId: `transferToken-${tx.sessionId}`, // unique identifier
+                },
+              },
+            ]);
+
+            this.logger.log('👇 Push job for token transfer', tx.sessionId);
+          } catch (error) {
+            await this.dehubPayService.updateTransaction(tx.sessionId, {
+              tokenSendStatus: 'failed',
+              note:error.toString()
+            });
+          }
+        }
       }
     } catch (error) {
       this.logger.error('Error monitoring transactions:', error.message);
     }
   }
+
+  // @Cron(CronExpression.EVERY_10_SECONDS)
+  // async retryFailedJob(){
+  //   const statuses:['failed'] = ['failed'];
+
+  //   // Get all failed jobs from the queue
+  //   const jobs = await this.transactionQueue.getJobs(statuses);
+
+  //   for (const job of jobs) {
+  //     try {
+  //       this.logger.log(`Retrying job ${job.id}`);
+  //       await job.retry();
+  //     } catch (err) {
+  //       this.logger.error(`Failed to retry job ${job.id}: ${err.message}`);
+  //     }
+  //   }
+  // }
   /**
    * Add a single job to the transaction queue.
    */
   async addJob(data: any, options) {
     await this.transactionQueue.add('verifyTransaction', data, options);
     this.logger.log(`Added single job for sessionId: ${data.sessionId}`);
+  }
+  /**
+   * Add a single job to the transaction queue.
+   */
+  async addJobTokenTransfer(data: any, options: any) {
+    await this.transactionQueue.add('transferToken', data, options);
+    this.logger.log(`Added token transfer job for sessionId: ${data.sessionId}`);
   }
 
   /**
@@ -128,6 +204,7 @@ export class DpayMonitor implements OnModuleInit {
 
     return jobs;
   }
+
   async clearAllJobs(): Promise<void> {
     const statuses: ('completed' | 'active' | 'delayed' | 'failed')[] = ['completed', 'active', 'delayed', 'failed'];
 
@@ -135,8 +212,12 @@ export class DpayMonitor implements OnModuleInit {
       const jobs = await this.transactionQueue.getJobs([status]);
 
       for (const job of jobs) {
-        await job.remove();
-        this.logger.log(`Removed job ID: ${job.id}, Name: ${job.name}`);
+        try {
+          await job.remove();
+          this.logger.log(`Removed job ID: ${job.id}, Name: ${job.name}`);
+        } catch (error) {
+          this.logger.log(`Failed to Remove job ID: ${job.id}, Name: ${job.name}`);
+        }
       }
     }
 

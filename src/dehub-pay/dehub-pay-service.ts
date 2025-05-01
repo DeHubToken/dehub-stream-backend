@@ -27,12 +27,18 @@ export class DehubPayService {
     this.stripe = new Stripe(stripeSecretKey, {
       apiVersion: '2025-03-31.basil',
     });
+
+    // setTimeout(async () => {
+    //   console.log(await DpayTnxModel.updateMany({}, { $set: { tokenSendStatus: 'not_sent' } }));
+    // }, 5000);
   }
-  async getTnxs(filter) {
+  async getTnxs(filter, line = []) {
     try {
-      const transactions = await DpayTnxModel.aggregate([
+      const pipeline = [
         { $match: filter },
         { $sort: { createdAt: -1 } },
+
+        ...line,
         {
           $project: {
             _id: 1,
@@ -58,7 +64,8 @@ export class DehubPayService {
             receiverId: 1,
           },
         },
-      ]);
+      ];
+      const transactions = await DpayTnxModel.aggregate(pipeline);
 
       return transactions;
     } catch (error) {
@@ -96,6 +103,9 @@ export class DehubPayService {
               txnHash: 1,
               note: 1,
               type: 1,
+              net: 1,
+              fee: 1,
+              exchange_rate: 1,
               currency: 1,
               tokenSendStatus: 1,
               tokenSendRetryCount: 1,
@@ -159,17 +169,19 @@ export class DehubPayService {
       });
 
       await transaction.save();
-
+      const expireInMinutesFromNow = Math.floor(Date.now() / 1000) + 30 * 60;
       const session = await this.createStripeSession(
         tokenSymbol,
         tokenId,
         currency,
         amount,
         transaction._id.toString(),
+        expireInMinutesFromNow,
         redirect,
       );
       transaction.sessionId = session.id;
       transaction.status_stripe = 'pending';
+      transaction.expires_at = expireInMinutesFromNow;
       await transaction.save(); // Save updated fields
 
       return { id: session.id, url: session.url };
@@ -184,11 +196,12 @@ export class DehubPayService {
     currency: string,
     localAmount: number,
     id: string,
+    expireInMinutesFromNow: number,
     redirect?: string,
   ) {
     try {
       // Fetch token price from Coingecko or your pricing service
-      const { price: tokenPrice } = await this.coingeckoGetPrice(tokenId, currency);
+      const { price: tokenPrice } = await this.coingeckoGetPrice(tokenId, currency, localAmount);
 
       if (!tokenPrice) {
         throw new Error(`Failed to fetch price for ${token}`);
@@ -214,6 +227,7 @@ export class DehubPayService {
           },
         ],
         mode: 'payment',
+        expires_at: expireInMinutesFromNow, // ⏰ expires
         success_url: `${redirect ?? process.env.FRONT_END_URL}/dpay/tnx/${id}`,
         cancel_url: `${redirect ?? process.env.FRONT_END_URL}/dpay/tnx/${id}`,
         metadata: {
@@ -306,9 +320,32 @@ export class DehubPayService {
       }
     }
   }
-  async coingeckoGetPrice(tokenSymbol: string, currency: string, chainId?: number) {
+  async stripeLatestCharge(balanceTransactionId: string) {
+    const balanceTransaction = await this.stripe.balanceTransactions.retrieve(balanceTransactionId);
+    // console.log('Gross Amount (before fee):', balanceTransaction.amount / 100);
+    // console.log('Fee taken by Stripe:', balanceTransaction.fee / 100);
+    // console.log('Net Amount (after fee):', balanceTransaction.net / 100);
+    // console.log('Transaction Currency:', balanceTransaction.currency);
+    // console.log('Exchange Rate (USD -> GBP):', balanceTransaction.exchange_rate);
+    return balanceTransaction;
+  }
+  async getBalanceTransaction(latest_charge: string) {
+    const charge = await this.stripe.charges.retrieve(latest_charge);
+    const balanceTransactionId = charge.balance_transaction as string;
+    return { balanceTransactionId, ...charge };
+  }
+  async stripeLatestChargeByIntentOrSessionId(id: string) {
+    const tnx = await DpayTnxModel.findOne(
+      { $or: [{ sessionId: id }, { intentId: id }] },
+      { latest_charge: 1, _id: 1 },
+    ).lean();
+    const balanceTnx = await this.getBalanceTransaction(tnx.latest_charge);
+    const balanceChargeTnx = await this.stripeLatestCharge(balanceTnx.balanceTransactionId);
+    return { ...balanceChargeTnx };
+  }
+  async coingeckoGetPrice(tokenSymbol: string, currency: string, amount?: number, chainId?: number) {
     try {
-      const cacheKey = `coingecko:price:${tokenSymbol}:${currency}`;
+      const cacheKey = `coingecko:price:${tokenSymbol}:${currency}:amount:${amount}`;
       const cachedPrice = await this.redisClient.get(cacheKey);
       if (cachedPrice) {
         return JSON.parse(cachedPrice);
@@ -403,11 +440,8 @@ export class DehubPayService {
       );
 
       const results = await Promise.all(balancePromises);
-      const groupedBalances = this.groupBalancesByChain(results);
-
-      // Cache the result for 1 hour
+      const groupedBalances = await this.groupBalancesByChain(results);
       await this.redisClient.setex(cacheKey, 60, JSON.stringify(groupedBalances));
-
       return groupedBalances;
     } catch (error) {
       this.logger.error('Error checking token availability', error.message);
@@ -436,7 +470,7 @@ export class DehubPayService {
       });
 
       const results = await Promise.all(gasBalancePromises);
-      const formattedBalances = this.formatGasBalances(results);
+      const formattedBalances = await this.formatGasBalances(results);
 
       // Cache the result for 1 hour
       await this.redisClient.setex(cacheKey, 60, JSON.stringify(formattedBalances));
@@ -447,14 +481,14 @@ export class DehubPayService {
       throw new Error('Failed to check gas availability');
     }
   }
-  groupBalancesByChain(results: { chainId: number; symbol: string; balance: number }[]) {
+  async groupBalancesByChain(results: { chainId: number; symbol: string; balance: number }[]) {
     return results.reduce((acc, { chainId, symbol, balance }) => {
       if (!acc[chainId]) acc[chainId] = {};
       acc[chainId][symbol] = balance;
       return acc;
     }, {});
   }
-  formatGasBalances(results: { chainId: number; nativeSymbol: string; balance: number }[]) {
+  async formatGasBalances(results: { chainId: number; nativeSymbol: string; balance: number }[]) {
     return results.reduce((acc, { chainId, nativeSymbol, balance }) => {
       acc[chainId] = { [nativeSymbol]: balance };
       return acc;
@@ -463,6 +497,8 @@ export class DehubPayService {
   async verifyTransactionStatus(sessionId: string) {
     try {
       const session = await this.stripe.checkout.sessions.retrieve(sessionId);
+
+      console.log('session', session);
       if (session.payment_status === 'paid') {
         return true;
       } else {
@@ -493,6 +529,9 @@ export class DehubPayService {
       return DpayTnxModel.updateOne({ sessionId }, { $set: { status_stripe, tokenSendStatus: 'cancelled' } });
     }
     return await DpayTnxModel.updateOne({ sessionId }, { $set: { status_stripe } });
+  }
+  async updateTransaction(sessionId: string, updates): Promise<any> {
+    return await DpayTnxModel.updateOne({ sessionId }, { $set: { ...updates } });
   }
   async getTransactionBySessionId(sessionId: string) {
     return DpayTnxModel.findOne({ sessionId });
@@ -525,6 +564,7 @@ export class DehubPayService {
       {
         $set: {
           status_stripe: intent.status,
+          latest_charge: intent.latest_charge,
         },
       },
       { new: true },
@@ -565,7 +605,7 @@ export class DehubPayService {
       // throw Error('Session Id Required');
       console.log('handleChargeSucceeded Session Id not Attached');
     }
-
+    DpayTnxModel.findOneAndUpdate({ sessionId }, { $set: { isChargeSucceeded: true } });
     console.log('handleChargeSucceeded sessionId', sessionId);
   }
   async handleChargeFailed(intent) {
@@ -574,7 +614,7 @@ export class DehubPayService {
       // throw Error('Session Id Required');
       console.log('handleChargeFailed Session Id not Attached');
     }
-
+    DpayTnxModel.findOneAndUpdate({ sessionId }, { $set: { isChargeFailed: true } });
     console.log('handleChargeFailed sessionId', sessionId);
   }
   async handleChargeRefunded(intent) {
@@ -583,6 +623,7 @@ export class DehubPayService {
       // throw Error('Session Id Required');
       console.log('handleChargeRefunded Session Id not Attached');
     }
+    DpayTnxModel.findOneAndUpdate({ sessionId }, { $set: { isChargeRefunded: true } });
 
     console.log('handleChargeRefunded sessionId', sessionId);
   }
@@ -592,7 +633,7 @@ export class DehubPayService {
       // throw Error('Session Id Required');
       console.log('handlePaymentMethodAttached Session Id not Attached');
     }
-
+    DpayTnxModel.findOneAndUpdate({ sessionId }, { $set: { idPaymentMethodAttached: true } });
     console.log('handlePaymentMethodAttached sessionId', sessionId);
   }
   async getStripeSession(paymentIntentId: string): Promise<string | null> {
@@ -741,15 +782,55 @@ export class DehubPayService {
     }
   }
 
-  // async getTokenBehind(chainId: number, tokenSymbol: string) {
-  //   let tempChainId = chainId;
-  //   if (chainId === 97) {
-  //     tempChainId = 56;
-  //   }
-  //   const platform = await this.getTokenContractAndPlatform(tempChainId, tokenSymbol);
-  //   const tokens = await this.checkTokenAvailability(defaultWalletAddress, { skipCache: true });
-  //   const gas = await this.checkGasAvailability(defaultWalletAddress, { skipCache: true });
-  //   const data = await this.fetchPriceByChain(platform.platformId, platform.contractAddress, tempChainId);
-  //   return { ...data, tokens, gas, tokenSymbol };
-  // }
+  async fetchStripeExchangeRate(sourceCurrency: string, destinationCurrency: string) {
+    try {
+      const data = [
+        `to_currency=${encodeURIComponent(destinationCurrency)}`,
+        `from_currencies[]=${encodeURIComponent(sourceCurrency)}`,
+        `lock_duration=hour`,
+      ].join('&');
+
+      const response = await axios.post('https://api.stripe.com/v1/fx_quotes', data, {
+        headers: {
+          Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`,
+          'Stripe-Version': '2025-02-24.acacia;fx_quote_preview=v1',
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        maxBodyLength: Infinity,
+      });
+
+      const quote = response.data;
+      return quote;
+    } catch (error) {
+      console.error('Error fetching FX quote:', error?.response?.data || error.message);
+      throw new Error('Could not fetch FX quote from Stripe');
+    }
+  }
+  calculateGBPFromQuote({ amount, sourceCurrency, quote }: { amount?: number; sourceCurrency: string; quote: any }) {
+    const rateInfo = quote.rates[sourceCurrency];
+
+    if (!rateInfo) {
+      throw new Error(`Rate for currency ${sourceCurrency} not found in quote.`);
+    }
+
+    const { exchange_rate, rate_details } = rateInfo;
+    const fxFeeRate = rate_details.fx_fee_rate || 0;
+
+    const grossGBP = amount * exchange_rate;
+    const fxFeeAmount = grossGBP * fxFeeRate;
+    const netGBP = grossGBP - fxFeeAmount;
+
+    return {
+      sourceAmount: amount,
+      sourceCurrency,
+      exchangeRate: exchange_rate,
+      fxFeeRate,
+      grossGBP: parseFloat(grossGBP.toFixed(6)),
+      fxFeeAmount: parseFloat(fxFeeAmount.toFixed(6)),
+      netGBP: parseFloat(netGBP.toFixed(6)),
+      toCurrency: quote.to_currency,
+    };
+  }
 }
+
+//latest_charge: 'ch_3RIktOH2gEWROW3h0h5rEIVF',

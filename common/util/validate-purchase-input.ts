@@ -9,6 +9,7 @@ interface ValidationResult {
     currency: string;
     tokensToReceive: number;
     tokenId: string;
+    amount:number;
     currencyLimits?: { minLimit: number; maxLimit: number };
   };
 }
@@ -16,7 +17,7 @@ interface ValidationResult {
 export function validatePurchaseInput(body: any): ValidationResult {
   const errors: { status: number; message: string }[] = [];
 
-  let { chainId, tokenSymbol, currency, tokensToReceive } = body;
+  let { chainId, tokenSymbol, currency, tokensToReceive,amount } = body;
 
   // Type validations
   if (!chainId || typeof chainId !== 'number') {
@@ -71,6 +72,7 @@ export function validatePurchaseInput(body: any): ValidationResult {
       chainId,
       tokenSymbol,
       currency,
+      amount,
       tokensToReceive,
       tokenId,
       currencyLimits,

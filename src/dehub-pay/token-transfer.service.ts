@@ -9,7 +9,7 @@ export class TokenTransferService {
   private readonly logger = new Logger(TokenTransferService.name);
   private readonly providers: Record<number, ethers.JsonRpcProvider> = {};
   private readonly wallets: Record<number, ethers.Wallet> = {};
-
+  private isProcessing = false;
   constructor(private readonly dehubPayService: DehubPayService) {
     const privateKey = process.env.DPWPK;
     if (!privateKey) throw new Error('DPWPK environment variable is not set');
@@ -25,14 +25,21 @@ export class TokenTransferService {
         this.wallets[id] = new ethers.Wallet(privateKey, provider);
       });
 
-    setTimeout(() => {
+    setTimeout(async () => {
       this.logger.log(`✅ Wallets initialized: ${Object.keys(this.wallets).join(', ')}`);
+      // const provider = this.providers[97];
+      // const wallet = this.wallets[97];
+      // console.log("DDDDD",    await provider.getBalance(wallet.address))
     }, 3000);
   }
 
   /**
    * Transfer ERC20 tokens.
    */
+
+  async getProcessing(){
+    return this.isProcessing;
+  }
   async transferERC20({
     to,
     amount,
@@ -45,10 +52,12 @@ export class TokenTransferService {
     chainId: number;
   }): Promise<string> {
     try {
+      this.isProcessing = true;
       const provider = this.providers[chainId];
       const wallet = this.wallets[chainId];
 
       if (!provider || !wallet) {
+        this.isProcessing = false;
         throw new Error(`Unsupported chainId: ${chainId}`);
       }
 
@@ -96,6 +105,8 @@ export class TokenTransferService {
     } catch (error) {
       this.logger.error(`❌ Transfer failed on chain ${chainId}: ${error.message}`);
       throw error;
+    } finally {
+      this.isProcessing = false;
     }
   }
 

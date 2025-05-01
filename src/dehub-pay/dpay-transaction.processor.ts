@@ -4,6 +4,8 @@ import { Job, Queue } from 'bull';
 import { DehubPayService } from './dehub-pay-service';
 import { TokenTransferService } from './token-transfer.service';
 import { supportedNetworks } from 'config/constants';
+import { DpayTnxModel } from 'models/dpay/dpay-transactions';
+import { symbolToIdMap } from './constants';
 
 @Injectable()
 @Processor('transactionQueue')
@@ -25,7 +27,8 @@ export class DpayTransactionProcessor {
       const isPaid = await this.dehubPayService.verifyTransactionStatus(sessionId);
       const transferDetails = await this.dehubPayService.getTransferDetailsBySessionId(sessionId);
       if (isPaid) {
-        await this.dehubPayService.updateTransactionStatus(sessionId, 'succeeded');
+        // const tnx = await this.dehubPayService.stripeLatestChargeByIntentOrSessionId(sessionId);
+        // await this.dehubPayService.updateTransaction(sessionId, { status_stripe: 'succeeded', ...tnx });
       } else {
         this.logger.log(`Transaction ${sessionId} is not completed yet.`);
 
@@ -43,35 +46,52 @@ export class DpayTransactionProcessor {
         }
       }
     } catch (error) {
+      console.log(error);
       this.logger.error(`Error processing transaction ${sessionId}: ${error.message}`);
       throw error;
     }
   }
 
-  @Process({ name: 'transferToken', concurrency: 100 })
+  @Process({ name: 'transferToken', concurrency: 1 })
   async processTokenTransfer(job: Job) {
-    const { sessionId, receiverAddress, amount: amt, tokenAddress, chainId } = job.data;
+    const { id } = job.data;
     const MAX_RETRIES = 3;
     const RETRY_DELAY_MS = 1000 * 60;
+    const {
+      chainId,
+      net,
+      sessionId,
+      receiverAddress,
+      tokenAddress,
+      amount: amt,
+      currency,
+      tokenSymbol,
+    } = await DpayTnxModel.findById(id);
     try {
+      this.logger.log("Waiting....",this.tokenTransferService.getProcessing())
+      // while (this.tokenTransferService.getProcessing()) {
+      //   await new Promise(resolve => setTimeout(resolve, 500));
+      // }
       const network = supportedNetworks.find(net => net.chainId === chainId);
       if (!network) throw new Error(`Unsupported chainId: ${chainId}`);
-
-      const { price: tokenPrice } = await this.dehubPayService.coingeckoGetPrice('dehub', 'usd');
+      
+      const { price: tokenPrice } = await this.dehubPayService.coingeckoGetPrice(
+        symbolToIdMap[tokenSymbol],
+        'gbp',
+        net,
+      );
       // const platform = await this.dehubPayService.getTokenContractAndPlatform(chainId, token);
       // const data = await this.dehubPayService.fetchPriceByChain(
-      //   platform.platformId,
-      //   platform.contractAddress,
-      //   platform.chain,
-      // );
-
-      const amount = amt / tokenPrice;
-
-      this.logger.log(
-        `Starting token transfer: sessionId=${sessionId}, receiverAddress=${receiverAddress}, amount=${amount}, token=${tokenAddress}, chainId=${chainId}`,
-      );
-
-      await this.dehubPayService.updateTokenSendStatus(sessionId, {
+        //   platform.platformId,
+        //   platform.contractAddress,
+        //   platform.chain,
+        // );
+        
+        const amount = net / tokenPrice;
+        this.logger.log(
+          `Starting token transfer: sessionId=${sessionId}, receiverAddress=${receiverAddress}, amount=${amt},  amount=${net},token=${tokenAddress}, chainId=${chainId}`,
+        );
+        await this.dehubPayService.updateTokenSendStatus(sessionId, {
         tokenSendStatus: 'sending',
         lastTriedAt: new Date(),
       });
@@ -79,7 +99,7 @@ export class DpayTransactionProcessor {
       const txHash = await this.tokenTransferService.transferERC20({
         to: receiverAddress,
         amount,
-        tokenSymbol: 'DHB',
+        tokenSymbol: tokenSymbol ?? 'DHB',
         chainId,
       });
 
@@ -97,7 +117,9 @@ export class DpayTransactionProcessor {
         tokenSendTxnHash: txHash,
       });
 
-      // this.logger.log(`✅ Token transfer confirmed on-chain for sessionId ${sessionId}. TxHash: ${txHash}`);
+      
+
+      this.logger.log(`✅ Token transfer confirmed on-chain for sessionId ${sessionId}. TxHash: ${txHash}`);
     } catch (error) {
       this.logger.error(`❌ Token transfer failed for sessionId ${sessionId}: ${error.message}`);
 
@@ -113,6 +135,7 @@ export class DpayTransactionProcessor {
           tokenSendStatus: 'failed',
           tokenSendRetryCount: retryCount + 1,
           lastTriedAt: new Date(),
+          note:error.toString()
         });
         await this.transactionQueue.add('transferToken', job.data, {
           delay: RETRY_DELAY_MS,

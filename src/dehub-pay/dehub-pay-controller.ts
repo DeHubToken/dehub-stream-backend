@@ -13,10 +13,17 @@ export class DehubPayController {
   async getDehubPrice(
     @Query('currency') currency: string = 'usd',
     @Query('chainId') chainId: number = 56,
+    @Query('amount') amount: number = 1,
+    @Query('tokenSymbol') tokenSymbol: string = 'DHB',
     @Res() res: Response,
   ) {
     try {
-      const data = await this.dehubPayService.coingeckoGetPrice(symbolToIdMap['DHB'], currency, chainId);
+      const data = await this.dehubPayService.coingeckoGetPrice(
+        symbolToIdMap[tokenSymbol ?? 'DHB'],
+        currency,
+        amount,
+        chainId,
+      );
       if (!data.price) {
         return res.status(HttpStatus.BAD_REQUEST).json({
           message: `Unsupported or invalid currency: ${currency}`,
@@ -36,10 +43,9 @@ export class DehubPayController {
   }
   @Get('/dpay/available/tokens')
   async getAvailableTokens(@Query('token') token: string = 'dehub', @Res() res: Response) {
-    try {
-      console.log('dehub', token);
+    try { 
       const balance: any = await this.dehubPayService.checkTokenAvailability();
-
+ 
       return res.status(HttpStatus.OK).json({
         balance,
       });
@@ -113,7 +119,11 @@ export class DehubPayController {
 
       // Step 1: Get the token price using the DehubPayService
 
-      const { price } = await this.dehubPayService.coingeckoGetPrice('dehub', 'usd');
+      const { price } = await this.dehubPayService.coingeckoGetPrice(
+        symbolToIdMap[tokenSymbol ?? 'DHB'],
+        currency,
+        amount,
+      );
       if (!price) {
         return res.status(HttpStatus.BAD_REQUEST).json({
           message: `Price for token '${'dehub'}' not found on CoinGecko`,

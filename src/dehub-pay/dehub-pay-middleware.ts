@@ -19,10 +19,10 @@ export class DehubPayMiddleware implements NestMiddleware {
       return res.status(status).json({ message });
     }
 
-    const { chainId, tokenSymbol, currency, tokensToReceive, tokenId, currencyLimits } = validated;
+    const { chainId, tokenSymbol, currency, tokensToReceive, tokenId, currencyLimits ,amount} = validated;
       req.body.tokenId=tokenId;
     try {
-      const priceData = await this.dehubPayService.coingeckoGetPrice(tokenId, currency);
+      const priceData = await this.dehubPayService.coingeckoGetPrice(tokenId, currency,amount);
       const tokenPrice = priceData?.price;
 
       if (!tokenPrice || typeof tokenPrice !== 'number') {
@@ -44,8 +44,7 @@ export class DehubPayMiddleware implements NestMiddleware {
       }
 
       const tokens = await this.dehubPayService.checkTokenAvailability(defaultWalletAddress, { skipCache: true });
-      const availableTokens = tokens?.[chainId]?.[tokenSymbol];
-console.log("tokensToReceive > availableTokens",tokensToReceive , availableTokens)
+      const availableTokens = tokens?.[chainId]?.[tokenSymbol]; 
       if (!availableTokens || tokensToReceive > availableTokens) {
         return res.status(HttpStatusCode.NotAcceptable).json({
           message: 'Requested amount exceeds available token supply.',

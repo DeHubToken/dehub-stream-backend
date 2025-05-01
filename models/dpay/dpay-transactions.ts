@@ -8,38 +8,45 @@ export type DpayTnxDocument = HydratedDocument<DpayTnx>;
 export class DpayTnx {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Account' })
   receiverId?: mongoose.Schema.Types.ObjectId;
-
   @Prop({ required: true })
   sessionId: string;
-
   @Prop({ required: true })
   amount: number;
-
   @Prop({ required: true })
   tokenSymbol: string;
-
   @Prop()
   tokenAddress?: string;
-
   @Prop({ required: true })
   chainId: number;
-
-  @Prop({ enum: ['init', 'pending', 'succeeded', 'failed'], default: 'init' })
-  status_stripe: 'init' | 'pending' | 'succeeded' | 'failed'; // Payment status
-
+  @Prop({ enum: ['init', 'pending', 'succeeded', 'failed','expired'], default: 'init' })
+  status_stripe: 'init' | 'pending' | 'succeeded' | 'failed'|'expired'; // Payment status
+  @Prop()
+  latest_charge?: string;
+  @Prop()
+  balanceTransactionId?: string;
   @Prop()
   txnHash?: string;
-
+  @Prop()
+  isChargeSucceeded: boolean;
+  @Prop()
+  isChargeRefunded: boolean;
+  @Prop()
+  idPaymentMethodAttached: boolean;
+  @Prop()
+  isChargeFailed: boolean;
+  @Prop()
+  exchange_rate?: number;
+  @Prop()
+  net?: number;
+  @Prop()
+  fee?: number;
   @Prop()
   note?: string;
-
   @Prop({ enum: ['buy_token', 'tip', 'paid-dm', 'subscription'], required: true, default: 'buy_token' })
   type: 'buy_token' | 'tip' | 'paid-dm' | 'subscription';
-
   // 🕑 For CRON: track token send status
   @Prop({ enum: ['not_sent', 'sent', 'processing', 'cancelled', 'failed'], default: 'not_sent' })
   tokenSendStatus: 'not_sent' | 'cancelled' | 'processing' | 'sent' | 'failed';
-
   // 🔁 Retry count to limit retries
   @Prop({ default: 0 })
   tokenSendRetryCount: number;
@@ -63,9 +70,10 @@ export class DpayTnx {
   lastTriedAt?: Date;
   @Prop()
   createdAt?: Date;
-
   @Prop()
   updatedAt?: Date;
+  @Prop()
+  expires_at:Number
 }
 
 export const DpayTnxSchema = SchemaFactory.createForClass(DpayTnx);
