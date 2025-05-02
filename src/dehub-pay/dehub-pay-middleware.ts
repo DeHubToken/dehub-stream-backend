@@ -1,7 +1,7 @@
 import { Injectable, Logger, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { DehubPayService } from './dehub-pay-service';
-import { defaultWalletAddress } from './constants';
+import { defaultWalletAddress, minGas } from './constants';
 import { HttpStatusCode } from 'axios';
 import { validatePurchaseInput } from 'common/util/validate-purchase-input';
 
@@ -19,10 +19,10 @@ export class DehubPayMiddleware implements NestMiddleware {
       return res.status(status).json({ message });
     }
 
-    const { chainId, tokenSymbol, currency, tokensToReceive, tokenId, currencyLimits ,amount} = validated;
-      req.body.tokenId=tokenId;
+    const { chainId, tokenSymbol, currency, tokensToReceive, tokenId, currencyLimits, amount } = validated;
+    req.body.tokenId = tokenId;
     try {
-      const priceData = await this.dehubPayService.coingeckoGetPrice(tokenId, currency,amount);
+      const priceData = await this.dehubPayService.coingeckoGetPrice(tokenId, currency, amount);
       const tokenPrice = priceData?.price;
 
       if (!tokenPrice || typeof tokenPrice !== 'number') {
@@ -44,13 +44,20 @@ export class DehubPayMiddleware implements NestMiddleware {
       }
 
       const tokens = await this.dehubPayService.checkTokenAvailability(defaultWalletAddress, { skipCache: true });
-      const availableTokens = tokens?.[chainId]?.[tokenSymbol]; 
+      const availableTokens = tokens?.[chainId]?.[tokenSymbol];
       if (!availableTokens || tokensToReceive > availableTokens) {
         return res.status(HttpStatusCode.NotAcceptable).json({
           message: 'Requested amount exceeds available token supply.',
         });
       }
-      console.log('Api passed.');
+
+      const gas = await this.dehubPayService.checkGasAvailability();
+
+      if (!gas?.[chainId] || gas[chainId] <= minGas[chainId]) {
+        return res.status(HttpStatusCode.NotAcceptable).json({
+          message: 'Unable to proceed with your request due to low gas on the selected chain.',
+        });
+      }
       return next();
     } catch (err) {
       console.error('Token purchase validation failed:', err);

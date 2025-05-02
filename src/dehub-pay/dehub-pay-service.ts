@@ -490,7 +490,7 @@ export class DehubPayService {
   }
   async formatGasBalances(results: { chainId: number; nativeSymbol: string; balance: number }[]) {
     return results.reduce((acc, { chainId, nativeSymbol, balance }) => {
-      acc[chainId] = { [nativeSymbol]: balance };
+      acc[chainId] =  balance;
       return acc;
     }, {});
   }

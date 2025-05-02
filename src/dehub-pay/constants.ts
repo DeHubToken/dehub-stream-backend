@@ -1,8 +1,14 @@
-export const defaultWalletAddress = process.env.DPAY_WALLET_ADDRESS?? '0xC8acD6eeeD02EA0dA142D57941E1102e81Cc0b77';
+import { ChainId } from 'config/constants';
+
+export const defaultWalletAddress = process.env.DPAY_WALLET_ADDRESS ?? '0xC8acD6eeeD02EA0dA142D57941E1102e81Cc0b77';
 export const symbolToIdMap = {
   DHB: 'dehub',
 };
-
+export const minGas = {
+  [ChainId.BSC_TESTNET]: 0.4,
+  [ChainId.BSC_MAINNET]: 0.4,
+  [ChainId.BASE_MAINNET]: 0.4,
+};
 export const currencyInfoMap: Record<string, { minLimit: number; enabled: true; maxLimit: number }> = {
   usd: { minLimit: 0.59, enabled: true, maxLimit: 6000 },
   eur: { minLimit: 0.53, enabled: true, maxLimit: 5500 },
