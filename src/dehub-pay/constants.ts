@@ -1,4 +1,4 @@
-export const defaultWalletAddress = '0xC8acD6eeeD02EA0dA142D57941E1102e81Cc0b77';
+export const defaultWalletAddress = process.env.DPAY_WALLET_ADDRESS?? '0xC8acD6eeeD02EA0dA142D57941E1102e81Cc0b77';
 export const symbolToIdMap = {
   DHB: 'dehub',
 };

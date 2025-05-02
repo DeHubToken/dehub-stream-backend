@@ -4,11 +4,18 @@ import { DehubPayService } from './dehub-pay-service';
 import { reqParam } from 'common/util/auth';
 import mongoose from 'mongoose';
 import { symbolToIdMap } from './constants';
+import { AuthGuard } from 'common/guards/auth.guard';
 
 @Controller()
 export class DehubPayController {
   private readonly logger = new Logger(DehubPayController.name);
-  constructor(private readonly dehubPayService: DehubPayService) {}
+  constructor(private readonly dehubPayService: DehubPayService) {
+
+    setTimeout(async() => {
+      const gas=await this.dehubPayService.checkGasAvailability()
+      console.log(gas)
+    }, 5000);
+  }
   @Get('/dpay/price')
   async getDehubPrice(
     @Query('currency') currency: string = 'usd',
@@ -100,7 +107,7 @@ export class DehubPayController {
     }
   }
   @Post('/dpay/checkout')
-  // @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard)
   async checkout(
     @Body('chainId') chainId: number = null,
     @Body('address') address: string = null,

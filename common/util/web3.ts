@@ -24,7 +24,6 @@ const getERC20TokenBalance = async (account: string, tokenAddress: string, chain
   const tokenContract = new ethers.Contract(tokenAddress, erc20ContractAbi, provider);
   const tokenBalance = await tokenContract.balanceOf(account);
   const out = Number(ethers.formatUnits(tokenBalance, await tokenContract.decimals()));
-  console.log('out', out);
   return out;
 };
 
