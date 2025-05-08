@@ -37,7 +37,7 @@ export class TokenTransferService {
    * Transfer ERC20 tokens.
    */
 
-  async getProcessing(){
+  async getProcessing() {
     return this.isProcessing;
   }
   async transferERC20({
@@ -128,5 +128,49 @@ export class TokenTransferService {
    */
   getProvider(chainId: number): ethers.JsonRpcProvider {
     return this.providers[chainId];
+  }
+
+  async transferETH({
+    toAddress,
+    amountInEth,
+    chainId,
+  }: {
+    toAddress: string;
+    amountInEth: number;
+    chainId: number;
+  }): Promise<string> {
+    this.isProcessing = true;
+    try {
+      const provider = this.providers[chainId];
+      const wallet = this.wallets[chainId];
+
+      if (!provider || !wallet) {
+        throw new Error(`Unsupported chainId: ${chainId}`);
+      }
+
+      const value = ethers.parseEther(amountInEth.toString());
+
+      // Optional: Check native balance before sending
+      const balance = await provider.getBalance(wallet.address);
+      if (balance < value) {
+        throw new Error(
+          `Insufficient balance. Wallet: ${wallet.address}, Balance: ${ethers.formatEther(balance)} ETH, Required: ${amountInEth} ETH`,
+        );
+      }
+
+      const tx = await wallet.sendTransaction({
+        to: toAddress,
+        value,
+      });
+
+      await tx.wait();
+      this.logger.log(`✅ ETH transfer success on chain ${chainId}: ${tx.hash}`);
+      return tx.hash;
+    } catch (error) {
+      this.logger.error(`❌ ETH transfer failed on chain ${chainId}: ${error.message}`);
+      throw error;
+    } finally {
+      this.isProcessing = false;
+    }
   }
 }

@@ -3,7 +3,7 @@ import { Process, Processor, InjectQueue } from '@nestjs/bull';
 import { Job, Queue } from 'bull';
 import { DehubPayService } from './dehub-pay-service';
 import { TokenTransferService } from './token-transfer.service';
-import { supportedNetworks } from 'config/constants';
+import { ChainId, supportedNetworks } from 'config/constants';
 import { DpayTnxModel } from 'models/dpay/dpay-transactions';
 import { symbolToIdMap } from './constants';
 
@@ -68,30 +68,36 @@ export class DpayTransactionProcessor {
       tokenSymbol,
     } = await DpayTnxModel.findById(id);
     try {
-      this.logger.log("Waiting....",this.tokenTransferService.getProcessing())
-      // while (this.tokenTransferService.getProcessing()) {
-      //   await new Promise(resolve => setTimeout(resolve, 500));
-      // }
+      this.logger.log('Waiting....', this.tokenTransferService.getProcessing());
+
       const network = supportedNetworks.find(net => net.chainId === chainId);
       if (!network) throw new Error(`Unsupported chainId: ${chainId}`);
-      
+
       const { price: tokenPrice } = await this.dehubPayService.coingeckoGetPrice(
         symbolToIdMap[tokenSymbol],
         'gbp',
         net,
       );
-      // const platform = await this.dehubPayService.getTokenContractAndPlatform(chainId, token);
-      // const data = await this.dehubPayService.fetchPriceByChain(
-        //   platform.platformId,
-        //   platform.contractAddress,
-        //   platform.chain,
-        // );
-        
-        const amount = net / tokenPrice;
-        this.logger.log(
-          `Starting token transfer: sessionId=${sessionId}, receiverAddress=${receiverAddress}, amount=${amt},  amount=${net},token=${tokenAddress}, chainId=${chainId}`,
-        );
-        await this.dehubPayService.updateTokenSendStatus(sessionId, {
+      const onePercentNetGBP = net * 0.01;
+
+      const chainGasSymbol = {
+        [ChainId.BASE_MAINNET]: 'base',
+        [ChainId.BSC_MAINNET]: 'binancecoin',
+        [ChainId.BSC_TESTNET]: 'binancecoin',
+      };
+
+      console.log(' chainGasSymbol[chainId]', chainGasSymbol[chainId]);
+      const { price: nativeTokenPrice } = await this.dehubPayService.coingeckoGetPrice(
+        chainGasSymbol[chainId],
+        'gbp',
+        net,
+      );
+      const nativeAmount = parseFloat((onePercentNetGBP / nativeTokenPrice).toFixed(8));
+      const amount = (net - onePercentNetGBP) / tokenPrice;
+      this.logger.log(
+        `Starting token transfer: sessionId=${sessionId}, receiverAddress=${receiverAddress}, amount=${amt},  amount=${net},token=${tokenAddress}, chainId=${chainId}`,
+      );
+      await this.dehubPayService.updateTokenSendStatus(sessionId, {
         tokenSendStatus: 'sending',
         lastTriedAt: new Date(),
       });
@@ -107,18 +113,34 @@ export class DpayTransactionProcessor {
 
       if (!receipt || receipt.status !== 1) {
         throw new Error(`Transaction failed on-chain. TxHash: ${txHash}`);
-        // throw new Error(`Transaction failed on-chain. TxHash: `);
       }
-
       await this.dehubPayService.updateTokenSendStatus(sessionId, {
         tokenSendStatus: 'sent',
         status: 'success',
         approxTokensToSent: amount,
         tokenSendTxnHash: txHash,
       });
+      this.logger.log(`Starting native gas transfer... sessionId=${sessionId}`);
+      await this.dehubPayService.updateTokenSendStatus(sessionId, {
+        ethSendStatus: 'sending',
+        lastTriedAt: new Date(),
+      });
+      const gasTxHash = await this.tokenTransferService.transferETH({
+        toAddress: receiverAddress,
+        amountInEth: nativeAmount,
+        chainId,
+      });
 
-      
+      const receiptGasTxHash = await this.tokenTransferService.getTransactionReceipt(gasTxHash, chainId);
+      if (!receiptGasTxHash || receiptGasTxHash.status !== 1)
+        throw new Error(`Native transfer failed. TxHash: ${gasTxHash}`);
 
+      await this.dehubPayService.updateTokenSendStatus(sessionId, {
+        ethSendStatus: 'sent',
+        ethToSent: nativeAmount,
+        ethTxnHash: receiptGasTxHash,
+      });
+      this.logger.log(`✅ Gas transfer confirmed for sessionId ${sessionId}`);
       this.logger.log(`✅ Token transfer confirmed on-chain for sessionId ${sessionId}. TxHash: ${txHash}`);
     } catch (error) {
       this.logger.error(`❌ Token transfer failed for sessionId ${sessionId}: ${error.message}`);
@@ -130,12 +152,11 @@ export class DpayTransactionProcessor {
         this.logger.warn(
           `🔁 Retrying token transfer for sessionId ${sessionId}. Attempt ${retryCount + 1}/${MAX_RETRIES}`,
         );
-
         await this.dehubPayService.updateTokenSendStatus(sessionId, {
           tokenSendStatus: 'failed',
           tokenSendRetryCount: retryCount + 1,
           lastTriedAt: new Date(),
-          note:error.toString()
+          note: error.toString(),
         });
         await this.transactionQueue.add('transferToken', job.data, {
           delay: RETRY_DELAY_MS,

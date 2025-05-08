@@ -1,5 +1,7 @@
-import { HttpStatusCode } from 'axios'; 
+import { HttpStatusCode } from 'axios';
+import { ChainId } from 'config/constants';
 import { currencyInfoMap, symbolToIdMap } from 'src/dehub-pay/constants';
+export const SUPPORTED_CHAIN_IDS = [ChainId.BSC_TESTNET, ChainId.BASE_MAINNET];
 
 interface ValidationResult {
   errors: { status: number; message: string }[];
@@ -9,7 +11,7 @@ interface ValidationResult {
     currency: string;
     tokensToReceive: number;
     tokenId: string;
-    amount:number;
+    amount: number;
     currencyLimits?: { minLimit: number; maxLimit: number };
   };
 }
@@ -17,13 +19,20 @@ interface ValidationResult {
 export function validatePurchaseInput(body: any): ValidationResult {
   const errors: { status: number; message: string }[] = [];
 
-  let { chainId, tokenSymbol, currency, tokensToReceive,amount } = body;
+  let { chainId, tokenSymbol, currency, tokensToReceive, amount } = body;
 
   // Type validations
   if (!chainId || typeof chainId !== 'number') {
     errors.push({
       status: HttpStatusCode.BadRequest,
       message: '`chainId` is required and must be a string.',
+    });
+  }
+
+  if (!SUPPORTED_CHAIN_IDS.includes(chainId)) {
+    errors.push({
+      status: HttpStatusCode.BadRequest,
+      message: '`chainId` is not supported.',
     });
   }
 
@@ -54,7 +63,7 @@ export function validatePurchaseInput(body: any): ValidationResult {
   }
 
   // Normalize and lookup
-  currency = currency?.toLowerCase()
+  currency = currency?.toLowerCase();
   const tokenId = symbolToIdMap[tokenSymbol] ?? tokenSymbol;
   const currencyLimits = currencyInfoMap[currency];
 

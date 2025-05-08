@@ -10,11 +10,10 @@ import { AuthGuard } from 'common/guards/auth.guard';
 export class DehubPayController {
   private readonly logger = new Logger(DehubPayController.name);
   constructor(private readonly dehubPayService: DehubPayService) {
-
-    setTimeout(async() => {
-      const gas=await this.dehubPayService.checkGasAvailability()
-      console.log(gas)
-    }, 5000);
+    // setTimeout(async() => {
+    //   const gas=await this.dehubPayService.checkGasAvailability()
+    //   console.log(gas)
+    // }, 5000);
   }
   @Get('/dpay/price')
   async getDehubPrice(
@@ -50,9 +49,9 @@ export class DehubPayController {
   }
   @Get('/dpay/available/tokens')
   async getAvailableTokens(@Query('token') token: string = 'dehub', @Res() res: Response) {
-    try { 
+    try {
       const balance: any = await this.dehubPayService.checkTokenAvailability();
- 
+
       return res.status(HttpStatus.OK).json({
         balance,
       });
@@ -212,6 +211,7 @@ export class DehubPayController {
   @Post('dpay/create-onramp-session')
   async createOnrampSession(@Req() req: Request, @Res() res: Response) {
     try {
+      
       return this.dehubPayService.createOnrampSession(req, res);
     } catch (error) {
       throw Error(error.message);

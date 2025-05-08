@@ -139,7 +139,7 @@ export class DpayMonitor implements OnModuleInit {
           } catch (error) {
             await this.dehubPayService.updateTransaction(tx.sessionId, {
               tokenSendStatus: 'failed',
-              note:error.toString()
+              note: error.toString(),
             });
           }
         }

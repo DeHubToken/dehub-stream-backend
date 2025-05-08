@@ -47,6 +47,8 @@ export class DpayTnx {
   // 🕑 For CRON: track token send status
   @Prop({ enum: ['not_sent', 'sent', 'processing', 'cancelled', 'failed'], default: 'not_sent' })
   tokenSendStatus: 'not_sent' | 'cancelled' | 'processing' | 'sent' | 'failed';
+  @Prop({ enum: ['not_sent', 'sent', 'processing', 'cancelled', 'failed'], default: 'not_sent' })
+  ethSendStatus: 'not_sent' | 'cancelled' | 'processing' | 'sent' | 'failed';
   // 🔁 Retry count to limit retries
   @Prop({ default: 0 })
   tokenSendRetryCount: number;
@@ -55,6 +57,8 @@ export class DpayTnx {
   // ✅ On successful send, store thiss
   @Prop()
   tokenSendTxnHash?: string;
+  @Prop()
+  ethSendTxnHash?: string; 
   @Prop()
   currency: string;
   @Prop()
@@ -65,6 +69,8 @@ export class DpayTnx {
   approxTokensToReceive?: string;
   @Prop()
   approxTokensToSent?: string;
+  @Prop()
+  ethToSent?: string;
   // ⏰ When was last CRON attempt
   @Prop()
   lastTriedAt?: Date;

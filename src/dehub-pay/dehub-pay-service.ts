@@ -111,8 +111,11 @@ export class DehubPayService {
               tokenSendRetryCount: 1,
               receiverAddress: 1,
               tokenSendTxnHash: 1,
+              ethSendTxnHash: 1,
               approxTokensToReceive: 1,
               approxTokensToSent: 1,
+              ethToSent: 1,
+              ethSendStatus: 1,
               lastTriedAt: 1,
               createdAt: 1,
               updatedAt: 1,
@@ -424,8 +427,11 @@ export class DehubPayService {
         supportedTokens
           .filter(
             t =>
-              [ChainId.BSC_MAINNET, ChainId.BSC_TESTNET, ChainId.BASE_MAINNET].includes(t.chainId) &&
-              t.symbol === 'DHB',
+              [
+                // ChainId.BSC_MAINNET,
+                ChainId.BSC_TESTNET,
+                ChainId.BASE_MAINNET,
+              ].includes(t.chainId) && t.symbol === 'DHB',
           )
           .map(async token => {
             try {
@@ -490,7 +496,7 @@ export class DehubPayService {
   }
   async formatGasBalances(results: { chainId: number; nativeSymbol: string; balance: number }[]) {
     return results.reduce((acc, { chainId, nativeSymbol, balance }) => {
-      acc[chainId] =  balance;
+      acc[chainId] = balance;
       return acc;
     }, {});
   }
@@ -652,14 +658,23 @@ export class DehubPayService {
   async createOnrampSession(req, res) {
     try {
       const { transaction_details } = req.body;
+      console.log('A');
+      const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+      const stripeCrypto = new Stripe(stripeSecretKey, {
+        apiVersion: '2025-03-31.basil',
+      });
+      console.log('B');
+
       const OnrampSessionResource = Stripe.StripeResource.extend({
         create: Stripe.StripeResource.method({
           method: 'POST',
           path: 'crypto/onramp_sessions',
         }),
       });
+      console.log('C');
+
       // Create an OnrampSession with the order amount and currency
-      const onrampSession: any = await new OnrampSessionResource(this.stripe).create({
+      const onrampSession: any = await new OnrampSessionResource(stripeCrypto).create({
         transaction_details: {
           destination_currency: transaction_details['destination_currency'],
           destination_exchange_amount: transaction_details['destination_exchange_amount'],
@@ -667,6 +682,7 @@ export class DehubPayService {
         },
         customer_ip_address: req.socket.remoteAddress,
       });
+      console.log('D');
 
       res.send({
         clientSecret: onrampSession.client_secret,
