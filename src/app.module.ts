@@ -27,6 +27,7 @@ import { ActivityModule } from './activity/activity.module';
 import { FeedReportModule } from './feed-report/feed-report.module';
 import { BuySellCryptoModule } from './crypto-payment/buy-sell-crypto.module';
 import { ChatbotModule } from './chatbot/chatbot.module';
+import { EmbeddingModule } from './embedding/embedding.module';
 
 @Module({
   imports: [
@@ -40,7 +41,7 @@ import { ChatbotModule } from './chatbot/chatbot.module';
     EventEmitterModule.forRoot(),
     MongooseModule.forRoot(`mongodb://${config.mongo.host}:${config.mongo.port}/${config.mongo.dbName}`),
     UserModule, 
-    NftModule, NotificationModule, CdnModule, AuthModule,ActivityModule,FeedReportModule, PlansModule,DmModule, ReactionModule, CategoryModule, LeaderboardModule, AssetModule, JobModule, ScheduleModule.forRoot(), LivestreamModule, BuySellCryptoModule, ChatbotModule],
+    NftModule, NotificationModule, CdnModule, AuthModule,ActivityModule,FeedReportModule, PlansModule,DmModule, ReactionModule, CategoryModule, LeaderboardModule, AssetModule, JobModule, ScheduleModule.forRoot(), LivestreamModule, BuySellCryptoModule, ChatbotModule, EmbeddingModule],
   controllers: [AppController],
   providers: [AppService, StreamCronService,
     // PlanEventListenerService
