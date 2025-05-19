@@ -14,4 +14,8 @@ export enum ChatbotSocketEvent {
   MESSAGES_LIST = 'chatbot:messagesList',
   ERROR = 'chatbot:error',
   MESSAGE_SENT_ACK = 'chatbot:messageSentAck',
+  // Image generation events
+  GENERATE_IMAGE = 'chatbot:generateImage',
+  IMAGE_READY = 'chatbot:imageReady',
+  IMAGE_ERROR = 'chatbot:imageError',
 }

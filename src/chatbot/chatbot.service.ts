@@ -5,6 +5,8 @@ import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { ChatMessage, ChatMessageDocument, MessageSenderType } from '../../models/ChatMessage';
 import { Conversation, ConversationDocument } from '../../models/Conversation';
+import { GenerateImageDto } from './dto/generate-image.dto';
+import * as crypto from 'crypto';
 
 // Define a constant system address for AI responses
 export const AI_SYSTEM_ADDRESS = "0x0000000000000000000000000000000000000000"; // Zero address for AI
@@ -17,6 +19,7 @@ export class ChatbotService {
     @InjectModel(Conversation.name) private conversationModel: Model<ConversationDocument>,
     @InjectModel(ChatMessage.name) private chatMessageModel: Model<ChatMessageDocument>,
     @InjectQueue('chatbot-message-processing') private messageProcessingQueue: Queue,
+    @InjectQueue('image-generation') private imageGenerationQueue: Queue,
   ) {}
 
   /**
@@ -97,26 +100,11 @@ export class ChatbotService {
     this.logger.log(`Received message from user ${userAddress}: ${messageText}`);
     
     try {
-      // Validate message text is not empty or whitespace-only
-      if (!messageText || messageText.trim() === '') {
-        throw new BadRequestException('Message text cannot be empty or contain only whitespace');
-      }
+      // Validate message text
+      this.validateTextInput(messageText, 'Message text');
       
-      let conversation: ConversationDocument;
-      
-      // If the user specified a conversationId, use that
-      if (conversationId) {
-        conversation = await this.validateAndGetConversation(userAddress, conversationId);
-      } else {
-        // If no conversationId provided, find the most recent active conversation
-        const existingConversation = await this.conversationModel.findOne({
-          userAddress,
-          isArchived: false,
-        }).sort({ lastMessageAt: -1 });
-        
-        // If no active conversation exists, create a new one
-        conversation = existingConversation || await this.createConversation(userAddress);
-      }
+      // Get and validate conversation
+      const conversation = await this.resolveConversation(userAddress, conversationId);
         
       // Create and save the user message
       const userMessage = new this.chatMessageModel({
@@ -128,15 +116,23 @@ export class ChatbotService {
       await userMessage.save();
       
       // Update the conversation's lastMessageAt
-      conversation.lastMessageAt = new Date();
-      await conversation.save();
+      await this.updateConversationTimestamp(conversation);
       
-      // Queue the message for processing
+      // Queue the message for processing with retry options
+      const jobId = `msg-${crypto.randomUUID()}`;
       await this.messageProcessingQueue.add({
         userAddress,
         conversationId: conversation._id.toString(),
         userMessageId: userMessage._id.toString(),
         message: messageText,
+      }, {
+        attempts: 3, // Retry up to 3 times
+        backoff: {
+          type: 'exponential',
+          delay: 5000, // Start with 5 seconds delay
+        },
+        removeOnComplete: true, // Remove job when completed
+        jobId: jobId, // Unique ID for tracing
       });
       
       return {
@@ -148,6 +144,114 @@ export class ChatbotService {
       this.logger.error(`Error handling message: ${error.message}`);
       throw error;
     }
+  }
+  
+  /**
+   * Handle image generation request from a user
+   * 
+   * This method queues the request for processing by the image generation service
+   */
+  async requestImageGeneration(
+    userAddress: string,
+    conversationId: string,
+    dto: GenerateImageDto,
+  ): Promise<{ success: boolean; conversationId: string }> {
+    this.logger.log(`Received image generation request from user ${userAddress}: ${dto.prompt}`);
+    
+    try {
+      // Validate prompt is not empty
+      this.validateTextInput(dto.prompt, 'Image prompt');
+      
+      // Validate and get the conversation
+      const conversation = await this.resolveConversation(userAddress, conversationId);
+      
+      // Create user message for the image request
+      const userMessage = new this.chatMessageModel({
+        conversationId: conversation._id,
+        senderAddress: userAddress,
+        senderType: MessageSenderType.USER,
+        text: `[Image Request] ${dto.prompt}`,
+        metadata: { 
+          type: 'image_request',
+          prompt: dto.prompt,
+          style: dto.style,
+        }
+      });
+      await userMessage.save();
+      
+      // Update conversation timestamp
+      await this.updateConversationTimestamp(conversation);
+      
+      // Queue the image generation request with retry options
+      const jobId = `img-${crypto.randomUUID()}`;
+      await this.imageGenerationQueue.add({
+        userAddress,
+        conversationId: conversation._id.toString(),
+        userMessageId: userMessage._id.toString(),
+        prompt: dto.prompt,
+        style: dto.style,
+      }, {
+        attempts: 3, // Retry up to 3 times
+        backoff: {
+          type: 'exponential',
+          delay: 5000, // Start with 5 seconds delay
+        },
+        removeOnComplete: true, // Remove job when completed
+        jobId: jobId, // Unique ID for tracing
+      });
+      
+      return {
+        success: true,
+        conversationId: conversation._id.toString(),
+      };
+    } catch (error) {
+      this.logger.error(`Error handling image generation request: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Validate that input text is not empty or whitespace-only
+   * @param text The text to validate
+   * @param fieldName Name of the field for error message
+   */
+  private validateTextInput(text: string, fieldName: string): void {
+    if (!text || text.trim() === '') {
+      throw new BadRequestException(`${fieldName} cannot be empty or contain only whitespace`);
+    }
+  }
+
+  /**
+   * Resolve and validate a conversation for a user
+   * @param userAddress The address of the user
+   * @param conversationId Optional conversation ID
+   * @returns The resolved conversation document
+   */
+  private async resolveConversation(
+    userAddress: string,
+    conversationId: string | null,
+  ): Promise<ConversationDocument> {
+    if (conversationId) {
+      return await this.validateAndGetConversation(userAddress, conversationId);
+    } else {
+      // If no conversationId provided, find the most recent active conversation
+      const existingConversation = await this.conversationModel.findOne({
+        userAddress,
+        isArchived: false,
+      }).sort({ lastMessageAt: -1 });
+      
+      // If no active conversation exists, create a new one
+      return existingConversation || await this.createConversation(userAddress);
+    }
+  }
+
+  /**
+   * Update a conversation's lastMessageAt timestamp
+   * @param conversation The conversation to update
+   */
+  private async updateConversationTimestamp(conversation: ConversationDocument): Promise<void> {
+    conversation.lastMessageAt = new Date();
+    await conversation.save();
   }
   
   /**

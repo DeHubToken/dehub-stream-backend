@@ -11,15 +11,22 @@ import {
 import { Server, Socket } from 'socket.io';
 import { UseGuards } from '@nestjs/common';
 import { ChatbotService } from './chatbot.service';
-import { SendMessageDto } from './send-message.dto';
+import { SendMessageDto } from './dto/send-message.dto';
 import { ChatbotSocketEvent } from './types';
 import { Logger } from '@nestjs/common';
 import { CreateConversationDto } from './create-conversation.dto';
 import { ChatMessageDocument } from '../../models/ChatMessage';
+import { GenerateImageDto } from './dto/generate-image.dto';
 
 interface ChatbotResponse {
   conversationId: string;
   message: ChatMessageDocument;
+}
+
+interface ImageReadyResponse {
+  conversationId: string;
+  imageUrl: string;
+  prompt: string;
 }
 
 @WebSocketGateway({
@@ -107,6 +114,57 @@ export class ChatbotGateway implements OnGatewayConnection, OnGatewayDisconnect 
       return {
         event: ChatbotSocketEvent.ERROR,
         data: { status: 'error', message: 'Internal server error'  },
+      };
+    }
+  }
+
+  @SubscribeMessage(ChatbotSocketEvent.GENERATE_IMAGE)
+  async handleGenerateImage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { conversationId: string, prompt: string, style?: string },
+  ): Promise<WsResponse<any>> {
+    try {
+      const userAddress = client.data?.userAddress;
+
+      if (!userAddress) {
+        this.logger.error('User address not found in socket connection');
+        client.emit(ChatbotSocketEvent.ERROR, { message: 'Authentication required' });
+        return {
+          event: ChatbotSocketEvent.ERROR,
+          data: { status: 'error', message: 'Authentication required' },
+        };
+      }
+
+      this.logger.debug(`Received image generation request from ${userAddress}: ${payload.prompt}`);
+
+      // Create DTO for image generation
+      const generateImageDto: GenerateImageDto = {
+        prompt: payload.prompt,
+        style: payload.style,
+      };
+
+      // Process the image generation request
+      const result = await this.chatbotService.requestImageGeneration(
+        userAddress, 
+        payload.conversationId, 
+        generateImageDto
+      );
+
+      // Acknowledge that the request was received and is being processed
+      return {
+        event: ChatbotSocketEvent.MESSAGE_SENT_ACK,
+        data: {
+          status: 'processing',
+          message: 'Image generation started',
+          conversationId: result.conversationId,
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Error processing image generation: ${error.message}`);
+      client.emit(ChatbotSocketEvent.ERROR, { message: 'Error generating image' });
+      return {
+        event: ChatbotSocketEvent.ERROR,
+        data: { status: 'error', message: 'Failed to generate image' },
       };
     }
   }
@@ -220,6 +278,30 @@ export class ChatbotGateway implements OnGatewayConnection, OnGatewayDisconnect 
       this.logger.debug(`Sent response to user ${userAddress} in conversation ${response.conversationId}`);
     } catch (error) {
       this.logger.error(`Error sending message to client ${userAddress}: ${error.message}`);
+    }
+  }
+
+  /**
+   * Sends an image ready notification to a specific client by their address
+   */
+  sendImageReadyToClient(userAddress: string, response: ImageReadyResponse): void {
+    try {
+      this.server.to(userAddress).emit(ChatbotSocketEvent.IMAGE_READY, response);
+      this.logger.debug(`Sent image ready to user ${userAddress} in conversation ${response.conversationId}`);
+    } catch (error) {
+      this.logger.error(`Error sending image ready to client ${userAddress}: ${error.message}`);
+    }
+  }
+
+  /**
+   * Sends an image error notification to a specific client by their address
+   */
+  sendImageErrorToClient(userAddress: string, response: { conversationId: string, error: string }): void {
+    try {
+      this.server.to(userAddress).emit(ChatbotSocketEvent.IMAGE_ERROR, response);
+      this.logger.debug(`Sent image error to user ${userAddress} in conversation ${response.conversationId}: ${response.error}`);
+    } catch (error) {
+      this.logger.error(`Error sending image error to client ${userAddress}: ${error.message}`);
     }
   }
 }

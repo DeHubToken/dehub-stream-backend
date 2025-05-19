@@ -9,6 +9,8 @@ import { ChatMessage, ChatMessageSchema } from '../../models/ChatMessage';
 import { ChatbotMessageProcessor } from './processors/chatbot-message.processor';
 import { EmbeddingModule } from '../embedding/embedding.module';
 import { ConfigModule } from '@nestjs/config';
+import { ImageProcessor } from './processors/image.processor';
+import { CdnModule } from '../cdn/cdn.module';
 
 @Module({
   imports: [
@@ -16,14 +18,20 @@ import { ConfigModule } from '@nestjs/config';
       { name: Conversation.name, schema: ConversationSchema },
       { name: ChatMessage.name, schema: ChatMessageSchema },
     ]),
-    BullModule.registerQueue({
-      name: 'chatbot-message-processing',
-    }),
+    BullModule.registerQueue(
+      {
+        name: 'chatbot-message-processing',
+      },
+      {
+        name: 'image-generation',
+      }
+    ),
     EmbeddingModule,
     ConfigModule,
+    CdnModule,
   ],
   controllers: [ChatbotController],
-  providers: [ChatbotService, ChatbotGateway, ChatbotMessageProcessor],
+  providers: [ChatbotService, ChatbotGateway, ChatbotMessageProcessor, ImageProcessor],
   exports: [ChatbotService],
 })
 export class ChatbotModule {} 
