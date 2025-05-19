@@ -1,9 +1,11 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { Document } from 'mongoose';
 
-// Document type for type safety
-export type ConversationDocument = Conversation & Document;
-
+/**
+ * Represents a Conversation document with Mongoose Document capabilities
+ * Combines the Conversation class properties with Mongoose Document methods
+ */
+ export type ConversationDocument = Conversation & Document;
 @Schema({ timestamps: true }) // Automatically manage createdAt and updatedAt fields
  export class Conversation {
   @Prop({ required: true, index: true })

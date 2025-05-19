@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import mongoose, { Document } from 'mongoose';
+import mongoose, { Document, Types } from 'mongoose';
 import { ConversationDocument } from './Conversation';
 
 // Document type for type safety
@@ -15,7 +15,7 @@ export enum MessageSenderType {
 @Schema({ timestamps: true }) // Automatically manage createdAt and updatedAt fields
  export class ChatMessage {
  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Conversation', required: true, index: true })
- conversationId: string | ConversationDocument;
+  conversationId: Types.ObjectId | ConversationDocument;
 
   @Prop({ required: true, index: true })
   senderAddress: string; // The address of the sender (user or system/AI identified by user context)
@@ -27,7 +27,7 @@ export enum MessageSenderType {
   text: string; // Text content of the message
 
   @Prop()
-  imageUrl: string; // For image messages (from user upload or AI generation)
+  imageUrl?: string; // For image messages (from user upload or AI generation)
 }
 
 // Create the schema
