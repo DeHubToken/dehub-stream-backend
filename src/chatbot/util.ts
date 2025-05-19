@@ -1,15 +1,21 @@
 import Redis from 'ioredis';
 import { config } from 'config';
 
+// Singleton Redis client
+let redisClientInstance: Redis | null = null;
+
 /**
  * Initialize Redis client for chatbot sessions
  * @returns Redis client
  */
-export const createRedisClient = () => {
-  return new Redis({
-    ...config.redis,
-    db: 3, // Use a separate DB index for chatbot
-  });
+export const createRedisClient = (): Redis => {
+  if (!redisClientInstance) {
+    redisClientInstance = new Redis({
+      ...config.redis,
+      db: 3, // Use a separate DB index for chatbot
+    });
+  }
+  return redisClientInstance;
 };
 
 /**
@@ -28,7 +34,8 @@ export const saveUserSession = async (
 ) => {
  try {
     const redisKey = `chatbot:user:${userAddress.toLowerCase()}`;
-    const session = JSON.parse(await redisClient.get(redisKey)) || {
+    const sessionData = await redisClient.get(redisKey);
+    const session = sessionData ? JSON.parse(sessionData) : {
       username,
       address: userAddress.toLowerCase(),
       _id: userId,
@@ -69,20 +76,24 @@ export const removeSocketFromSession = async (
 ) => {
  try {
    const redisKey = getUserSessionKey(userAddress);
-    const session = JSON.parse(await redisClient.get(redisKey));
+   const sessionData = await redisClient.get(redisKey);
+   
+   if (sessionData) {
+     const session = JSON.parse(sessionData);
+     
+     if (session) {
+       // Remove the socket ID
+       session.socketIds = session.socketIds.filter((id: string) => id !== socketId);
 
-    if (session) {
-      // Remove the socket ID
-      session.socketIds = session.socketIds.filter((id: string) => id !== socketId);
-
-      if (session.socketIds.length > 0) {
-        // Update Redis if there are still sockets
-        await redisClient.set(redisKey, JSON.stringify(session), 'EX', 86400);
-      } else {
-        // Remove the session if no sockets remain
-        await redisClient.del(redisKey);
-      }
-    }
+       if (session.socketIds.length > 0) {
+         // Update Redis if there are still sockets
+         await redisClient.set(redisKey, JSON.stringify(session), 'EX', 86400);
+       } else {
+         // Remove the session if no sockets remain
+         await redisClient.del(redisKey);
+       }
+     }
+   }
  } catch (error) {
    console.error('Failed to remove socket from session:', error);
    throw new Error(`Failed to remove socket for user ${userAddress}: ${error.message}`);
