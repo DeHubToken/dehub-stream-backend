@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, UseGuards, Req, Query, Param, NotFoundException, BadRequestException, HttpCode, HttpStatus, InternalServerErrorException, Logger } from '@nestjs/common';
 import { ChatbotService } from './chatbot.service';
-import { SendMessageDto } from './send-message.dto';
+import { SendMessageDto } from './dto/send-message.dto';
 import { AuthGuard } from 'common/guards/auth.guard';
 import { CreateConversationDto } from './create-conversation.dto';
 import { ConversationDocument } from '../../models/Conversation';
