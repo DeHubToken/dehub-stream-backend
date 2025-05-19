@@ -12,9 +12,12 @@ export enum MessageSenderType {
   SYSTEM = 'system', // For system messages like "Conversation started"
 }
 
-@Schema({ timestamps: true }) // Automatically manage createdAt and updatedAt fields
- export class ChatMessage {
- @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Conversation', required: true, index: true })
+@Schema({ 
+  timestamps: true, 
+  collection: 'chat_messages' // Explicitly set collection name with underscore
+}) 
+export class ChatMessage {
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Conversation', required: true, index: true })
   conversationId: Types.ObjectId | ConversationDocument;
 
   @Prop({ required: true, index: true })
