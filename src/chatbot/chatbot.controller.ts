@@ -1,8 +1,10 @@
-import { Controller, Get, Post, Body, UseGuards, Req, Query, Param, NotFoundException, BadRequestException, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Req, Query, Param, NotFoundException, BadRequestException, HttpCode, HttpStatus, InternalServerErrorException, Logger } from '@nestjs/common';
 import { ChatbotService } from './chatbot.service';
 import { SendMessageDto } from './send-message.dto';
 import { AuthGuard } from 'common/guards/auth.guard';
 import { CreateConversationDto } from './create-conversation.dto';
+import { ConversationDocument } from '../../models/Conversation';
+import { ChatMessageDocument } from '../../models/ChatMessage';
 
 /**
  * Controller for HTTP endpoints for the chatbot
@@ -11,6 +13,8 @@ import { CreateConversationDto } from './create-conversation.dto';
  */
 @Controller('chatbot')
 export class ChatbotController {
+  private readonly logger = new Logger(ChatbotController.name);
+
   constructor(private readonly chatbotService: ChatbotService) {}
 
   /**
@@ -18,7 +22,7 @@ export class ChatbotController {
    * @param address User's blockchain address
    */
   @Get()
-  async getUserConversations(@Query('address') address: string) {
+  async getUserConversations(@Query('address') address: string): Promise<ConversationDocument[]> {
     // Temporary auth check - will be replaced with proper auth in the future
     if (!address) {
       throw new BadRequestException('Address parameter is required');
@@ -38,7 +42,7 @@ export class ChatbotController {
   async createConversation(
     @Query('address') address: string,
     @Body() createConversationDto: CreateConversationDto
-  ) {
+  ): Promise<ConversationDocument> {
     // Temporary auth check
     if (!address) {
       throw new BadRequestException('Address parameter is required');
@@ -54,7 +58,7 @@ export class ChatbotController {
   async getConversationMessages(
     @Query('address') address: string,
     @Param('conversationId') conversationId: string
-  ) {
+  ): Promise<ChatMessageDocument[]> {
     // Temporary auth check
     if (!address) {
       throw new BadRequestException('Address parameter is required');
@@ -66,7 +70,8 @@ export class ChatbotController {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      throw new BadRequestException(error.message);
+      this.logger.error(`Error retrieving messages: ${error.message}`, error.stack);
+      throw new BadRequestException('Failed to retrieve conversation messages');
     }
   }
 
@@ -79,7 +84,12 @@ export class ChatbotController {
     @Query('address') address: string,
     @Param('conversationId') conversationId: string,
     @Body() sendMessageDto: SendMessageDto
-  ) {
+  ): Promise<{
+    success: boolean;
+    message: string;
+    messageId: string;
+    conversationId: string;
+  }> {
     // Temporary auth check
     if (!address) {
       throw new BadRequestException('Address parameter is required');
@@ -103,7 +113,8 @@ export class ChatbotController {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      throw new BadRequestException(error.message);
+      this.logger.error(`Error sending message: ${error.message}`, error.stack);
+      throw new BadRequestException('Failed to process message');
     }
   }
 } 

@@ -1,11 +1,10 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { ChatMessage, ChatMessageDocument, MessageSenderType } from '../../models/ChatMessage';
 import { Conversation, ConversationDocument } from '../../models/Conversation';
-import { SendMessageDto } from './send-message.dto';
 
 // Define a constant system address for AI responses
 export const AI_SYSTEM_ADDRESS = "0x0000000000000000000000000000000000000000"; // Zero address for AI
@@ -98,6 +97,11 @@ export class ChatbotService {
     this.logger.log(`Received message from user ${userAddress}: ${messageText}`);
     
     try {
+      // Validate message text is not empty or whitespace-only
+      if (!messageText || messageText.trim() === '') {
+        throw new BadRequestException('Message text cannot be empty or contain only whitespace');
+      }
+      
       let conversation: ConversationDocument;
       
       // If the user specified a conversationId, use that
@@ -132,6 +136,7 @@ export class ChatbotService {
         userAddress,
         conversationId: conversation._id.toString(),
         userMessageId: userMessage._id.toString(),
+        message: messageText,
       });
       
       return {
