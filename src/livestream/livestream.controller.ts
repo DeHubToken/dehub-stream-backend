@@ -47,17 +47,6 @@ export class LivestreamController {
     return this.livestreamService.startStream(streamId);
   }
 
-  // @UseGuards(AuthGuard)
-  // @Post('end')
-  // async endStream(@Body('streamId') streamId: string) {
-  //   return this.livestreamService.endStream(streamId);
-  // }
-
-  // @Get(':streamId/playback-url')
-  // async getPlaybackUrl(@Param('streamId') streamId: string) {
-  //   return this.livestreamService.getStreamPlaybackUrl(streamId);
-  // }
-
   @Get('user/:address')
   getMyLiveStreams(@Param('address') address: string) {
     return this.livestreamService.getUserStreams(address);
@@ -66,6 +55,13 @@ export class LivestreamController {
   @Get(':streamId')
   getStreamDetails(@Param('streamId') streamId: string) {
     return this.livestreamService.getStream(streamId);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get(':streamId/key')
+  async getStreamKey(@Param('streamId') streamId: string, @Req() req) {
+    const requesterAddress = req.params.address; 
+    return this.livestreamService.getStreamKey(streamId, requesterAddress);
   }
 
   @Get(':streamId/activities')
