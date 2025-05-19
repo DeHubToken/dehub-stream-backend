@@ -13,6 +13,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { RunnableSequence } from "@langchain/core/runnables";
+import { LangSmithService } from '../../tracing/langsmith.service';
 
 interface MessageProcessingJobData {
   userAddress: string;
@@ -36,6 +37,7 @@ export class ChatbotMessageProcessor {
     private chatbotGateway: ChatbotGateway,
     private configService: ConfigService,
     private chromaService: ChromaService,
+    private langsmithService: LangSmithService,
   ) {
     try {
       const apiKey = this.configService.get<string>('TOGETHER_API_KEY');
@@ -92,6 +94,22 @@ export class ChatbotMessageProcessor {
 
   @Process()
   async processUserMessage(job: Job<MessageProcessingJobData>): Promise<void> {
+    // Create a parent trace for the entire processing job
+    const mainRunTree = this.langsmithService.createRunTree({
+      name: 'ChatbotMessageProcessor',
+      run_type: 'chain',
+      inputs: job.data,
+      metadata: {
+        userAddress: job.data.userAddress,
+        conversationId: job.data.conversationId,
+      },
+      tags: ['chatbot', 'message-processing'],
+    });
+
+    if (mainRunTree) {
+      await mainRunTree.postRun();
+    }
+
     const { userAddress, conversationId, userMessageId, message } = job.data;
     this.logger.debug(`Processing message ${userMessageId} from user ${userAddress} in conversation ${conversationId}`);
 
@@ -127,8 +145,21 @@ export class ChatbotMessageProcessor {
         }
       });
 
-      // 5. Get RAG context if available
+      // 5. Get RAG context if available - create a child run for RAG retrieval
       let ragContext = '';
+      let relevantDocs = [];
+      
+      const ragRunTree = mainRunTree ? 
+        await mainRunTree.createChild({
+          name: 'RAG_Retrieval',
+          run_type: 'chain',
+          inputs: { query: message },
+        }) : null;
+        
+      if (ragRunTree) {
+        await ragRunTree.postRun();
+      }
+      
       if (message && message.trim().length > 0) {
         try {
           if (!this.chromaService) {
@@ -140,7 +171,7 @@ export class ChatbotMessageProcessor {
             if (documentCount === 0) {
               this.logger.debug('No documents in the vector database, skipping RAG context');
             } else {
-              const relevantDocs = await this.chromaService.similaritySearch(message, 3);
+              relevantDocs = await this.chromaService.similaritySearch(message, 3);
               this.logger.debug(`Relevant docs: ${JSON.stringify(relevantDocs)}`);
               
               if (relevantDocs.length > 0) {
@@ -154,15 +185,50 @@ export class ChatbotMessageProcessor {
               }
             }
           }
+          
+          if (ragRunTree) {
+            await ragRunTree.end({
+              outputs: { 
+                context: ragContext,
+                documentsFound: relevantDocs.length,
+              }
+            });
+            await ragRunTree.patchRun();
+          }
         } catch (error) {
           this.logger.warn(`Error retrieving context from vector store: ${error instanceof Error ? error.message : 'Unknown error'}`);
           // Don't let RAG failures stop the process
           ragContext = '';
+          
+          if (ragRunTree) {
+            await ragRunTree.end({
+              error: `Error retrieving context: ${error instanceof Error ? error.message : 'Unknown error'}`
+            });
+            await ragRunTree.patchRun();
+          }
         }
       }
 
       // 7. Generate response with LLM using LangChain
       let aiResponseText;
+      const llmRunTree = mainRunTree ? 
+        await mainRunTree.createChild({
+          name: 'LLM_Generation',
+          run_type: 'llm',
+          inputs: { 
+            context: ragContext,
+            history: historyMessages,
+            query: message,
+          },
+          metadata: {
+            model: this.llmModel,
+          },
+        }) : null;
+        
+      if (llmRunTree) {
+        await llmRunTree.postRun();
+      }
+      
       try {
         if (!this.llm) {
           this.logger.warn('LLM not initialized, using fallback response');
@@ -184,9 +250,24 @@ export class ChatbotMessageProcessor {
           
           this.logger.debug('Generated AI response successfully using LangChain');
         }
+        
+        if (llmRunTree) {
+          await llmRunTree.end({
+            outputs: { response: aiResponseText }
+          });
+          await llmRunTree.patchRun();
+        }
       } catch (error) {
         this.logger.error(`Error generating LLM response: ${error instanceof Error ? error.message : 'Unknown error'}`);
         aiResponseText = "I'm sorry, I encountered an error while processing your request. Please try again later.";
+        
+        if (llmRunTree) {
+          await llmRunTree.end({
+            error: `Error generating response: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            outputs: { fallback_response: aiResponseText }
+          });
+          await llmRunTree.patchRun();
+        }
       }
       
       // 8. Save the AI's response to the database
@@ -209,9 +290,25 @@ export class ChatbotMessageProcessor {
       });
 
       this.logger.debug(`Message ${userMessageId} processed successfully`);
+      
+      if (mainRunTree) {
+        await mainRunTree.end({
+          outputs: { success: true, aiMessageId: aiMessage._id.toString() }
+        });
+        // Note: patchRun() doesn't take parameters in the current LangSmith version
+        await mainRunTree.patchRun();
+      }
     } catch (error) {
       this.logger.error(`Error processing message ${userMessageId}: ${error instanceof Error ? error.message : 'Unknown error'}`, error);
       // In a production app, we might want to retry the job or notify the user of the failure
+      
+      if (mainRunTree) {
+        await mainRunTree.end({
+          error: `Error processing message: ${error instanceof Error ? error.message : 'Unknown error'}`
+        });
+        // Note: patchRun() doesn't take parameters in the current LangSmith version
+        await mainRunTree.patchRun();
+      }
     }
   }
 } 

@@ -5,6 +5,7 @@ import { Document } from '@langchain/core/documents';
 import { BaseDocumentLoader } from 'langchain/document_loaders/base';
 import { TextLoader } from 'langchain/document_loaders/fs/text';
 import Together from 'together-ai';
+import { LangSmithService } from '../tracing/langsmith.service';
 
 @Injectable()
 export class EmbeddingService {
@@ -12,7 +13,10 @@ export class EmbeddingService {
   private readonly togetherClient: Together;
   private readonly embeddingModel: string = 'BAAI/bge-large-en-v1.5';
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    private langsmithService: LangSmithService,
+  ) {
     const apiKey = this.configService.get<string>('TOGETHER_API_KEY');
 if (!apiKey) {
   this.logger.error('TOGETHER_API_KEY not found in environment variables');
@@ -23,6 +27,9 @@ if (!apiKey) {
     this.togetherClient = new Together({
       apiKey,
     });
+    
+    // Wrap the Together client with LangSmith for tracing
+    this.togetherClient = this.langsmithService.wrapSDK(this.togetherClient);
   }
 
   /**
@@ -33,13 +40,26 @@ if (!apiKey) {
    * @throws Error if embedding generation fails
    */
   async getEmbedding(text: string): Promise<number[]> {
+    // Wrap the embedding generation in LangSmith tracing
+    const tracedGetEmbedding = this.langsmithService.traceFunction(
+      async (inputText: string) => {
+        const response = await this.togetherClient.embeddings.create({
+          input: inputText,
+          model: this.embeddingModel,
+        });
+        
+        return response.data[0].embedding;
+      },
+      {
+        name: 'getEmbedding',
+        run_type: 'llm',
+        metadata: { model: this.embeddingModel },
+        tags: ['embedding', 'together-ai'],
+      }
+    );
+    
     try {
-      const response = await this.togetherClient.embeddings.create({
-        input: text,
-        model: this.embeddingModel,
-      });
-      
-      return response.data[0].embedding;
+      return await tracedGetEmbedding(text);
     } catch (error) {
       this.logger.error(`Error getting embedding: ${error instanceof Error ? error.message : 'Unknown error'}`, 
         error instanceof Error ? error.stack : undefined);
@@ -55,13 +75,29 @@ if (!apiKey) {
    * @throws Error if batch embedding generation fails
    */
   async getEmbeddings(texts: string[]): Promise<number[][]> {
+    // Wrap the batch embedding generation in LangSmith tracing
+    const tracedGetEmbeddings = this.langsmithService.traceFunction(
+      async (inputTexts: string[]) => {
+        const response = await this.togetherClient.embeddings.create({
+          input: inputTexts,
+          model: this.embeddingModel,
+        });
+        
+        return response.data.map(item => item.embedding);
+      },
+      {
+        name: 'getEmbeddings',
+        run_type: 'llm',
+        metadata: { 
+          model: this.embeddingModel,
+          count: texts.length,
+        },
+        tags: ['embedding', 'together-ai', 'batch'],
+      }
+    );
+    
     try {
-      const response = await this.togetherClient.embeddings.create({
-        input: texts,
-        model: this.embeddingModel,
-      });
-      
-      return response.data.map(item => item.embedding);
+      return await tracedGetEmbeddings(texts);
     } catch (error) {
       this.logger.error(`Error getting embeddings: ${error instanceof Error ? error.message : 'Unknown error'}`, 
         error instanceof Error ? error.stack : undefined);
@@ -138,8 +174,24 @@ if (!apiKey) {
    * @throws Error if document loading or splitting fails
    */
   async loadAndSplitDocument(filePath: string, fileType: 'md' | 'pdf' | 'txt', chunkSize: number = 1000, chunkOverlap: number = 200): Promise<Document[]> {
-    const documents = await this.loadDocument(filePath, fileType);
-    return this.splitDocuments(documents, chunkSize, chunkOverlap);
+    const tracedLoadAndSplit = this.langsmithService.traceFunction(
+      async (path: string, type: 'md' | 'pdf' | 'txt', size: number, overlap: number) => {
+        const documents = await this.loadDocument(path, type);
+        return this.splitDocuments(documents, size, overlap);
+      },
+      {
+        name: 'loadAndSplitDocument',
+        metadata: { 
+          filePath,
+          fileType,
+          chunkSize,
+          chunkOverlap,
+        },
+        tags: ['document-processing'],
+      }
+    );
+    
+    return tracedLoadAndSplit(filePath, fileType, chunkSize, chunkOverlap);
   }
 
   /**

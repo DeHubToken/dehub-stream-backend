@@ -12,6 +12,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ImageProcessor } from './processors/image.processor';
 import { AITasksProcessor } from './processors/ai-tasks.processor';
 import { CdnModule } from '../cdn/cdn.module';
+import { TracingModule } from '../tracing/tracing.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { CdnModule } from '../cdn/cdn.module';
     EmbeddingModule,
     ConfigModule,
     CdnModule,
+    TracingModule,
   ],
   controllers: [ChatbotController],
   providers: [ChatbotService, ChatbotGateway, ChatbotMessageProcessor, ImageProcessor, AITasksProcessor],
