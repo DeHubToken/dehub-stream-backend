@@ -13,9 +13,9 @@ export enum MessageSenderType {
 }
 
 @Schema({ timestamps: true }) // Automatically manage createdAt and updatedAt fields
-export class ChatMessage extends Document {
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Conversation', required: true, index: true })
-  conversationId: ConversationDocument | mongoose.Schema.Types.ObjectId;
+ export class ChatMessage {
+ @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Conversation', required: true, index: true })
+ conversationId: string | ConversationDocument;
 
   @Prop({ required: true, index: true })
   senderAddress: string; // The address of the sender (user or system/AI identified by user context)
@@ -36,5 +36,3 @@ export const ChatMessageSchema = SchemaFactory.createForClass(ChatMessage);
 // Create an index for efficiently retrieving messages in a conversation chronologically
 ChatMessageSchema.index({ conversationId: 1, createdAt: 1 });
 
-// Create the model
-export const ChatMessageModel = mongoose.model<ChatMessageDocument>('chat_messages', ChatMessageSchema); 

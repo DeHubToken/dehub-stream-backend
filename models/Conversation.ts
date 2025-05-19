@@ -5,7 +5,7 @@ import mongoose, { Document } from 'mongoose';
 export type ConversationDocument = Conversation & Document;
 
 @Schema({ timestamps: true }) // Automatically manage createdAt and updatedAt fields
-export class Conversation extends Document {
+ export class Conversation {
   @Prop({ required: true, index: true })
   userAddress: string; // Corresponds to Account.address
 
@@ -24,6 +24,3 @@ export const ConversationSchema = SchemaFactory.createForClass(Conversation);
 
 // Create an index for querying conversations by user, sorted by recency
 ConversationSchema.index({ userAddress: 1, lastMessageAt: -1 });
-
-// Create the model
-export const ConversationModel = mongoose.model<ConversationDocument>('conversations', ConversationSchema); 
