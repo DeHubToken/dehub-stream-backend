@@ -28,6 +28,12 @@ export enum MessageSenderType {
 
   @Prop()
   imageUrl?: string; // For image messages (from user upload or AI generation)
+  
+  @Prop({ type: mongoose.Schema.Types.Mixed })
+  metadata?: Record<string, any>; // Additional metadata for special message types like image analysis
+  
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'ChatMessage' })
+  replyToMessage?: Types.ObjectId | ChatMessageDocument; // For replies to specific messages
 }
 
 // Create the schema

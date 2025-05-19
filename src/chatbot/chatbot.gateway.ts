@@ -17,6 +17,7 @@ import { Logger } from '@nestjs/common';
 import { CreateConversationDto } from './create-conversation.dto';
 import { ChatMessageDocument } from '../../models/ChatMessage';
 import { GenerateImageDto } from './dto/generate-image.dto';
+import { AnalyzeImageDto } from './dto/analyze-image.dto';
 
 interface ChatbotResponse {
   conversationId: string;
@@ -27,6 +28,12 @@ interface ImageReadyResponse {
   conversationId: string;
   imageUrl: string;
   prompt: string;
+}
+
+interface AnalysisResponse {
+  conversationId: string;
+  message: ChatMessageDocument;
+  analysis: string;
 }
 
 @WebSocketGateway({
@@ -262,6 +269,59 @@ export class ChatbotGateway implements OnGatewayConnection, OnGatewayDisconnect 
     }
   }
 
+  @SubscribeMessage(ChatbotSocketEvent.ANALYZE_IMAGE)
+  async handleAnalyzeImage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: AnalyzeImageDto & { conversationId: string },
+  ): Promise<WsResponse<any>> {
+    try {
+      const userAddress = client.data?.userAddress;
+
+      if (!userAddress) {
+        this.logger.error('User address not found in socket connection');
+        client.emit(ChatbotSocketEvent.ERROR, { message: 'Authentication required' });
+        return {
+          event: ChatbotSocketEvent.ERROR,
+          data: { status: 'error', message: 'Authentication required' },
+        };
+      }
+
+      // Validate that at least one image source is provided
+      if (!payload.imageUrl && !payload.imageData) {
+        client.emit(ChatbotSocketEvent.ERROR, { message: 'Either imageUrl or imageData is required' });
+        return {
+          event: ChatbotSocketEvent.ERROR,
+          data: { status: 'error', message: 'Either imageUrl or imageData is required' },
+        };
+      }
+
+      this.logger.debug(`Received image analysis request from ${userAddress} in conversation ${payload.conversationId}`);
+
+      // Process the image analysis request
+      const result = await this.chatbotService.requestImageAnalysis(
+        userAddress, 
+        payload
+      );
+
+      // Acknowledge that the request was received and is being processed
+      return {
+        event: ChatbotSocketEvent.MESSAGE_SENT_ACK,
+        data: {
+          status: 'processing',
+          message: 'Image analysis started',
+          conversationId: result.conversationId,
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Error processing image analysis: ${error.message}`);
+      client.emit(ChatbotSocketEvent.ERROR, { message: 'Error analyzing image' });
+      return {
+        event: ChatbotSocketEvent.ERROR,
+        data: { status: 'error', message: 'Failed to analyze image' },
+      };
+    }
+  }
+
   /**
    * Sends a message to a specific client by their address
    */
@@ -303,5 +363,21 @@ export class ChatbotGateway implements OnGatewayConnection, OnGatewayDisconnect 
     } catch (error) {
       this.logger.error(`Error sending image error to client ${userAddress}: ${error.message}`);
     }
+  }
+
+  sendAnalysisToClient(userAddress: string, response: AnalysisResponse): void {
+    this.server.to(userAddress).emit(ChatbotSocketEvent.ANALYSIS_COMPLETE, response);
+    this.logger.debug(`Analysis sent to user ${userAddress}`);
+    
+    // Also send as a regular message notification
+    this.sendMessageToClient(userAddress, {
+      conversationId: response.conversationId,
+      message: response.message,
+    });
+  }
+
+  sendAnalysisErrorToClient(userAddress: string, response: { conversationId: string, error: string }): void {
+    this.server.to(userAddress).emit(ChatbotSocketEvent.ANALYSIS_ERROR, response);
+    this.logger.debug(`Analysis error sent to user ${userAddress}`);
   }
 }

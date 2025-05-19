@@ -18,4 +18,8 @@ export enum ChatbotSocketEvent {
   GENERATE_IMAGE = 'chatbot:generateImage',
   IMAGE_READY = 'chatbot:imageReady',
   IMAGE_ERROR = 'chatbot:imageError',
+  // Image analysis events
+  ANALYZE_IMAGE = 'chatbot:analyzeImage',
+  ANALYSIS_COMPLETE = 'chatbot:analysisComplete',
+  ANALYSIS_ERROR = 'chatbot:analysisError',
 }

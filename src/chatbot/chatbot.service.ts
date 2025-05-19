@@ -6,6 +6,7 @@ import { Queue } from 'bull';
 import { ChatMessage, ChatMessageDocument, MessageSenderType } from '../../models/ChatMessage';
 import { Conversation, ConversationDocument } from '../../models/Conversation';
 import { GenerateImageDto } from './dto/generate-image.dto';
+import { AnalyzeImageDto } from './dto/analyze-image.dto';
 import * as crypto from 'crypto';
 
 // Define a constant system address for AI responses
@@ -20,6 +21,7 @@ export class ChatbotService {
     @InjectModel(ChatMessage.name) private chatMessageModel: Model<ChatMessageDocument>,
     @InjectQueue('chatbot-message-processing') private messageProcessingQueue: Queue,
     @InjectQueue('image-generation') private imageGenerationQueue: Queue,
+    @InjectQueue('image-analysis') private imageAnalysisQueue: Queue,
   ) {}
 
   /**
@@ -206,6 +208,52 @@ export class ChatbotService {
       };
     } catch (error) {
       this.logger.error(`Error handling image generation request: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Handle image analysis request from a user
+   * 
+   * This method queues the request for processing by the image analysis service
+   */
+  async requestImageAnalysis(
+    userAddress: string,
+    dto: AnalyzeImageDto & { conversationId: string },
+  ): Promise<{ success: boolean; conversationId: string }> {
+    this.logger.log(`Received image analysis request from user ${userAddress} for conversation ${dto.conversationId}`);
+    
+    try {
+      // Validate and get the conversation
+      const conversation = await this.validateAndGetConversation(userAddress, dto.conversationId);
+      
+     // Update conversation timestamp
+     await this.updateConversationTimestamp(conversation);
+     
+      // Queue the image analysis request with retry options
+      const jobId = `analysis-${crypto.randomUUID()}`;
+      await this.imageAnalysisQueue.add('analyzeImage', {
+        userAddress,
+        conversationId: conversation._id.toString(),
+        imageUrl: dto.imageUrl,
+        imageData: dto.imageData,
+        prompt: dto.prompt,
+      }, {
+        attempts: 3, // Retry up to 3 times
+        backoff: {
+          type: 'exponential',
+          delay: 5000, // Start with 5 seconds delay
+        },
+        removeOnComplete: true, // Remove job when completed
+        jobId: jobId, // Unique ID for tracing
+      });
+      
+      return {
+        success: true,
+        conversationId: conversation._id.toString(),
+      };
+    } catch (error) {
+      this.logger.error(`Error queuing image analysis: ${error.message}`);
       throw error;
     }
   }

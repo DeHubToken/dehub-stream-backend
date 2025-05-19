@@ -10,6 +10,7 @@ import { ChatbotMessageProcessor } from './processors/chatbot-message.processor'
 import { EmbeddingModule } from '../embedding/embedding.module';
 import { ConfigModule } from '@nestjs/config';
 import { ImageProcessor } from './processors/image.processor';
+import { AITasksProcessor } from './processors/ai-tasks.processor';
 import { CdnModule } from '../cdn/cdn.module';
 
 @Module({
@@ -24,6 +25,9 @@ import { CdnModule } from '../cdn/cdn.module';
       },
       {
         name: 'image-generation',
+      },
+      {
+        name: 'image-analysis',
       }
     ),
     EmbeddingModule,
@@ -31,7 +35,7 @@ import { CdnModule } from '../cdn/cdn.module';
     CdnModule,
   ],
   controllers: [ChatbotController],
-  providers: [ChatbotService, ChatbotGateway, ChatbotMessageProcessor, ImageProcessor],
+  providers: [ChatbotService, ChatbotGateway, ChatbotMessageProcessor, ImageProcessor, AITasksProcessor],
   exports: [ChatbotService],
 })
 export class ChatbotModule {} 
