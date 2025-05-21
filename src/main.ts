@@ -39,16 +39,11 @@ const webSockets = (socket: any, io: socketIO.Server) => {
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
 
-  app.use(
-    bodyParser.json({
-      verify: (req: any, res, buf: Buffer, encoding: string) => {
-        if (req.originalUrl === '/api/moonpay/webhook') {
-          req.rawBody = buf;
-        }
-      },
-    }),
-  );
 
+
+   // 👇 Stripe webhook raw body setup (⚠️ only for Stripe!)
+   app.use('/api/dpay/webhook', bodyParser.raw({ type: 'application/json' }));
+ 
   app.use(cookieParser());
   app.use(cors());
   app.use(json()); // Ensure JSON body parsing is set up
