@@ -74,8 +74,8 @@ export class DpayTnx {
   // ⏰ When was last CRON attempt
   @Prop()
   lastTriedAt?: Date; 
-  @Prop({ enum: ['dehub', 'blocjerk'], default: 'dehub' })
-  platform: 'blocjerk' | 'dehub'; 
+  @Prop({ enum: ['dehub', "unknown"], default: 'dehub' })
+  platform: 'unknown' | 'dehub'; 
   @Prop()
   createdAt?: Date;
   @Prop()
