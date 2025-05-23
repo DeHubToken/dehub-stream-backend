@@ -73,7 +73,9 @@ export class DpayTnx {
   ethToSent?: string;
   // ⏰ When was last CRON attempt
   @Prop()
-  lastTriedAt?: Date;
+  lastTriedAt?: Date; 
+  @Prop({ enum: ['dehub', "unknown"], default: 'dehub' })
+  platform: 'unknown' | 'dehub'; 
   @Prop()
   createdAt?: Date;
   @Prop()

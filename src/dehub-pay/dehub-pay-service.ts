@@ -436,11 +436,11 @@ export class DehubPayService {
           .map(async token => {
             try {
               const balance = await getERC20TokenBalance(address, token.address, token.chainId);
-              return { chainId: token.chainId, symbol: token.symbol, balance };
+              return { chainId: token.chainId, symbol: token.symbol, balance, account: address };
             } catch (error) {
               console.log(error);
               this.logger?.warn?.(`Error fetching ${token.symbol} balance on chain ${token.chainId}: ${error.message}`);
-              return { chainId: token.chainId, symbol: token.symbol, balance: 0 };
+              return { chainId: token.chainId, symbol: token.symbol, balance: 0, account: address };
             }
           }),
       );
@@ -487,10 +487,11 @@ export class DehubPayService {
       throw new Error('Failed to check gas availability');
     }
   }
-  async groupBalancesByChain(results: { chainId: number; symbol: string; balance: number }[]) {
-    return results.reduce((acc, { chainId, symbol, balance }) => {
+  async groupBalancesByChain(results: { chainId: number; symbol: string; balance: number; account: string }[]) {
+    return results.reduce((acc, { chainId, symbol, balance, account }) => {
       if (!acc[chainId]) acc[chainId] = {};
       acc[chainId][symbol] = balance;
+      acc[chainId]['account'] = account;
       return acc;
     }, {});
   }
