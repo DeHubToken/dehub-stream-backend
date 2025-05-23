@@ -491,7 +491,7 @@ export class DehubPayService {
     return results.reduce((acc, { chainId, symbol, balance, account }) => {
       if (!acc[chainId]) acc[chainId] = {};
       acc[chainId][symbol] = balance;
-      acc[chainId]['account'] = account;
+      // acc[chainId]['account'] = account;
       return acc;
     }, {});
   }
