@@ -5,9 +5,9 @@ export const symbolToIdMap = {
   DHB: 'dehub',
 };
 export const minGas = {
-  [ChainId.BSC_TESTNET]: 0.4,
-  [ChainId.BSC_MAINNET]: 0.4,
-  [ChainId.BASE_MAINNET]: 0.4,
+  [ChainId.BSC_TESTNET]: 0.01,
+  [ChainId.BSC_MAINNET]: 0.01,
+  [ChainId.BASE_MAINNET]: 0.01,
 };
 export const currencyInfoMap: Record<string, { minLimit: number; enabled: true; maxLimit: number }> = {
   usd: { minLimit: 0.59, enabled: true, maxLimit: 6000 },
