@@ -52,7 +52,7 @@ export class DpayMonitor implements OnModuleInit {
       if (result.modifiedCount > 0) {
         this.logger.log(`✅ Expired ${result.modifiedCount} transactions.`);
       } else {
-        this.logger.log(`✅ No pending transactions found to expire.`);
+        // this.logger.log(`✅ No pending transactions found to expire.`);
       }
     } catch (error) {
       this.logger.error('❌ Error expiring transactions:', error.message);
