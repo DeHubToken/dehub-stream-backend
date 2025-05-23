@@ -13,7 +13,7 @@ export class DpayMonitor implements OnModuleInit {
     private readonly dehubPayService: DehubPayService,
     @InjectQueue('transactionQueue') private readonly transactionQueue: Queue,
   ) {
-    this.clearAllJobs(); // use in only dev
+    // this.clearAllJobs(); // use in only dev
   }
 
   async onModuleInit() {
