@@ -13,7 +13,7 @@ export class DpayMonitor implements OnModuleInit {
     private readonly dehubPayService: DehubPayService,
     @InjectQueue('transactionQueue') private readonly transactionQueue: Queue,
   ) {
-    this.clearAllJobs(); // use in only dev
+    // this.clearAllJobs(); // use in only dev
   }
 
   async onModuleInit() {
@@ -52,7 +52,7 @@ export class DpayMonitor implements OnModuleInit {
       if (result.modifiedCount > 0) {
         this.logger.log(`✅ Expired ${result.modifiedCount} transactions.`);
       } else {
-        this.logger.log(`✅ No pending transactions found to expire.`);
+        // this.logger.log(`✅ No pending transactions found to expire.`);
       }
     } catch (error) {
       this.logger.error('❌ Error expiring transactions:', error.message);
