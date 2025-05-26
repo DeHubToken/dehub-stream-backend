@@ -26,12 +26,13 @@ export class DpayTransactionProcessor {
       this.logger.log(`Processing transaction with sessionId: ${sessionId}`);
       const isPaid = await this.dehubPayService.verifyTransactionStatus(sessionId);
       const transferDetails = await this.dehubPayService.getTransferDetailsBySessionId(sessionId);
-      if (isPaid) { 
+      if (isPaid) {
         const { payment_intent } = await this.dehubPayService.getStripeSessionId(sessionId);
         const { latest_charge, status } = await this.dehubPayService.getStripeIntent(payment_intent);
         await this.dehubPayService.updateTransaction(sessionId, {
           latest_charge,
-          status_stripe:status,
+          intentId: payment_intent,
+          status_stripe: status,
         });
       } else {
         this.logger.log(`Transaction ${sessionId} is not completed yet.`);

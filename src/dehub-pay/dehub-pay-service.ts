@@ -106,6 +106,7 @@ export class DehubPayService {
               tokenSendStatus: 1,
               tokenSendRetryCount: 1,
               receiverAddress: 1,
+              stripe_hooks:1,
               tokenSendTxnHash: 1,
               ethSendTxnHash: 1,
               approxTokensToReceive: 1,

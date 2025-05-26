@@ -106,7 +106,7 @@ export class DehubPayController {
     }
   }
   @Post('/dpay/checkout')
-  // @UseGuards(AuthGuard)`
+  @UseGuards(AuthGuard)
   async checkout(
     @Body('chainId') chainId: number = null,
     @Body('address') address: string = null,
