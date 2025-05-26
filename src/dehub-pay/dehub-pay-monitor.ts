@@ -62,14 +62,14 @@ export class DpayMonitor implements OnModuleInit {
   /**
    * Cron job to monitor pending transactions every minute.
    */
-  @Cron(CronExpression.EVERY_30_MINUTES)
+  @Cron(CronExpression.EVERY_5_MINUTES)
   async monitorStripePendingTransactions() {
     this.logger.log('Checking for pending transactions...');
 
     try {
       const pendingTransactions = await this.dehubPayService.getTnxs(
         {
-          status_stripe: 'pending',
+          status_stripe: { $in: ['pending', 'init'] },
           tokenSendStatus: 'not_sent',
           expires_at: { $gt: Math.floor(Date.now() / 1000) },
         },
@@ -89,8 +89,8 @@ export class DpayMonitor implements OnModuleInit {
         this.logger.log(`Queued ${jobs.length} pending transaction(s) for verification.`);
       }
     } catch (error) {
-      this.logger.error('Error monitoring transactions:', error);
-      this.logger.error('Error monitoring transactions:', error.message);
+      this.logger.error('Error monitoring pending transactions:', error);
+      this.logger.error('Error monitoring  pending transactions:', error.message);
     }
   }
   @Cron(CronExpression.EVERY_10_SECONDS)
@@ -100,48 +100,45 @@ export class DpayMonitor implements OnModuleInit {
     try {
       const pendingTransactions = await this.dehubPayService.getTnxs(
         {
-          status_stripe: 'succeeded',
+          status_stripe: { $in: ['succeeded', 'complete'] },
           tokenSendStatus: { $in: ['not_sent'] },
         },
         [{ $limit: 1 }],
       );
-      const jobs = [];
       for (const tx of pendingTransactions) {
-        if (tx.status_stripe === 'succeeded') {
-          try {
-            const tnx = await this.dehubPayService.stripeLatestChargeByIntentOrSessionId(tx.sessionId);
+        try {
+          const tnx = await this.dehubPayService.stripeLatestChargeByIntentOrSessionId(tx.sessionId);
 
-            if (!tnx) {
-              return;
-            }
-            if (!tnx.net) {
-              return;
-            }
-            await this.dehubPayService.updateTransaction(tx.sessionId, {
-              fee: tnx.fee / 100,
-              net: tnx.net / 100,
-              exchange_rate: tnx.exchange_rate,
-              tokenSendStatus: 'processing',
-            });
-            this.addJobsBulk([
-              {
-                name: 'transferToken',
-                data: {
-                  id: tx._id,
-                },
-                opts: {
-                  jobId: `transferToken-${tx.sessionId}`, // unique identifier
-                },
-              },
-            ]);
-
-            this.logger.log('👇 Push job for token transfer', tx.sessionId);
-          } catch (error) {
-            await this.dehubPayService.updateTransaction(tx.sessionId, {
-              tokenSendStatus: 'failed',
-              note: error.toString(),
-            });
+          if (!tnx) {
+            return;
           }
+          if (!tnx.net) {
+            return;
+          }
+          await this.dehubPayService.updateTransaction(tx.sessionId, {
+            fee: tnx.fee / 100,
+            net: tnx.net / 100,
+            exchange_rate: tnx.exchange_rate,
+            tokenSendStatus: 'processing',
+          });
+          this.addJobsBulk([
+            {
+              name: 'transferToken',
+              data: {
+                id: tx._id,
+              },
+              opts: {
+                jobId: `transferToken-${tx.sessionId}`, // unique identifier
+              },
+            },
+          ]);
+
+          this.logger.log('👇 Push job for token transfer', tx.sessionId);
+        } catch (error) {
+          await this.dehubPayService.updateTransaction(tx.sessionId, {
+            tokenSendStatus: 'failed',
+            note: error.toString(),
+          });
         }
       }
     } catch (error) {

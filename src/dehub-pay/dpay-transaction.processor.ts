@@ -26,9 +26,13 @@ export class DpayTransactionProcessor {
       this.logger.log(`Processing transaction with sessionId: ${sessionId}`);
       const isPaid = await this.dehubPayService.verifyTransactionStatus(sessionId);
       const transferDetails = await this.dehubPayService.getTransferDetailsBySessionId(sessionId);
-      if (isPaid) {
-        // const tnx = await this.dehubPayService.stripeLatestChargeByIntentOrSessionId(sessionId);
-        // await this.dehubPayService.updateTransaction(sessionId, { status_stripe: 'succeeded', ...tnx });
+      if (isPaid) { 
+        const { payment_intent } = await this.dehubPayService.getStripeSessionId(sessionId);
+        const { latest_charge, status } = await this.dehubPayService.getStripeIntent(payment_intent);
+        await this.dehubPayService.updateTransaction(sessionId, {
+          latest_charge,
+          status_stripe:status,
+        });
       } else {
         this.logger.log(`Transaction ${sessionId} is not completed yet.`);
 
@@ -117,7 +121,7 @@ export class DpayTransactionProcessor {
       await this.dehubPayService.updateTokenSendStatus(sessionId, {
         tokenSendStatus: 'sent',
         status: 'success',
-        approxTokensToSent: amount,
+        tokenReceived: amount,
         tokenSendTxnHash: txHash,
       });
       this.logger.log(`Starting native gas transfer... sessionId=${sessionId}`);
