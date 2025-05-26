@@ -456,24 +456,7 @@ const mainNetworks = [
     graphUrl: process.env.BASE_GRAPH_API_ENDPOINT,
     eventRpc: [`https://base-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`],
   },
-  // {
-  //   chainId: ChainId.MAINNET,
-  //   shortName: `mainnet`,
-  //   rpcUrls: [`https://mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`],
-  //   startBlockNumber: 16428469,
-  //   graphUrl: process.env.ETHEREUM_GRAPH_API_ENDPOINT,
-  //   eventRpc: [`https://mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`],
-  // },
-  // {
-  //   chainId: ChainId.POLYGON_MAINNET,
-  //   shortName: `polygon`,
-  //   rpcUrls: [
-  //     `https://polygon-mainnet.rpcfast.com?api_key=xbhWBI1Wkguk8SNMu1bvvLurPGLXmgwYeC4S6g2H7WdwFigZSmPWVZRxrskEQwIf`,
-  //   ],
-  //   startBlockNumber: 38197541,
-  //   graphUrl: process.env.POLYGON_GRAPH_API_ENDPOINT,
-  //   eventRpc: [`https://rpc-mainnet.matic.quiknode.pro`],
-  // },
+ 
 ];
 const testNetworks = [
   {
