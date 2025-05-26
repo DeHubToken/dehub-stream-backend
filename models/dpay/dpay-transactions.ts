@@ -18,8 +18,10 @@ export class DpayTnx {
   tokenAddress?: string;
   @Prop({ required: true })
   chainId: number;
-  @Prop({ enum: ['init', 'pending', 'succeeded', 'failed','expired'], default: 'init' })
-  status_stripe: 'init' | 'pending' | 'succeeded' | 'failed'|'expired'; // Payment status
+  @Prop({ enum: ['init', 'pending', 'succeeded', 'complete', 'failed', 'expired'], default: 'init' })
+  status_stripe: 'init' | 'pending' | 'succeeded' | 'complete' | 'failed' | 'expired'; // Payment status
+  @Prop({ type: [Object], default: [] })
+  stripe_hooks?: Record<string, any>[];  
   @Prop()
   latest_charge?: string;
   @Prop()
@@ -58,30 +60,30 @@ export class DpayTnx {
   @Prop()
   tokenSendTxnHash?: string;
   @Prop()
-  ethSendTxnHash?: string; 
+  ethSendTxnHash?: string;
   @Prop()
   currency: string;
   @Prop()
   intentId?: string;
   @Prop({ default: false })
-  isIntentCreated?: Boolean;
+  isIntentCreated?: Boolean;  
   @Prop()
   approxTokensToReceive?: string;
   @Prop()
-  approxTokensToSent?: string;
+  tokenReceived?: string;
   @Prop()
   ethToSent?: string;
   // ⏰ When was last CRON attempt
   @Prop()
-  lastTriedAt?: Date; 
-  @Prop({ enum: ['dehub', "unknown"], default: 'dehub' })
-  platform: 'unknown' | 'dehub'; 
+  lastTriedAt?: Date;
+  @Prop({ enum: ['dehub', 'unknown'], default: 'dehub' })
+  platform: 'unknown' | 'dehub';
   @Prop()
   createdAt?: Date;
   @Prop()
   updatedAt?: Date;
   @Prop()
-  expires_at:Number
+  expires_at: Number;
 }
 
 export const DpayTnxSchema = SchemaFactory.createForClass(DpayTnx);

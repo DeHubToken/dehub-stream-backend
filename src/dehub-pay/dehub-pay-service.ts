@@ -27,10 +27,6 @@ export class DehubPayService {
     this.stripe = new Stripe(stripeSecretKey, {
       apiVersion: '2025-03-31.basil',
     });
-
-    // setTimeout(async () => {
-    //   console.log(await DpayTnxModel.updateMany({}, { $set: { tokenSendStatus: 'not_sent' } }));
-    // }, 5000);
   }
   async getTnxs(filter, line = []) {
     try {
@@ -57,7 +53,7 @@ export class DehubPayService {
             receiverAddress: 1,
             tokenSendTxnHash: 1,
             approxTokensToReceive: 1,
-            approxTokensToSent: 1,
+            tokenReceived: 1,
             lastTriedAt: 1,
             createdAt: 1,
             updatedAt: 1,
@@ -110,10 +106,11 @@ export class DehubPayService {
               tokenSendStatus: 1,
               tokenSendRetryCount: 1,
               receiverAddress: 1,
+              stripe_hooks:1,
               tokenSendTxnHash: 1,
               ethSendTxnHash: 1,
               approxTokensToReceive: 1,
-              approxTokensToSent: 1,
+              tokenReceived: 1,
               ethToSent: 1,
               ethSendStatus: 1,
               lastTriedAt: 1,
@@ -212,7 +209,9 @@ export class DehubPayService {
 
       // Calculate approximate tokens user will receive
       const approxTokensToReceive = localAmount / tokenPrice;
-      console.log('approxTokensToReceive', approxTokensToReceive);
+      const fee = approxTokensToReceive * 0.1; // 10% fee
+      const netTokens = approxTokensToReceive - fee;
+      console.log('approxTokensToReceive', netTokens);
       const session = await this.stripe.checkout.sessions.create({
         payment_method_types: ['card'],
         line_items: [
@@ -221,7 +220,7 @@ export class DehubPayService {
               currency: currency,
               product_data: {
                 name: `${token} Token Purchase`,
-                description: `Approx. ${approxTokensToReceive.toFixed(2)} ${token} tokens`,
+                description: `Approx. ${netTokens.toFixed(2)} ${token} tokens`,
                 images: ['https://dehub.io/icons/DHB.png'],
               },
               unit_amount: Math.round(localAmount * 100),
@@ -292,7 +291,10 @@ export class DehubPayService {
             console.log(`💰 Charge succeeded for amount: ${successfulCharge.amount}`);
             this.handleChargeSucceeded(successfulCharge);
             break;
-
+          case 'checkout.session.completed':
+            const sessionCompleted = event.data.object;
+            this.handleCheckoutSessionCompleted(sessionCompleted);
+            break;
           case 'charge.failed':
             const failedCharge = event.data.object;
             console.log(`❌ Charge failed: ${failedCharge.failure_message}`);
@@ -314,7 +316,20 @@ export class DehubPayService {
           default:
             console.log(`⚠️ Unhandled event type: ${event.type}`);
         }
+        console.log('WEBHOOK', 'ID:', 'HOOK', event.type, event.data.object.id, 'Status: ', event.data.object.status);
+        const sessionId = await this.getStripeSession(event.data.object.id);
+        const updateData = {};
+        updateData[event.type] = event.data.object.status;
 
+        await DpayTnxModel.findOneAndUpdate(
+          { $or: [{ sessionId }, { sessionId: event.data.object.id }] },
+          {
+            $push: {
+              stripe_hooks: updateData,
+            },
+          },
+          { new: true },
+        );
         // Return a 200 response to acknowledge receipt of the event
         res.send();
       } catch (err) {
@@ -331,6 +346,23 @@ export class DehubPayService {
     // console.log('Transaction Currency:', balanceTransaction.currency);
     // console.log('Exchange Rate (USD -> GBP):', balanceTransaction.exchange_rate);
     return balanceTransaction;
+  }
+  async getStripeSessionId(sessionId) {
+    console.log('getStripeSessionId(sessionId)', sessionId);
+    const session = await this.stripe.checkout.sessions.retrieve(sessionId);
+    return session;
+  }
+  async getStripeIntent(intent_id) {
+    console.log("getStripeIntent(intent_id)",intent_id)
+    const intent = await this.stripe.paymentIntents.retrieve(intent_id);
+    console.log('INTENT:', intent);
+    return intent;
+  }
+  async getStripeLatestChargeId(sessionId) {
+    console.log('getStripeLatestChargeId(sessionId)', sessionId);
+    const intent_id = (await this.getStripeSessionId(sessionId)).payment_intent;
+    const latest_charge = (await this.getStripeIntent(intent_id)).latest_charge;
+    return latest_charge;
   }
   async getBalanceTransaction(latest_charge: string) {
     const charge = await this.stripe.charges.retrieve(latest_charge);
@@ -554,7 +586,7 @@ export class DehubPayService {
       return;
     }
     await DpayTnxModel.findOneAndUpdate(
-      { sessionId },
+      { $or: [{ sessionId }, { sessionId: intent.id }] },
       {
         $set: {
           intentId: intent.id,
@@ -567,7 +599,7 @@ export class DehubPayService {
   async handlePaymentIntentSucceeded(intent) {
     const sessionId = await this.getStripeSession(intent.id);
     const tnx = await DpayTnxModel.findOneAndUpdate(
-      { sessionId },
+      { $or: [{ sessionId }, { sessionId: intent.id }] },
       {
         $set: {
           status_stripe: intent.status,
@@ -591,7 +623,7 @@ export class DehubPayService {
 
       // Update transaction status to reflect failure
       const tnx = await DpayTnxModel.findOneAndUpdate(
-        { sessionId },
+        { $or: [{ sessionId }, { sessionId: intent.id }] },
         {
           $set: {
             status_stripe: intent.status,
@@ -612,7 +644,10 @@ export class DehubPayService {
       // throw Error('Session Id Required');
       console.log('handleChargeSucceeded Session Id not Attached');
     }
-    DpayTnxModel.findOneAndUpdate({ sessionId }, { $set: { isChargeSucceeded: true } });
+    DpayTnxModel.findOneAndUpdate(
+      { $or: [{ sessionId }, { sessionId: intent.id }] },
+      { $set: { isChargeSucceeded: true } },
+    );
     console.log('handleChargeSucceeded sessionId', sessionId);
   }
   async handleChargeFailed(intent) {
@@ -621,7 +656,10 @@ export class DehubPayService {
       // throw Error('Session Id Required');
       console.log('handleChargeFailed Session Id not Attached');
     }
-    DpayTnxModel.findOneAndUpdate({ sessionId }, { $set: { isChargeFailed: true } });
+    DpayTnxModel.findOneAndUpdate(
+      { $or: [{ sessionId }, { sessionId: intent.id }] },
+      { $set: { isChargeFailed: true } },
+    );
     console.log('handleChargeFailed sessionId', sessionId);
   }
   async handleChargeRefunded(intent) {
@@ -630,7 +668,10 @@ export class DehubPayService {
       // throw Error('Session Id Required');
       console.log('handleChargeRefunded Session Id not Attached');
     }
-    DpayTnxModel.findOneAndUpdate({ sessionId }, { $set: { isChargeRefunded: true } });
+    DpayTnxModel.findOneAndUpdate(
+      { $or: [{ sessionId }, { sessionId: intent.id }] },
+      { $set: { isChargeRefunded: true } },
+    );
 
     console.log('handleChargeRefunded sessionId', sessionId);
   }
@@ -640,8 +681,27 @@ export class DehubPayService {
       // throw Error('Session Id Required');
       console.log('handlePaymentMethodAttached Session Id not Attached');
     }
-    DpayTnxModel.findOneAndUpdate({ sessionId }, { $set: { idPaymentMethodAttached: true } });
+    DpayTnxModel.findOneAndUpdate(
+      { $or: [{ sessionId }, { sessionId: intent.id }] },
+      { $set: { idPaymentMethodAttached: true } },
+    );
     console.log('handlePaymentMethodAttached sessionId', sessionId);
+  }
+  async handleCheckoutSessionCompleted(intent) {
+    const sessionId = await this.getStripeSession(intent.id);
+    // getStripeIntent()
+    console.log('handleCheckoutSessionCompleted', intent);
+    const latest_charge = await this.getStripeLatestChargeId(intent.id);
+    const tnx = await DpayTnxModel.findOneAndUpdate(
+      { $or: [{ sessionId }, { sessionId: intent.id }] },
+      {
+        $set: {
+          status_stripe: intent.status,
+          latest_charge: latest_charge,
+        },
+      },
+      { new: true },
+    );
   }
   async getStripeSession(paymentIntentId: string): Promise<string | null> {
     'use strict';
@@ -741,7 +801,7 @@ export class DehubPayService {
         $project: {
           chainId: 1,
           tokenSymbol: 1,
-          approxTokensToSentNum: { $toDouble: '$approxTokensToSent' },
+          tokenReceivedNum: { $toDouble: '$tokenReceived' },
         },
       },
       {
@@ -752,7 +812,7 @@ export class DehubPayService {
           },
           chainId: { $first: '$chainId' },
           tokenSymbol: { $first: '$tokenSymbol' },
-          total: { $sum: '$approxTokensToSentNum' },
+          total: { $sum: '$tokenReceivedNum' },
         },
       },
       {
