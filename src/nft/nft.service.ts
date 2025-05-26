@@ -360,7 +360,7 @@ export class NftService {
       const postFilter = {};
       const contentFilter = {
         video: {
-          $or: [{ postType: { $nin: ['feed-simple', 'feed-images'] } }],
+          $or: [{ postType: { $nin: ['feed-simple', 'feed-images', 'live'] } }],
         },
         'feed-all': {
           $or: [{ postType: 'feed-simple' }, { postType: 'feed-images' }],
