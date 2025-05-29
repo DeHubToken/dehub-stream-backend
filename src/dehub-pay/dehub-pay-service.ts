@@ -389,7 +389,14 @@ export class DehubPayService {
       const response = await axios.get(
         `https://api.coingecko.com/api/v3/simple/price?ids=${tokenSymbol}&vs_currencies=${currency.toLowerCase()}`,
       );
-
+  const chainGasSymbol = {
+        [ChainId.BASE_MAINNET]: 'base',
+        [ChainId.BSC_MAINNET]: 'binancecoin',
+        [ChainId.BSC_TESTNET]: 'binancecoin',
+      };
+      if(chainGasSymbol[chainId]){
+        
+      }
       const price = response.data?.[tokenSymbol]?.[currency.toLowerCase()] ?? 0;
 
       if (price === 0) {
@@ -403,6 +410,42 @@ export class DehubPayService {
 
       return priceData;
     } catch (error) {
+      this.logger.error(`Error fetching price for ${tokenSymbol} in ${currency}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  async coinMarketCapGetPrice(tokenSymbol: string, currency: string, amount?: number, chainId?: number) {
+    try {
+      const cacheKey = `coingecko:price:${tokenSymbol}:${currency}:amount:${amount}`;
+      const cachedPrice = await this.redisClient.get(cacheKey);
+      if (cachedPrice) {
+        return JSON.parse(cachedPrice);
+      } 
+      const response = await await axios.get('https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest', {
+        headers: {
+          'X-CMC_PRO_API_KEY': process.env.X_CMC_PRO_API_KEY,
+          Accept: 'application/json',
+        },
+        params: {
+          symbol: tokenSymbol,
+          convert: currency.toLowerCase(),
+        },
+      });
+      const price = response.data.data?.[tokenSymbol]?.quote[currency.toUpperCase()].price ?? 0;
+
+      if (price === 0) {
+        throw new Error(`Price not found for ${tokenSymbol} in ${currency}`);
+      }
+
+      const priceData = { price, tokenSymbol, currency };
+
+      // Cache the price for 10 minutes
+      await this.redisClient.setex(cacheKey, 600, JSON.stringify(priceData));
+
+      return priceData;
+    } catch (error) {
+      console.log(error);
       this.logger.error(`Error fetching price for ${tokenSymbol} in ${currency}: ${error.message}`);
       throw error;
     }
@@ -909,5 +952,4 @@ export class DehubPayService {
     };
   }
 }
-
-//latest_charge: 'ch_3RIktOH2gEWROW3h0h5rEIVF',
+ 

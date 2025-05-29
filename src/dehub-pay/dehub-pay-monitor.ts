@@ -62,7 +62,7 @@ export class DpayMonitor implements OnModuleInit {
   /**
    * Cron job to monitor pending transactions every minute.
    */
-  @Cron(CronExpression.EVERY_5_MINUTES)
+  @Cron(CronExpression.EVERY_MINUTE)
   async monitorStripePendingTransactions() {
     this.logger.log('Checking for pending transactions...');
 

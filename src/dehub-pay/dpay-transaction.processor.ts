@@ -78,7 +78,7 @@ export class DpayTransactionProcessor {
       const network = supportedNetworks.find(net => net.chainId === chainId);
       if (!network) throw new Error(`Unsupported chainId: ${chainId}`);
 
-      const { price: tokenPrice } = await this.dehubPayService.coingeckoGetPrice(
+      const { price: tokenPrice } = await this.dehubPayService.coinMarketCapGetPrice(
         symbolToIdMap[tokenSymbol],
         'gbp',
         net,
@@ -86,13 +86,18 @@ export class DpayTransactionProcessor {
       const onePercentNetGBP = net * 0.01;
 
       const chainGasSymbol = {
-        [ChainId.BASE_MAINNET]: 'base',
-        [ChainId.BSC_MAINNET]: 'binancecoin',
-        [ChainId.BSC_TESTNET]: 'binancecoin',
+        [ChainId.BASE_MAINNET]: 'BASE',
+        [ChainId.BSC_MAINNET]: 'BNB',
+        [ChainId.BSC_TESTNET]: 'BNB',
       };
+      // const chainGasSymbol = {// in the case of coingeko
+      //   [ChainId.BASE_MAINNET]: 'base',
+      //   [ChainId.BSC_MAINNET]: 'binancecoin',
+      //   [ChainId.BSC_TESTNET]: 'binancecoin',
+      // };
 
       console.log(' chainGasSymbol[chainId]', chainGasSymbol[chainId]);
-      const { price: nativeTokenPrice } = await this.dehubPayService.coingeckoGetPrice(
+      const { price: nativeTokenPrice } = await this.dehubPayService.coinMarketCapGetPrice(
         chainGasSymbol[chainId],
         'gbp',
         net,
