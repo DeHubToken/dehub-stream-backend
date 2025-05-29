@@ -125,7 +125,7 @@ export class DehubPayController {
 
       // Step 1: Get the token price using the DehubPayService
 
-      const { price } = await this.dehubPayService.coingeckoGetPrice(
+      const { price } = await this.dehubPayService.coinMarketCapGetPrice(
         symbolToIdMap[tokenSymbol ?? 'DHB'],
         currency,
         amount,

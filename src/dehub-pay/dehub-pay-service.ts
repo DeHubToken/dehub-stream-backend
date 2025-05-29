@@ -201,7 +201,7 @@ export class DehubPayService {
   ) {
     try {
       // Fetch token price from Coingecko or your pricing service
-      const { price: tokenPrice } = await this.coingeckoGetPrice(tokenId, currency, localAmount);
+      const { price: tokenPrice } = await this.coinMarketCapGetPrice(tokenId, currency, localAmount);
 
       if (!tokenPrice) {
         throw new Error(`Failed to fetch price for ${token}`);

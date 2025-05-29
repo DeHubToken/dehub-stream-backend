@@ -22,7 +22,7 @@ export class DehubPayMiddleware implements NestMiddleware {
     const { chainId, tokenSymbol, currency, tokensToReceive, tokenId, currencyLimits, amount } = validated;
     req.body.tokenId = tokenId;
     try {
-      const priceData = await this.dehubPayService.coingeckoGetPrice(tokenId, currency, amount);
+      const priceData = await this.dehubPayService.coinMarketCapGetPrice(tokenId, currency, amount);
       const tokenPrice = priceData?.price;
 
       if (!tokenPrice || typeof tokenPrice !== 'number') {
