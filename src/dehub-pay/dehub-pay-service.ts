@@ -130,7 +130,7 @@ export class DehubPayService {
         limit,
       };
 
-      await this.redisClient.setex(cacheKey, 60, JSON.stringify(result)); // 60 seconds cache
+      await this.redisClient.setex(cacheKey, 30, JSON.stringify(result)); // 30 seconds cache
 
       return result;
     } catch (error) {
