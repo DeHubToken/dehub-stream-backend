@@ -24,7 +24,7 @@ export class DehubPayController {
     @Res() res: Response,
   ) {
     try {
-      const data = await this.dehubPayService.coingeckoGetPrice(
+      const data = await this.dehubPayService.coinMarketCapGetPrice(
         symbolToIdMap[tokenSymbol ?? 'DHB'],
         currency,
         amount,
