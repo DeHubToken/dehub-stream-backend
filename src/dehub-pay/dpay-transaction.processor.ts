@@ -73,7 +73,7 @@ export class DpayTransactionProcessor {
         amount: amt,
         currency,
         tokenSymbol,
-      } = await DpayTnxModel.findOne({ $or: [{ _id: id, sessionId: sid }] });
+      } = await DpayTnxModel.findOne({ $or: [{ _id: id},{sessionId: sid}] });
       this.logger.debug(
         `GET transferToken TNX: id ${id} amt:${amt} receiverAddress:${receiverAddress} tokenSymbol:${tokenSymbol}`,
       );
