@@ -20,7 +20,7 @@ export class DpayMonitor implements OnModuleInit {
     this.logger.log('DpayMonitor initialized.');
   }
 
-  @Cron(CronExpression.EVERY_10_SECONDS)
+  @Cron(CronExpression.EVERY_10_MINUTES)
   async expireTheTnx() {
     try {
       const now = Math.floor(Date.now() / 1000);
@@ -31,17 +31,7 @@ export class DpayMonitor implements OnModuleInit {
               status_stripe: { $in: ['pending', 'init'] },
               tokenSendStatus: 'not_sent',
               expires_at: { $lt: now },
-            },
-            {
-              status_stripe: { $exists: false }, // Handles missing status_stripe
-              tokenSendStatus: 'not_sent',
-              expires_at: { $lt: now },
-            },
-            {
-              expires_at: { $exists: false }, // Handles missing expires_at
-              status_stripe: { $in: ['pending', 'init'] },
-              tokenSendStatus: 'not_sent',
-            },
+            }, 
           ],
         },
         {
@@ -136,24 +126,25 @@ export class DpayMonitor implements OnModuleInit {
       this.logger.error('Error monitoring transactions:', error.message);
     }
   }
-  @Cron(CronExpression.EVERY_5_SECONDS)
+  @Cron(CronExpression.EVERY_5_MINUTES)
   async reTryJobTokenTransfer() {
     try {
-      console.log('Retry Job: Starting update for failed or processing transactions...');
+      // console.log('Retry Job: Starting update for failed or processing transactions...');
 
       const result = await DpayTnxModel.updateMany(
         {
           status_stripe: { $in: ['succeeded', 'complete'] },
           tokenSendStatus: { $in: ['processing', 'failed'] },
-          tokenSendRetryCount:{ $lt: 3 }
+          tokenSendRetryCount: { $lt: 3 },
         },
         {
           $set: { tokenSendStatus: 'not_sent' },
         },
       );
-
-      console.log('Retry Job: Update result:', result);
-      console.log(`Retry Job: Matched ${result.matchedCount}, Modified ${result.modifiedCount}`);
+      if (result.modifiedCount != 0) {
+        console.log('Retry Job: Update result:', result);
+        console.log(`Retry Job: Matched ${result.matchedCount}, Modified ${result.modifiedCount}`);
+      }
     } catch (error) {
       console.error('Retry Job: Error occurred while updating transactions:', error);
     }
@@ -235,25 +226,20 @@ export class DpayMonitor implements OnModuleInit {
 
   async syncChargesFromStripe(tx) {
     const tnx = await this.dehubPayService.stripeLatestChargeByIntentOrSessionId(tx.sessionId);
-  
     if (!tnx || !tnx.net) {
       return;
     }
-  
     // If all already set, skip updating
     if (tx.fee != null && tx.net != null && tx.exchange_rate != null) {
       console.log(`syncChargesFromStripe: Skipping update for sessionId=${tx.sessionId} - already synced`);
       return;
     }
-  
     // Log before update
     console.log(`syncChargesFromStripe: Updating fee/net/exchange_rate for sessionId=${tx.sessionId}`);
-  
     await this.dehubPayService.updateTransaction(tx.sessionId, {
       fee: tnx.fee / 100,
       net: tnx.net / 100,
       exchange_rate: tnx.exchange_rate,
     });
   }
-  
 }
