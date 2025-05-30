@@ -59,7 +59,8 @@ export class DpayTransactionProcessor {
 
   @Process({ name: 'transferToken', concurrency: 1 })
   async processTokenTransfer(job: Job) {
-    const { id } = job.data;
+    const { id ,sid} = job.data;
+    this.logger.debug(`GET transferToken TNX: ${id}`);
     const MAX_RETRIES = 3;
     const RETRY_DELAY_MS = 1000 * 60;
     const {
@@ -71,18 +72,23 @@ export class DpayTransactionProcessor {
       amount: amt,
       currency,
       tokenSymbol,
-    } = await DpayTnxModel.findById(id);
+    } = await DpayTnxModel.findOne({$or:[{_id:id,sessionId:sid}]});
+    this.logger.debug(
+      `GET transferToken TNX: id ${id} amt:${amt} receiverAddress:${receiverAddress} tokenSymbol:${tokenSymbol}`,
+    );
     try {
-      this.logger.log('Waiting....', this.tokenTransferService.getProcessing());
+      this.logger.log('Waiting....', await this.tokenTransferService.getProcessing());
 
       const network = supportedNetworks.find(net => net.chainId === chainId);
-      if (!network) throw new Error(`Unsupported chainId: ${chainId}`);
 
+      if (!network) throw new Error(`Unsupported chainId: ${chainId}`);
+      this.logger.debug(`NetWork :${network.shortName}`);
       const { price: tokenPrice } = await this.dehubPayService.coinMarketCapGetPrice(
         symbolToIdMap[tokenSymbol],
         'gbp',
         net,
       );
+      this.logger.debug(`tokenPrice :${tokenPrice}`);
       const onePercentNetGBP = net * 0.01;
 
       const chainGasSymbol = {
@@ -111,17 +117,19 @@ export class DpayTransactionProcessor {
         tokenSendStatus: 'sending',
         lastTriedAt: new Date(),
       });
-
+      this.logger.log(`Starting token transfer:  transferERC20`);
       const txHash = await this.tokenTransferService.transferERC20({
         to: receiverAddress,
         amount,
         tokenSymbol: tokenSymbol ?? 'DHB',
         chainId,
       });
-
+      this.logger.debug(`Transaction txHash: ${txHash}`);
       const receipt = await this.tokenTransferService.getTransactionReceipt(txHash, chainId);
 
       if (!receipt || receipt.status !== 1) {
+        this.logger.debug(`Transaction failed on-chain. TxHash: ${txHash}`);
+
         throw new Error(`Transaction failed on-chain. TxHash: ${txHash}`);
       }
       await this.dehubPayService.updateTokenSendStatus(sessionId, {
@@ -130,7 +138,7 @@ export class DpayTransactionProcessor {
         tokenReceived: amount,
         tokenSendTxnHash: txHash,
       });
-      this.logger.log(`Starting native gas transfer... sessionId=${sessionId}`);
+      this.logger.debug(`Starting native gas transfer... sessionId=${sessionId}`);
       await this.dehubPayService.updateTokenSendStatus(sessionId, {
         ethSendStatus: 'sending',
         lastTriedAt: new Date(),
