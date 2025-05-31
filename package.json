@@ -27,6 +27,7 @@
     "@ethersproject/providers": "^5.7.2",
     "@langchain/community": "^0.3.43",
     "@langchain/core": "^0.3.56",
+    "@langchain/langgraph": "^0.2.24",
     "@langchain/openai": "^0.5.10",
     "@moonpay/moonpay-node": "^0.2.9",
     "@mux/mux-node": "^9.0.1",

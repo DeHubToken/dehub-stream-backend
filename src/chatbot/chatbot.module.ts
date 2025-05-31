@@ -13,6 +13,7 @@ import { ImageProcessor } from './processors/image.processor';
 import { AITasksProcessor } from './processors/ai-tasks.processor';
 import { CdnModule } from '../cdn/cdn.module';
 import { TracingModule } from '../tracing/tracing.module';
+import { AgenticRAGService } from './services/agentic-rag.service';
 
 @Module({
   imports: [
@@ -37,7 +38,7 @@ import { TracingModule } from '../tracing/tracing.module';
     TracingModule,
   ],
   controllers: [ChatbotController],
-  providers: [ChatbotService, ChatbotGateway, ChatbotMessageProcessor, ImageProcessor, AITasksProcessor],
+  providers: [ChatbotService, ChatbotGateway, ChatbotMessageProcessor, ImageProcessor, AITasksProcessor, AgenticRAGService],
   exports: [ChatbotService],
 })
 export class ChatbotModule {} 
