@@ -53,7 +53,9 @@ export class DpayTnx {
   ethSendStatus: 'not_sent' | 'cancelled' | 'processing' | 'sent' | 'failed';
   // 🔁 Retry count to limit retries
   @Prop({ default: 0 })
-  tokenSendRetryCount: number;
+  tokenSendRetryCount: number; 
+   @Prop({ default: 0 })
+  attemptCount: number;
   @Prop()
   receiverAddress: string;
   // ✅ On successful send, store thiss
