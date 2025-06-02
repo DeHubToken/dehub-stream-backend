@@ -614,6 +614,17 @@ export class LivestreamService {
     return { streamKey: stream.streamKey };
   }
 
+  async getStreamIngestUrl(streamId: string, requesterAddress: string): Promise<{ ingestUrl: string }> {
+    const stream = await this.livestreamModel.findById(streamId).lean();
+
+    if (stream.address.toLowerCase() !== requesterAddress.toLowerCase()) {
+      throw new ForbiddenException('You are not authorized to view the ingest URL');
+    }
+
+    const ingestUrl = await this.livepeerService.getIngestUrl(stream.streamKey);
+    return { ingestUrl };
+  }
+
   async getStreamActivities(
     streamId: string,
     options: {
