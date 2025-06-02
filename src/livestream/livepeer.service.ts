@@ -43,4 +43,8 @@ export class LivepeerService {
       },
     });
   }
+
+  async getIngestUrl(streamKey: string): Promise<string> {
+    return `rtmp://livepeer.studio/live/${streamKey}`;
+  }
 }

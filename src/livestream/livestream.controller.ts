@@ -11,6 +11,7 @@ import {
   UseInterceptors,
   UploadedFiles,
   InternalServerErrorException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { LivestreamService } from './livestream.service';
 import { AuthGuard } from 'common/guards/auth.guard';
@@ -100,5 +101,13 @@ export class LivestreamController {
   @Post('webhook')
   handleWebhook(@Body() data: any) {
     return this.livestreamService.handleWebhook(data);
+  }
+
+  // Incomplete!
+  @UseGuards(AuthGuard)
+  @Get(':streamId/ingesturl')
+  async getStreamIngestUrl(@Param('streamId') streamId: string, @Req() req) {
+    const requesterAddress = req.params.address;
+    return this.livestreamService.getStreamIngestUrl(streamId, requesterAddress);
   }
 }

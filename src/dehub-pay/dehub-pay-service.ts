@@ -72,14 +72,14 @@ export class DehubPayService {
   async getTnxsApi(filter, page = 1, limit = 10, cache = true) {
     try {
       const skip = (page - 1) * limit;
-      const cacheKey = `transactions:${JSON.stringify(filter)}:page:${page}:limit:${limit}`;
+      // const cacheKey = `transactions:${JSON.stringify(filter)}:page:${page}:limit:${limit}`;
 
-      if (cache) {
-        const cached = await this.redisClient.get(cacheKey);
-        if (cached) {
-          return JSON.parse(cached);
-        }
-      }
+      // if (cache) {
+      //   const cached = await this.redisClient.get(cacheKey);
+      //   if (cached) {
+      //     return JSON.parse(cached);
+      //   }
+      // }
 
       const [transactions, total] = await Promise.all([
         DpayTnxModel.aggregate([
@@ -130,7 +130,7 @@ export class DehubPayService {
         limit,
       };
 
-      await this.redisClient.setex(cacheKey, 60, JSON.stringify(result)); // 60 seconds cache
+      // await this.redisClient.setex(cacheKey, 30, JSON.stringify(result)); // 30 seconds cache
 
       return result;
     } catch (error) {
@@ -201,7 +201,7 @@ export class DehubPayService {
   ) {
     try {
       // Fetch token price from Coingecko or your pricing service
-      const { price: tokenPrice } = await this.coingeckoGetPrice(tokenId, currency, localAmount);
+      const { price: tokenPrice } = await this.coinMarketCapGetPrice(tokenId, currency, localAmount);
 
       if (!tokenPrice) {
         throw new Error(`Failed to fetch price for ${token}`);
@@ -353,7 +353,7 @@ export class DehubPayService {
     return session;
   }
   async getStripeIntent(intent_id) {
-    console.log("getStripeIntent(intent_id)",intent_id)
+    console.log('getStripeIntent(intent_id)', intent_id);
     const intent = await this.stripe.paymentIntents.retrieve(intent_id);
     console.log('INTENT:', intent);
     return intent;
@@ -370,13 +370,17 @@ export class DehubPayService {
     return { balanceTransactionId, ...charge };
   }
   async stripeLatestChargeByIntentOrSessionId(id: string) {
-    const tnx = await DpayTnxModel.findOne(
-      { $or: [{ sessionId: id }, { intentId: id }] },
-      { latest_charge: 1, _id: 1 },
-    ).lean();
-    const balanceTnx = await this.getBalanceTransaction(tnx.latest_charge);
-    const balanceChargeTnx = await this.stripeLatestCharge(balanceTnx.balanceTransactionId);
-    return { ...balanceChargeTnx };
+    try {
+      const tnx = await DpayTnxModel.findOne(
+        { $or: [{ sessionId: id }, { intentId: id }] },
+        { latest_charge: 1, _id: 1 },
+      ).lean();
+      const balanceTnx = await this.getBalanceTransaction(tnx.latest_charge);
+      const balanceChargeTnx = await this.stripeLatestCharge(balanceTnx.balanceTransactionId);
+      return { ...balanceChargeTnx };
+    } catch (error) {
+     throw new Error(error)
+    }
   }
   async coingeckoGetPrice(tokenSymbol: string, currency: string, amount?: number, chainId?: number) {
     try {
@@ -389,14 +393,11 @@ export class DehubPayService {
       const response = await axios.get(
         `https://api.coingecko.com/api/v3/simple/price?ids=${tokenSymbol}&vs_currencies=${currency.toLowerCase()}`,
       );
-  const chainGasSymbol = {
+      const chainGasSymbol = {
         [ChainId.BASE_MAINNET]: 'base',
         [ChainId.BSC_MAINNET]: 'binancecoin',
         [ChainId.BSC_TESTNET]: 'binancecoin',
-      };
-      if(chainGasSymbol[chainId]){
-        
-      }
+      }; 
       const price = response.data?.[tokenSymbol]?.[currency.toLowerCase()] ?? 0;
 
       if (price === 0) {
@@ -421,7 +422,7 @@ export class DehubPayService {
       const cachedPrice = await this.redisClient.get(cacheKey);
       if (cachedPrice) {
         return JSON.parse(cachedPrice);
-      } 
+      }
       const response = await await axios.get('https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest', {
         headers: {
           'X-CMC_PRO_API_KEY': process.env.X_CMC_PRO_API_KEY,
@@ -619,7 +620,17 @@ export class DehubPayService {
     return DpayTnxModel.findOne({ sessionId });
   }
   async updateTokenSendStatus(sessionId: string, updates: Partial<any>) {
-    return DpayTnxModel.updateOne({ sessionId }, { $set: updates });
+    const { $inc, ...setFields } = updates as any;
+  
+    const updateOps: any = {
+      $set: setFields,
+    };
+  
+    if ($inc) {
+      updateOps.$inc = $inc;
+    }
+  
+    return DpayTnxModel.updateOne({ sessionId }, updateOps);
   }
   async handlePaymentIntentCreated(intent) {
     const sessionId = await this.getStripeSession(intent.id);
@@ -952,4 +963,3 @@ export class DehubPayService {
     };
   }
 }
- 
