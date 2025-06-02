@@ -1,10 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { config } from 'config';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-// import * as pm2 from 'pm2';
-// import pm2 from 'pm2';
 const pm2 = require('pm2');
 
 @Injectable()
@@ -22,19 +19,9 @@ export class ServerLogsService {
 
     console.log('Using log file:', this.logFilePath);
     console.log('Using process name:', this.processName);
-    // console.log("Pm2 stuff", pm2);
-  }
-
-  private async initPm2() {
-    if (!this.pm2Instance) {
-      this.pm2Instance = await import('pm2');
-    }
-    return this.pm2Instance;
   }
 
   async getLogs(lastNLines: number, filters: string[]): Promise<string> {
-    //   console.log("Pm2 object:", pm2); // Debug PM2 object
-    // const pm2 = await this.initPm2();
     return new Promise((resolve, reject) => {
       pm2.connect(err => {
         if (err) {
