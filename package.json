@@ -80,6 +80,7 @@
     "node-media-server": "^4.0.7",
     "nodemailer": "^6.9.15",
     "optional": "^0.1.4",
+    "pm2": "^6.0.6",
     "pubnub": "^8.2.8",
     "reflect-metadata": "^0.2.0",
     "request": "^2.88.2",
