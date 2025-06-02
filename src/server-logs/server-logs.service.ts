@@ -15,7 +15,7 @@ export class ServerLogsService {
     const isWindows = os.platform() === 'win32';
     this.logFilePath = isWindows
       ? path.join(os.homedir(), '.pm2', 'logs', 'main-out.log')
-      : '~/.pm2/logs/api-prod-out.log';
+      : '/root/.pm2/logs/api-prod-out.log';
 
     console.log('Using log file:', this.logFilePath);
   }
