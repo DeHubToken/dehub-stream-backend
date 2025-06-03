@@ -54,7 +54,7 @@ export class DpayMonitor implements OnModuleInit {
    */
   @Cron(CronExpression.EVERY_MINUTE)
   async monitorStripePendingTransactions() {
-    this.logger.log('Checking for pending transactions...');
+    // this.logger.log('Checking for pending transactions...');
 
     try {
       const pendingTransactions = await this.dehubPayService.getTnxs(
@@ -85,7 +85,7 @@ export class DpayMonitor implements OnModuleInit {
   }
   @Cron(CronExpression.EVERY_5_SECONDS)
   async monitorStripeSuccessTransactions() {
-    this.logger.log('Checking for Success transactions...');
+    // this.logger.log('Checking for Success transactions...');
 
     try {
       const pendingTransactions = await this.dehubPayService.getTnxs(
