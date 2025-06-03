@@ -13,8 +13,7 @@ export class DpayMonitor implements OnModuleInit {
     private readonly dehubPayService: DehubPayService,
     @InjectQueue('transactionQueue') private readonly transactionQueue: Queue,
   ) {
-    this.clearAllJobs();
-    this.reTryJobTokenTransfer();
+
 
     setTimeout(async () => {
       const tnx = await DpayTnxModel.findOne({
@@ -63,7 +62,10 @@ export class DpayMonitor implements OnModuleInit {
         },
       );
       console.log('OnRestartServer', JSON.stringify({ resultForToken, resultForGas }, null, 1));
+
     }, 100);
+    this.clearAllJobs();
+    this.reTryJobTokenTransfer();
   }
   async onModuleInit() {
     this.logger.log('DpayMonitor initialized.');
