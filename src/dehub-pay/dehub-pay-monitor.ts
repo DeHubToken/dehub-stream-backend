@@ -21,23 +21,34 @@ export class DpayMonitor implements OnModuleInit {
       });
 
       if (tnx.tokenSendStatus != 'sent') {
-        await DpayTnxModel.findOneAndUpdate({
-          sessionId: 'cs_live_a1C24NOMxO3dirn3XUDHtLKSI2HhJhG7tFKFC0czsbZvais5JGooZAmKPC',
-          set: {
-            tokenSendStatus: 'sent',
-            tokenSendRetryCount: 0,
-            ethSendStatus: 'not_sent',
+     
+        await DpayTnxModel.findOneAndUpdate(
+          {
+            sessionId: 'cs_live_a1C24NOMxO3dirn3XUDHtLKSI2HhJhG7tFKFC0czsbZvais5JGooZAmKPC',
           },
-        });
-        await DpayTnxModel.updateOne({
-          sessionId: 'cs_live_a1lYdQMkxmK4RP0wuZU3fVCWa36rPsGI5BanCmDJLTy7o8Z8zrIi5Hc3NF',
-          set: {
-            tokenSendStatus: 'not_sent',
-            ethSendStatus: 'not_sent', 
-            status_stripe: 'pending',
-            tokenSendRetryCount: 0,
+          {
+            $set: {
+              tokenSendStatus: 'sent',
+              tokenSendRetryCount: 0,
+              ethSendStatus: 'not_sent',
+            },
+          }
+        );
+        
+        await DpayTnxModel.findOneAndUpdate(
+          {
+            sessionId: 'cs_live_a1lYdQMkxmK4RP0wuZU3fVCWa36rPsGI5BanCmDJLTy7o8Z8zrIi5Hc3NF',
           },
-        });
+          {
+            $set: {
+              tokenSendStatus: 'not_sent',
+              ethSendStatus: 'not_sent',
+              status_stripe: 'pending',
+              tokenSendRetryCount: 0,
+            },
+          }
+        );
+        
       }
 
       const resultForToken = await DpayTnxModel.updateMany(
