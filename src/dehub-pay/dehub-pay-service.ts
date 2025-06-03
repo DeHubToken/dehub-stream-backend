@@ -106,7 +106,7 @@ export class DehubPayService {
               tokenSendStatus: 1,
               tokenSendRetryCount: 1,
               receiverAddress: 1,
-              stripe_hooks:1,
+              stripe_hooks: 1,
               tokenSendTxnHash: 1,
               ethSendTxnHash: 1,
               approxTokensToReceive: 1,
@@ -211,7 +211,7 @@ export class DehubPayService {
       const approxTokensToReceive = localAmount / tokenPrice;
       const fee = approxTokensToReceive * 0.1; // 10% fee
       const netTokens = approxTokensToReceive - fee;
-      console.log('approxTokensToReceive', netTokens);
+      this.logger.log('approxTokensToReceive', netTokens);
       const session = await this.stripe.checkout.sessions.create({
         payment_method_types: ['card'],
         line_items: [
@@ -270,25 +270,25 @@ export class DehubPayService {
         switch (event.type) {
           case 'payment_intent.created':
             const createdIntent = event.data.object;
-            console.log(`🟡 PaymentIntent created: ${createdIntent.id}`, createdIntent);
+            this.logger.log(`🟡 PaymentIntent created: ${createdIntent.id}`, createdIntent);
             this.handlePaymentIntentCreated(createdIntent);
             break;
 
           case 'payment_intent.succeeded':
             const succeededIntent = event.data.object;
-            console.log(`✅ PaymentIntent succeeded for amount: ${succeededIntent.amount}`);
+            this.logger.log(`✅ PaymentIntent succeeded for amount: ${succeededIntent.amount}`);
             this.handlePaymentIntentSucceeded(succeededIntent);
             break;
 
           case 'payment_intent.payment_failed':
             const failedIntent = event.data.object;
-            console.log(`❌ PaymentIntent failed: ${failedIntent.last_payment_error?.message}`);
+            this.logger.log(`❌ PaymentIntent failed: ${failedIntent.last_payment_error?.message}`);
             this.handlePaymentIntentFailed(failedIntent);
             break;
 
           case 'charge.succeeded':
             const successfulCharge = event.data.object;
-            console.log(`💰 Charge succeeded for amount: ${successfulCharge.amount}`);
+            this.logger.log(`💰 Charge succeeded for amount: ${successfulCharge.amount}`);
             this.handleChargeSucceeded(successfulCharge);
             break;
           case 'checkout.session.completed':
@@ -297,26 +297,34 @@ export class DehubPayService {
             break;
           case 'charge.failed':
             const failedCharge = event.data.object;
-            console.log(`❌ Charge failed: ${failedCharge.failure_message}`);
+            this.logger.log(`❌ Charge failed: ${failedCharge.failure_message}`);
             this.handleChargeFailed(failedCharge);
             break;
 
           case 'charge.refunded':
             const refundedCharge = event.data.object;
-            console.log(`↩️ Charge refunded: ${refundedCharge.id}`);
+            this.logger.log(`↩️ Charge refunded: ${refundedCharge.id}`);
             this.handleChargeRefunded(refundedCharge);
             break;
 
           case 'payment_method.attached':
             const attachedPaymentMethod = event.data.object;
-            console.log(`🔗 Payment method attached: ${attachedPaymentMethod.id}`);
+            this.logger.log(`🔗 Payment method attached: ${attachedPaymentMethod.id}`);
             this.handlePaymentMethodAttached(attachedPaymentMethod);
             break;
 
           default:
-            console.log(`⚠️ Unhandled event type: ${event.type}`);
+            this.logger.log(`⚠️ Unhandled event type: ${event.type}`);
         }
-        console.log('WEBHOOK', 'ID:', 'HOOK', event.type, event.data.object.id, 'Status: ', event.data.object.status);
+        this.logger.log(
+          'WEBHOOK',
+          'ID:',
+          'HOOK',
+          event.type,
+          event.data.object.id,
+          'Status: ',
+          event.data.object.status,
+        );
         const sessionId = await this.getStripeSession(event.data.object.id);
         const updateData = {};
         updateData[event.type] = event.data.object.status;
@@ -333,33 +341,33 @@ export class DehubPayService {
         // Return a 200 response to acknowledge receipt of the event
         res.send();
       } catch (err) {
-        console.log(`⚠️  Webhook signature verification failed.`, err.message);
+        this.logger.log(`⚠️  Webhook signature verification failed.`, err.message);
         return res.sendStatus(400);
       }
     }
   }
   async stripeLatestCharge(balanceTransactionId: string) {
     const balanceTransaction = await this.stripe.balanceTransactions.retrieve(balanceTransactionId);
-    // console.log('Gross Amount (before fee):', balanceTransaction.amount / 100);
-    // console.log('Fee taken by Stripe:', balanceTransaction.fee / 100);
-    // console.log('Net Amount (after fee):', balanceTransaction.net / 100);
-    // console.log('Transaction Currency:', balanceTransaction.currency);
-    // console.log('Exchange Rate (USD -> GBP):', balanceTransaction.exchange_rate);
+    // this.logger.log('Gross Amount (before fee):', balanceTransaction.amount / 100);
+    // this.logger.log('Fee taken by Stripe:', balanceTransaction.fee / 100);
+    // this.logger.log('Net Amount (after fee):', balanceTransaction.net / 100);
+    // this.logger.log('Transaction Currency:', balanceTransaction.currency);
+    // this.logger.log('Exchange Rate (USD -> GBP):', balanceTransaction.exchange_rate);
     return balanceTransaction;
   }
   async getStripeSessionId(sessionId) {
-    console.log('getStripeSessionId(sessionId)', sessionId);
+    this.logger.log('getStripeSessionId(sessionId)', sessionId);
     const session = await this.stripe.checkout.sessions.retrieve(sessionId);
     return session;
   }
   async getStripeIntent(intent_id) {
-    console.log('getStripeIntent(intent_id)', intent_id);
+    this.logger.log('getStripeIntent(intent_id)', intent_id);
     const intent = await this.stripe.paymentIntents.retrieve(intent_id);
-    console.log('INTENT:', intent);
+    this.logger.log('INTENT:', intent);
     return intent;
   }
   async getStripeLatestChargeId(sessionId) {
-    console.log('getStripeLatestChargeId(sessionId)', sessionId);
+    this.logger.log('getStripeLatestChargeId(sessionId)', sessionId);
     const intent_id = (await this.getStripeSessionId(sessionId)).payment_intent;
     const latest_charge = (await this.getStripeIntent(intent_id)).latest_charge;
     return latest_charge;
@@ -379,7 +387,7 @@ export class DehubPayService {
       const balanceChargeTnx = await this.stripeLatestCharge(balanceTnx.balanceTransactionId);
       return { ...balanceChargeTnx };
     } catch (error) {
-     throw new Error(error)
+      throw new Error(error);
     }
   }
   async coingeckoGetPrice(tokenSymbol: string, currency: string, amount?: number, chainId?: number) {
@@ -397,7 +405,7 @@ export class DehubPayService {
         [ChainId.BASE_MAINNET]: 'base',
         [ChainId.BSC_MAINNET]: 'binancecoin',
         [ChainId.BSC_TESTNET]: 'binancecoin',
-      }; 
+      };
       const price = response.data?.[tokenSymbol]?.[currency.toLowerCase()] ?? 0;
 
       if (price === 0) {
@@ -446,7 +454,7 @@ export class DehubPayService {
 
       return priceData;
     } catch (error) {
-      console.log(error);
+      this.logger.error(JSON.stringify(error));
       this.logger.error(`Error fetching price for ${tokenSymbol} in ${currency}: ${error.message}`);
       throw error;
     }
@@ -487,7 +495,7 @@ export class DehubPayService {
 
       return priceData;
     } catch (err) {
-      console.error(`Error fetching price for ${platformId}:`, err);
+      this.logger.error(`Error fetching price for ${platformId}:`, err);
       return { platform: platformId, price: 0, url };
     }
   }
@@ -514,7 +522,8 @@ export class DehubPayService {
               const balance = await getERC20TokenBalance(address, token.address, token.chainId);
               return { chainId: token.chainId, symbol: token.symbol, balance, account: address };
             } catch (error) {
-              console.log(error);
+              this.logger.error(JSON.stringify(error));
+
               this.logger?.warn?.(`Error fetching ${token.symbol} balance on chain ${token.chainId}: ${error.message}`);
               return { chainId: token.chainId, symbol: token.symbol, balance: 0, account: address };
             }
@@ -580,15 +589,13 @@ export class DehubPayService {
   async verifyTransactionStatus(sessionId: string) {
     try {
       const session = await this.stripe.checkout.sessions.retrieve(sessionId);
-
-      console.log('session', session);
       if (session.payment_status === 'paid') {
         return true;
       } else {
         return false;
       }
     } catch (error) {
-      console.error('Error verifying transaction:', error.message);
+      this.logger.error('Error verifying transaction:', error.message);
       return false;
     }
   }
@@ -621,22 +628,22 @@ export class DehubPayService {
   }
   async updateTokenSendStatus(sessionId: string, updates: Partial<any>) {
     const { $inc, ...setFields } = updates as any;
-  
+
     const updateOps: any = {
       $set: setFields,
     };
-  
+
     if ($inc) {
       updateOps.$inc = $inc;
     }
-  
+
     return DpayTnxModel.updateOne({ sessionId }, updateOps);
   }
   async handlePaymentIntentCreated(intent) {
     const sessionId = await this.getStripeSession(intent.id);
     if (!sessionId) {
       // throw Error('Session Id Required');
-      console.log('handlePaymentIntentCreated Session Id not Attached');
+      this.logger.log('handlePaymentIntentCreated Session Id not Attached');
       return;
     }
     await DpayTnxModel.findOneAndUpdate(
@@ -662,16 +669,15 @@ export class DehubPayService {
       },
       { new: true },
     );
-    console.log({ sessionId, intent, tnx });
 
-    console.log('handlePaymentIntentSucceeded sessionId', sessionId);
+    this.logger.log('handlePaymentIntentSucceeded sessionId', sessionId);
   }
   // Handling Payment Intent Failed
   async handlePaymentIntentFailed(intent) {
     try {
       const sessionId = await this.getStripeSession(intent.id);
       if (!sessionId) {
-        console.log('handlePaymentIntentFailed: Session ID not found');
+        this.logger.log('handlePaymentIntentFailed: Session ID not found');
         return;
       }
 
@@ -687,64 +693,64 @@ export class DehubPayService {
         },
         { new: true },
       );
-      console.log('Payment Intent Failed', { sessionId, intent, tnx });
+      this.logger.log('Payment Intent Failed', { sessionId, intent, tnx });
     } catch (error) {
-      console.error('Error in handlePaymentIntentFailed:', error);
+      this.logger.error('Error in handlePaymentIntentFailed:', error);
     }
   }
   async handleChargeSucceeded(intent) {
     const sessionId = await this.getStripeSession(intent.id);
     if (!sessionId) {
       // throw Error('Session Id Required');
-      console.log('handleChargeSucceeded Session Id not Attached');
+      this.logger.log('handleChargeSucceeded Session Id not Attached');
     }
     DpayTnxModel.findOneAndUpdate(
       { $or: [{ sessionId }, { sessionId: intent.id }] },
       { $set: { isChargeSucceeded: true } },
     );
-    console.log('handleChargeSucceeded sessionId', sessionId);
+    this.logger.log('handleChargeSucceeded sessionId', sessionId);
   }
   async handleChargeFailed(intent) {
     const sessionId = await this.getStripeSession(intent.id);
     if (!sessionId) {
       // throw Error('Session Id Required');
-      console.log('handleChargeFailed Session Id not Attached');
+      this.logger.log('handleChargeFailed Session Id not Attached');
     }
     DpayTnxModel.findOneAndUpdate(
       { $or: [{ sessionId }, { sessionId: intent.id }] },
       { $set: { isChargeFailed: true } },
     );
-    console.log('handleChargeFailed sessionId', sessionId);
+    this.logger.log('handleChargeFailed sessionId', sessionId);
   }
   async handleChargeRefunded(intent) {
     const sessionId = await this.getStripeSession(intent.id);
     if (!sessionId) {
       // throw Error('Session Id Required');
-      console.log('handleChargeRefunded Session Id not Attached');
+      this.logger.log('handleChargeRefunded Session Id not Attached');
     }
     DpayTnxModel.findOneAndUpdate(
       { $or: [{ sessionId }, { sessionId: intent.id }] },
       { $set: { isChargeRefunded: true } },
     );
 
-    console.log('handleChargeRefunded sessionId', sessionId);
+    this.logger.log('handleChargeRefunded sessionId', sessionId);
   }
   async handlePaymentMethodAttached(intent) {
     const sessionId = await this.getStripeSession(intent.id);
     if (!sessionId) {
       // throw Error('Session Id Required');
-      console.log('handlePaymentMethodAttached Session Id not Attached');
+      this.logger.log('handlePaymentMethodAttached Session Id not Attached');
     }
     DpayTnxModel.findOneAndUpdate(
       { $or: [{ sessionId }, { sessionId: intent.id }] },
       { $set: { idPaymentMethodAttached: true } },
     );
-    console.log('handlePaymentMethodAttached sessionId', sessionId);
+    this.logger.log('handlePaymentMethodAttached sessionId', sessionId);
   }
   async handleCheckoutSessionCompleted(intent) {
     const sessionId = await this.getStripeSession(intent.id);
     // getStripeIntent()
-    console.log('handleCheckoutSessionCompleted', intent);
+    this.logger.log('handleCheckoutSessionCompleted', intent);
     const latest_charge = await this.getStripeLatestChargeId(intent.id);
     const tnx = await DpayTnxModel.findOneAndUpdate(
       { $or: [{ sessionId }, { sessionId: intent.id }] },
@@ -773,12 +779,11 @@ export class DehubPayService {
   async createOnrampSession(req, res) {
     try {
       const { transaction_details } = req.body;
-      console.log('A');
+
       const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
       const stripeCrypto = new Stripe(stripeSecretKey, {
         apiVersion: '2025-03-31.basil',
       });
-      console.log('B');
 
       const OnrampSessionResource = Stripe.StripeResource.extend({
         create: Stripe.StripeResource.method({
@@ -786,7 +791,6 @@ export class DehubPayService {
           path: 'crypto/onramp_sessions',
         }),
       });
-      console.log('C');
 
       // Create an OnrampSession with the order amount and currency
       const onrampSession: any = await new OnrampSessionResource(stripeCrypto).create({
@@ -797,7 +801,6 @@ export class DehubPayService {
         },
         customer_ip_address: req.socket.remoteAddress,
       });
-      console.log('D');
 
       res.send({
         clientSecret: onrampSession.client_secret,
@@ -908,7 +911,7 @@ export class DehubPayService {
       return newTicket;
     } catch (error) {
       // Handle errors (e.g., logging or throwing a custom error)
-      console.error('Error creating ticket:', error);
+      this.logger.error('Error creating ticket:', error);
       throw new Error('Failed to create ticket');
     }
   }
@@ -933,7 +936,7 @@ export class DehubPayService {
       const quote = response.data;
       return quote;
     } catch (error) {
-      console.error('Error fetching FX quote:', error?.response?.data || error.message);
+      this.logger.error('Error fetching FX quote:', error?.response?.data || error.message);
       throw new Error('Could not fetch FX quote from Stripe');
     }
   }
@@ -961,5 +964,23 @@ export class DehubPayService {
       netGBP: parseFloat(netGBP.toFixed(6)),
       toCurrency: quote.to_currency,
     };
+  }
+  async syncChargesFromStripe(tx) {
+    const tnx = await this.stripeLatestChargeByIntentOrSessionId(tx.sessionId);
+    if (!tnx || !tnx.net) {
+      return;
+    }
+    // If all already set, skip updating
+    if (tx?.fee != null && tx?.net != null && tx?.exchange_rate != null) {
+      this.logger.log(`syncChargesFromStripe: Skipping update for sessionId=${tx.sessionId} - already synced`);
+      return;
+    }
+    // Log before update
+    this.logger.log(`syncChargesFromStripe: Updating fee/net/exchange_rate for sessionId=${tx.sessionId}`);
+    await this.updateTransaction(tx.sessionId, {
+      fee: tnx.fee / 100,
+      net: tnx.net / 100,
+      exchange_rate: tnx.exchange_rate,
+    });
   }
 }

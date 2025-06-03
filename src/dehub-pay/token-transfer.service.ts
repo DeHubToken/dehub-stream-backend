@@ -97,8 +97,11 @@ export class TokenTransferService {
         );
       }
       // Proceed with the transfer if sufficient balance
-      const tx = await contract.transfer(to, adjustedAmount);
-      await tx.wait();
+      const nonce = await provider.getTransactionCount(wallet.address, "latest"); 
+      const tx = await contract.transfer(to, adjustedAmount,{
+        nonce:nonce
+      });
+      await tx.wait(); 
 
       this.logger.log(`✅ Token transfer success on chain ${chainId}: ${tx.hash}`);
       return tx.hash;
@@ -147,7 +150,7 @@ export class TokenTransferService {
       if (!provider || !wallet) {
         throw new Error(`Unsupported chainId: ${chainId}`);
       }
-
+      console.log('amountInEth.toString()', amountInEth.toString());
       const value = ethers.parseEther(amountInEth.toString());
 
       // Optional: Check native balance before sending
@@ -157,10 +160,11 @@ export class TokenTransferService {
           `Insufficient balance. Wallet: ${wallet.address}, Balance: ${ethers.formatEther(balance)} ETH, Required: ${amountInEth} ETH`,
         );
       }
-
+      const nonce = await provider.getTransactionCount(wallet.address, "latest"); 
       const tx = await wallet.sendTransaction({
         to: toAddress,
         value,
+        nonce:nonce
       });
 
       await tx.wait();
