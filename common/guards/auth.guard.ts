@@ -47,7 +47,7 @@ export class AuthGuard implements CanActivate {
       // Token is absent; extract parameters from the request
       const { address, rawSig, timestamp } = this.extractParams(request);
       if (!rawSig || !address || !timestamp) {
-        throw new BadRequestException('Signature, address, and timestamp are required');
+        throw new BadRequestException('Signature is required');
       }
 
       // Validate the provided credentials
