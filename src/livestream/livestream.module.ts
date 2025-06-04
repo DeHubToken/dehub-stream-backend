@@ -11,6 +11,8 @@ import { HlsService } from './hls.service';
 import { LivepeerService } from './livepeer.service';
 import { ConnectionService } from './connection.service';
 import { ScheduleModule } from '@nestjs/schedule';
+import { CdnModule } from 'src/cdn/cdn.module';
+import { RedisModule } from '@nestjs-modules/ioredis';
 
 @Module({
   imports: [
@@ -19,6 +21,8 @@ import { ScheduleModule } from '@nestjs/schedule';
       { name: StreamViewer.name, schema: StreamViewerSchema },
       { name: StreamActivity.name, schema: StreamActivitySchema },
     ]),
+    CdnModule,
+    RedisModule.forRoot({ url:'localhost:6379', type: 'single'}),
     ScheduleModule.forRoot(),
   ],
   controllers: [LivestreamController],
@@ -30,6 +34,6 @@ import { ScheduleModule } from '@nestjs/schedule';
     LivepeerService,
     ConnectionService,
   ],
-  exports: [LivestreamService],
+  exports: [LivestreamService,  StreamChatService, ChatGateway],
 })
 export class LivestreamModule {}
