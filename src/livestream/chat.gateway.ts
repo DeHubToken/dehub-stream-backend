@@ -17,10 +17,12 @@ import { Interval } from '@nestjs/schedule';
   cors: {
     origin: '*',
     path: 'socket.io',
-    // origin: process.env.FRONTEND_URL, // Update your .env FRONTEND_URL variable
+    credentials: true,
   },
   pingInterval: 10000, // 10 seconds
   pingTimeout: 5000,   // 5 seconds
+  transports: ['websocket', 'polling'],
+  allowUpgrades: true,
 })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
@@ -44,74 +46,104 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   async handleConnection(client: Socket) {
-    console.log(`Client connected: ${client.id}`);
+    try {
+      console.log(`Client attempting connection: ${client.id}`);
+      
+      // Handle both auth methods (auth object and query params)
+      const authUser = client.handshake.auth?.user;
+      const queryAddress = client.handshake.query?.address as string;
 
-    const user = client.handshake.auth?.user;
-    if (!user) {
-      client.disconnect();
-      return;
+      // If no auth user but has address in query, create basic user object
+      const user = authUser || (queryAddress ? { address: queryAddress } : null);
+
+      if (!user) {
+        console.log(`Client ${client.id} connected without authentication`);
+        // Don't disconnect - allow anonymous connections
+        client.data.user = { address: null, isAnonymous: true };
+        return;
+      }
+
+      client.data.user = {
+        ...user,
+        isAnonymous: false
+      };
+
+      console.log(`User connected: ${user.username || user.address}`);
+
+      // Track connection in Redis only for authenticated users
+      if (user.address) {
+        await this.connectionService.trackConnection(client.id, user.address);
+
+        // Clear any pending disconnect timer
+        const disconnectTimer = this.disconnectTimers.get(user.address);
+        if (disconnectTimer) {
+          clearTimeout(disconnectTimer);
+          this.disconnectTimers.delete(user.address);
+        }
+
+        // Restore user sessions
+        await this.restoreUserSession(client, user);
+
+        // Emit online users update
+        this.emitOnlineUsers();
+      }
+    } catch (error) {
+      console.error('Error in handleConnection:', error);
+      // Don't disconnect on error, just log it
     }
-
-    client.data.user = user;
-    console.log(`User connected: ${user.username || user.address}`);
-
-    // Track connection in Redis
-    await this.connectionService.trackConnection(client.id, user.address);
-
-    // Clear any pending disconnect timer
-    const disconnectTimer = this.disconnectTimers.get(user.address);
-    if (disconnectTimer) {
-      clearTimeout(disconnectTimer);
-      this.disconnectTimers.delete(user.address);
-    }
-
-    // Restore user sessions
-    await this.restoreUserSession(client, user);
   }
 
   async handleDisconnect(client: Socket) {
-    const user = client.data.user;
-    if (!user) {
-      console.warn('Disconnected client had no associated user.');
-      return;
+    try {
+      const user = client.data.user;
+      if (!user || user.isAnonymous) {
+        return;
+      }
+
+      console.log(`Client disconnected: ${client.id} -- ${user.address}`);
+
+      // Set a timer for final cleanup if no reconnection occurs
+      const timer = setTimeout(async () => {
+        await this.handleFinalDisconnect(client, user);
+        this.disconnectTimers.delete(user.address);
+        // Emit online users update after disconnect
+        this.emitOnlineUsers();
+      }, this.reconnectTimeout);
+
+      this.disconnectTimers.set(user.address, timer);
+
+      // Remove the connection from tracking
+      await this.connectionService.removeConnection(client.id, user.address);
+    } catch (error) {
+      console.error('Error in handleDisconnect:', error);
     }
-
-    console.log(`Client disconnected: ${client.id} -- ${user.address}`);
-
-    // Set a timer for final cleanup if no reconnection occurs
-    const timer = setTimeout(async () => {
-      await this.handleFinalDisconnect(client, user);
-      this.disconnectTimers.delete(user.address);
-    }, this.reconnectTimeout);
-
-    this.disconnectTimers.set(user.address, timer);
-
-    // Remove the connection from tracking
-    await this.connectionService.removeConnection(client.id, user.address);
   }
 
-  private async handleFinalDisconnect(client: Socket, user: any) {
-    // Check if user was streaming
-    const activeStream = await this.livestreamService.getActiveStreamByUser(user.address);
-    if (activeStream) {
-      console.log(`Streamer ${user.address} disconnected from stream ${activeStream.id}. Stream will be ended by Livepeer webhook if no reconnection occurs.`);
-      // Leave the stream room but don't end the stream - Livepeer webhook will handle that
-      await client.leave(`stream:${activeStream.id}`);
-    }
+  private async emitOnlineUsers() {
+    try {
+      // Get all unique user addresses from active connections
+      const sockets = await this.server.sockets.sockets;
+      const onlineUsers = Array.from(sockets.values())
+        .map(socket => socket.data.user?.address)
+        .filter(address => address) // Filter out null/undefined addresses
+        .filter((address, index, self) => self.indexOf(address) === index); // Remove duplicates
 
-    // Handle viewers leaving streams
-    const activeViewStreams = await this.livestreamService.getStreamsByViewer(user.address);
-    for (const stream of activeViewStreams) {
-      await this.handleLeaveStream(client, { streamId: stream.id });
+      // Emit to all connected clients
+      this.server.emit('update-online-users', onlineUsers);
+    } catch (error) {
+      console.error('Error emitting online users:', error);
     }
-
-    // Clean up all user sessions
-    await this.connectionService.cleanupUserSessions(user.address);
   }
 
   @SubscribeMessage('heartbeat')
   async handleHeartbeat(@ConnectedSocket() client: Socket) {
-    await this.connectionService.updateHeartbeat(client.id);
+    try {
+      if (client.data.user?.address) {
+        await this.connectionService.updateHeartbeat(client.id);
+      }
+    } catch (error) {
+      console.error('Error in handleHeartbeat:', error);
+    }
   }
 
   @UseGuards(WsAuthGuard)
@@ -233,5 +265,28 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async cleanupStaleConnections() {
     // This will be handled by Redis TTL automatically
     // We might add additional cleanup logic here if needed
+  }
+
+  private async handleFinalDisconnect(client: Socket, user: any) {
+    try {
+      // Check if user was streaming
+      const activeStream = await this.livestreamService.getActiveStreamByUser(user.address);
+      if (activeStream) {
+        console.log(`Streamer ${user.address} disconnected from stream ${activeStream.id}. Stream will be ended by Livepeer webhook if no reconnection occurs.`);
+        // Leave the stream room but don't end the stream - Livepeer webhook will handle that
+        await client.leave(`stream:${activeStream.id}`);
+      }
+
+      // Handle viewers leaving streams
+      const activeViewStreams = await this.livestreamService.getStreamsByViewer(user.address);
+      for (const stream of activeViewStreams) {
+        await this.handleLeaveStream(client, { streamId: stream.id });
+      }
+
+      // Clean up all user sessions
+      await this.connectionService.cleanupUserSessions(user.address);
+    } catch (error) {
+      console.error('Error in handleFinalDisconnect:', error);
+    }
   }
 }
