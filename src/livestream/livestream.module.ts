@@ -1,18 +1,16 @@
 import { Module } from '@nestjs/common';
-import { LivestreamService } from './livestream.service';
 import { LivestreamController } from './livestream.controller';
+import { LivestreamService } from './livestream.service';
 import { MongooseModule } from '@nestjs/mongoose';
 import { LiveStream, LiveStreamSchema } from 'models/LiveStream';
 import { StreamViewer, StreamViewerSchema } from 'models/LiveStreamViewer';
-import { StreamChatService } from './chat.service';
 import { StreamActivity, StreamActivitySchema } from 'models/LiveStreamActivity';
-import { RedisModule } from '@nestjs-modules/ioredis';
-import { CdnModule } from 'src/cdn/cdn.module';
-import { HlsService } from './hls.service';
-import { NmsStreamingService } from './nms.service';
 import { ChatGateway } from './chat.gateway';
-import { MuxService } from './mux.service';
+import { StreamChatService } from './chat.service';
+import { HlsService } from './hls.service';
 import { LivepeerService } from './livepeer.service';
+import { ConnectionService } from './connection.service';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -21,13 +19,17 @@ import { LivepeerService } from './livepeer.service';
       { name: StreamViewer.name, schema: StreamViewerSchema },
       { name: StreamActivity.name, schema: StreamActivitySchema },
     ]),
-    CdnModule,
-    RedisModule.forRoot({ url:'localhost:6379', type: 'single'})
+    ScheduleModule.forRoot(),
   ],
   controllers: [LivestreamController],
-  providers: [LivestreamService, StreamChatService, HlsService, ChatGateway, LivepeerService
-    // , NmsStreamingService, MuxService
+  providers: [
+    LivestreamService,
+    ChatGateway,
+    StreamChatService,
+    HlsService,
+    LivepeerService,
+    ConnectionService,
   ],
-  exports: [LivestreamService, StreamChatService, ChatGateway]
+  exports: [LivestreamService],
 })
 export class LivestreamModule {}
