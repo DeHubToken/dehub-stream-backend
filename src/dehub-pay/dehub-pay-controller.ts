@@ -115,6 +115,7 @@ export class DehubPayController {
     @Body('tokenSymbol') tokenSymbol: string = 'DHB',
     @Body('receiverAddress') receiverAddress: number = 0,
     @Body('amount') amount: number = 0,
+    @Body('termsAndServicesAccepted') termsAndServicesAccepted: boolean = false,
     @Body('tokensToReceive') tokensToReceive: number = 0,
     @Body('redirect') redirect: string = process.env.FRONT_END_URL,
     @Res() res: Response,
@@ -147,6 +148,7 @@ export class DehubPayController {
         tokenSymbol,
         currency,
         tokenId,
+        termsAndServicesAccepted
       });
 
       // Step 3: Return the session id and redirect URL
