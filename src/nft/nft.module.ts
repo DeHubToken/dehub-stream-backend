@@ -10,8 +10,8 @@ import { LiveStream, LiveStreamSchema } from 'models/LiveStream';
 @Module({
   controllers: [NFTController],
   providers: [
-    NftService,
-     NftIndexer
+    NftService
+    // , NftIndexer
     ],
   imports:[
     CdnModule,
