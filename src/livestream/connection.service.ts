@@ -4,9 +4,10 @@ import Redis from 'ioredis';
 
 @Injectable()
 export class ConnectionService {
-  private readonly HEARTBEAT_EXPIRY = 30; // seconds
+  private readonly HEARTBEAT_EXPIRY = 60; 
   private readonly CONNECTION_KEY_PREFIX = 'ws:connection:';
   private readonly USER_SESSIONS_PREFIX = 'ws:user:';
+  private readonly VIEWER_PREFIX = 'stream:viewer:';
 
   constructor(@InjectRedis() private readonly redis: Redis) {}
 
@@ -39,10 +40,31 @@ export class ConnectionService {
   }
 
   async updateHeartbeat(clientId: string) {
-    await this.redis.expire(
-      `${this.CONNECTION_KEY_PREFIX}${clientId}`,
-      this.HEARTBEAT_EXPIRY
-    );
+    try {
+      const userId = await this.redis.get(`${this.CONNECTION_KEY_PREFIX}${clientId}`);
+      if (!userId) {
+        console.warn(`No user found for client ${clientId} during heartbeat update`);
+        return;
+      }
+
+      const multi = this.redis.multi();
+      
+      // Update connection expiry
+      multi.expire(
+        `${this.CONNECTION_KEY_PREFIX}${clientId}`,
+        this.HEARTBEAT_EXPIRY
+      );
+
+      // Update any active viewer sessions
+      const viewerKeys = await this.redis.keys(`${this.VIEWER_PREFIX}*:${userId}`);
+      for (const key of viewerKeys) {
+        multi.expire(key, this.HEARTBEAT_EXPIRY);
+      }
+
+      await multi.exec();
+    } catch (error) {
+      console.error('Error updating heartbeat:', error);
+    }
   }
 
   async getUserActiveSessions(userId: string): Promise<string[]> {
@@ -68,7 +90,29 @@ export class ConnectionService {
     
     // Remove user's session set
     multi.del(`${this.USER_SESSIONS_PREFIX}${userId}`);
+
+    // Remove any viewer records
+    const viewerKeys = await this.redis.keys(`${this.VIEWER_PREFIX}*:${userId}`);
+    for (const key of viewerKeys) {
+      multi.del(key);
+    }
     
     await multi.exec();
+  }
+
+  async trackViewer(streamId: string, userId: string) {
+    const key = `${this.VIEWER_PREFIX}${streamId}:${userId}`;
+    await this.redis.setex(key, this.HEARTBEAT_EXPIRY, '1');
+  }
+
+  async removeViewer(streamId: string, userId: string) {
+    const key = `${this.VIEWER_PREFIX}${streamId}:${userId}`;
+    await this.redis.del(key);
+  }
+
+  async isViewerActive(streamId: string, userId: string): Promise<boolean> {
+    const key = `${this.VIEWER_PREFIX}${streamId}:${userId}`;
+    const exists = await this.redis.exists(key);
+    return exists === 1;
   }
 } 

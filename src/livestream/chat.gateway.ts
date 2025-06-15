@@ -167,37 +167,69 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @UseGuards(WsAuthGuard)
   @SubscribeMessage(LivestreamEvents.JoinStream)
   async handleJoinStream(@ConnectedSocket() client: Socket, @MessageBody() data: { streamId: string }) {
-    console.log(' Joining strean');
-    const user = client.data.user;
-    await client.join(`stream:${data.streamId}`);
-    await this.livestreamService.addViewer(data.streamId, user.address);
+    try {
+      const user = client.data.user;
+      if (!user?.address) return;
 
-    this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.JoinStream, {
-      viewerCount: await this.livestreamService.getViewerCount(data.streamId),
-      user: { address: user.address, username: user.username || user.address },
-    });
+      console.log('Joining stream:', data.streamId);
+      await client.join(`stream:${data.streamId}`);
+      
+      // Track viewer in Redis
+      await this.connectionService.trackViewer(data.streamId, user.address);
+      
+      // Add viewer to database
+      await this.livestreamService.addViewer(data.streamId, user.address);
 
-    this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.ViewCountUpdate, {
-      viewerCount: await this.livestreamService.getViewerCount(data.streamId),
-    });
+      const viewerCount = await this.livestreamService.getViewerCount(data.streamId);
+      
+      this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.JoinStream, {
+        viewerCount,
+        user: { address: user.address, username: user.username || user.address },
+      });
+
+      this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.ViewCountUpdate, {
+        viewerCount,
+      });
+    } catch (error) {
+      console.error('Error in handleJoinStream:', error);
+    }
   }
 
   @UseGuards(WsAuthGuard)
   @SubscribeMessage(LivestreamEvents.LeaveStream)
   async handleLeaveStream(@ConnectedSocket() client: Socket, @MessageBody() data: { streamId: string }) {
-    const user = client.data.user;
-    await client.leave(`stream:${data.streamId}`);
-    await this.livestreamService.removeViewer(data.streamId, user.address);
+    try {
+      const user = client.data.user;
+      if (!user?.address) return;
 
-    this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.LeaveStream, {
-      viewerCount: await this.livestreamService.getViewerCount(data.streamId),
-      user: { address: user.address, username: user.username || user.address },
-    });
+      // Check if user is actually active in the stream
+      const isActive = await this.connectionService.isViewerActive(data.streamId, user.address);
+      if (!isActive) {
+        console.log(`User ${user.address} already left stream ${data.streamId}`);
+        return;
+      }
 
-    // Emit viewer count update
-    this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.ViewCountUpdate, {
-      viewerCount: await this.livestreamService.getViewerCount(data.streamId),
-    });
+      await client.leave(`stream:${data.streamId}`);
+      
+      // Remove viewer from Redis
+      await this.connectionService.removeViewer(data.streamId, user.address);
+      
+      // Remove viewer from database
+      await this.livestreamService.removeViewer(data.streamId, user.address);
+
+      const viewerCount = await this.livestreamService.getViewerCount(data.streamId);
+
+      this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.LeaveStream, {
+        viewerCount,
+        user: { address: user.address, username: user.username || user.address },
+      });
+
+      this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.ViewCountUpdate, {
+        viewerCount,
+      });
+    } catch (error) {
+      console.error('Error in handleLeaveStream:', error);
+    }
   }
 
   @UseGuards(WsAuthGuard)
@@ -261,10 +293,26 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     console.log(`User ${client.data.user.address} converting to viewer after stream end.`);
   }
 
-  @Interval(15000) // Run every 15 seconds
+  @Interval(30000) // Run every 30 seconds
   async cleanupStaleConnections() {
-    // This will be handled by Redis TTL automatically
-    // We might add additional cleanup logic here if needed
+    try {
+      // Get all active connections
+      const sockets = await this.server.sockets.sockets;
+      
+      for (const [clientId, socket] of sockets.entries()) {
+        const user = socket.data.user;
+        if (!user?.address) continue;
+
+        // Check if connection is still active in Redis
+        const isActive = await this.connectionService.isConnectionActive(clientId);
+        if (!isActive) {
+          console.log(`Cleaning up stale connection for user ${user.address}`);
+          await this.handleFinalDisconnect(socket, user);
+        }
+      }
+    } catch (error) {
+      console.error('Error in cleanupStaleConnections:', error);
+    }
   }
 
   private async handleFinalDisconnect(client: Socket, user: any) {
