@@ -11,12 +11,13 @@ import { LangSmithService } from '../tracing/langsmith.service';
 export class EmbeddingService {
   private readonly logger = new Logger(EmbeddingService.name);
   private readonly togetherClient: Together;
-  private readonly embeddingModel: string = 'BAAI/bge-large-en-v1.5';
+  private readonly embeddingModel: string;
 
   constructor(
     private configService: ConfigService,
     private langsmithService: LangSmithService,
   ) {
+    this.embeddingModel = this.configService.get<string>('EMBEDDING_MODEL');
     const apiKey = this.configService.get<string>('TOGETHER_API_KEY');
 if (!apiKey) {
   this.logger.error('TOGETHER_API_KEY not found in environment variables');
