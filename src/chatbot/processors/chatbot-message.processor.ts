@@ -30,7 +30,7 @@ interface MessageProcessingJobData {
 export class ChatbotMessageProcessor {
   private readonly logger = new Logger(ChatbotMessageProcessor.name);
   private readonly llm: ChatOpenAI;
-  private readonly llmModel: string = 'meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo';
+  private readonly llmModel: string ;
   private readonly standardPrompt: ChatPromptTemplate;
   private readonly conversationalPrompt: ChatPromptTemplate;
 
@@ -46,6 +46,7 @@ export class ChatbotMessageProcessor {
   ) {
     // Initialize LLM for fallback scenarios only
     const apiKey = this.configService.get<string>('TOGETHER_API_KEY');
+    this.llmModel = this.configService.get<string>('AI_LLM_MODEL');
     if (apiKey) {
       this.llm = new ChatOpenAI({
         openAIApiKey: apiKey,

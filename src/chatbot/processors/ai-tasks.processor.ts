@@ -36,7 +36,7 @@ export class AITasksProcessor {
     this.togetherApiKey = this.configService.get<string>('TOGETHER_API_KEY');
     
     // Get model config
-    this.defaultModel = this.configService.get<string>('AI_VISION_MODEL') || 'meta-llama/Llama-3.2-11B-Vision-Instruct-Turbo';
+    this.defaultModel = this.configService.get<string>('AI_VISION_MODEL');
     
     // Verify that API key is available
     if (!this.togetherApiKey) {

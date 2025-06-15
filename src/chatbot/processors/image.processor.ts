@@ -29,6 +29,7 @@ export class ImageProcessor {
   private readonly isProd: boolean;
   private readonly localImagesDir: string;
   private readonly apiKey: string | undefined;
+  private readonly model: string;
 
   constructor(
     @InjectModel(ChatMessage.name) private chatMessageModel: Model<ChatMessageDocument>,
@@ -41,7 +42,7 @@ export class ImageProcessor {
     this.isProd = this.configService.get<string>('NODE_ENV') === 'production';
     this.localImagesDir = path.join(process.cwd(), 'docs', 'images');
     this.apiKey = this.configService.get<string>('TOGETHER_API_KEY');
-    
+    this.model = this.configService.get<string>('AI_IMAGE_MODEL');
     // Ensure local images directory exists in development mode
     if (!this.isProd && !fs.existsSync(this.localImagesDir)) {
       fs.mkdirSync(this.localImagesDir, { recursive: true });
@@ -208,7 +209,7 @@ export class ImageProcessor {
           'Authorization': `Bearer ${this.apiKey}`
         },
         body: JSON.stringify({
-          model: 'black-forest-labs/FLUX.1-schnell-Free',
+          model: this.model,
           prompt: prompt,
           steps: 4, // Steps must be between 1 and 4
           n: 1 // Generate 1 image
