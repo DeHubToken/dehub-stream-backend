@@ -31,7 +31,9 @@ export class DpayTnx {
   @Prop()
   isChargeSucceeded: boolean;
   @Prop()
-  isChargeRefunded: boolean;
+  isChargeRefunded: boolean; 
+  @Prop()
+  termsAndServicesAccepted: boolean;
   @Prop()
   idPaymentMethodAttached: boolean;
   @Prop()

@@ -148,6 +148,7 @@ export class DehubPayService {
     tokenSymbol,
     currency,
     tokenId,
+    termsAndServicesAccepted
   }) {
     try {
       const user = await AccountModel.findOne({ address: address.toLowerCase() });
@@ -166,6 +167,7 @@ export class DehubPayService {
         type: 'buy_token',
         receiverAddress,
         approxTokensToReceive: tokensToReceive,
+        termsAndServicesAccepted
       });
 
       await transaction.save();
@@ -243,7 +245,7 @@ export class DehubPayService {
             message: 'Click to confirm your token purchase',
           },
           terms_of_service_acceptance: {
-            message: "By continuing, you agree to DeHub's token terms and conditions.",
+            message: "By continuing, you agree to DeHub Terms and Service.",
           },
         },
         consent_collection: {
