@@ -19,13 +19,25 @@ interface ValidationResult {
 export function validatePurchaseInput(body: any): ValidationResult {
   const errors: { status: number; message: string }[] = [];
 
-  let { chainId, tokenSymbol, currency, tokensToReceive, amount } = body;
+  let { chainId, tokenSymbol, currency, tokensToReceive, termsAndServicesAccepted, amount } = body;
 
   // Type validations
   if (!chainId || typeof chainId !== 'number') {
     errors.push({
       status: HttpStatusCode.BadRequest,
       message: '`chainId` is required and must be a string.',
+    });
+  }
+  if (termsAndServicesAccepted === undefined || typeof termsAndServicesAccepted !== 'boolean') {
+    errors.push({
+      status: HttpStatusCode.BadRequest,
+      message: '`termsAndServicesAccepted` is required and must be a boolean.',
+    });
+  }
+  if (termsAndServicesAccepted === false) {
+    errors.push({
+      status: HttpStatusCode.BadRequest,
+      message: '`termsAndServicesAccepted` must be true to proceed.',
     });
   }
 

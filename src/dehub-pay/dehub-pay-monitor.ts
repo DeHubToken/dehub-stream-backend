@@ -13,6 +13,7 @@ export class DpayMonitor implements OnModuleInit {
     private readonly dehubPayService: DehubPayService,
     @InjectQueue('transactionQueue') private readonly transactionQueue: Queue,
   ) {
+
     this.clearAllJobs();
     this.reTryJobTokenTransfer();
   }
@@ -31,7 +32,7 @@ export class DpayMonitor implements OnModuleInit {
               status_stripe: { $in: ['pending', 'init'] },
               tokenSendStatus: 'not_sent',
               expires_at: { $lt: now },
-            }, 
+            },
           ],
         },
         {
@@ -54,7 +55,7 @@ export class DpayMonitor implements OnModuleInit {
    */
   @Cron(CronExpression.EVERY_MINUTE)
   async monitorStripePendingTransactions() {
-    this.logger.log('Checking for pending transactions...');
+    // this.logger.log('Checking for pending transactions...');
 
     try {
       const pendingTransactions = await this.dehubPayService.getTnxs(
@@ -85,19 +86,18 @@ export class DpayMonitor implements OnModuleInit {
   }
   @Cron(CronExpression.EVERY_5_SECONDS)
   async monitorStripeSuccessTransactions() {
-    this.logger.log('Checking for Success transactions...');
-
+    // this.logger.log('Checking for Success transactions...');
+    const pendingTransactions = await this.dehubPayService.getTnxs(
+      {
+        status_stripe: { $in: ['succeeded', 'complete'] },
+        $or: [{ tokenSendStatus: { $in: ['not_sent'] } }, { ethSendStatus: { $in: ['not_sent'] } }],
+      },
+      [{ $limit: 1 }],
+    );
     try {
-      const pendingTransactions = await this.dehubPayService.getTnxs(
-        {
-          status_stripe: { $in: ['succeeded', 'complete'] },
-          tokenSendStatus: { $in: ['not_sent'] },
-        },
-        [{ $limit: 1 }],
-      );
       for (const tx of pendingTransactions) {
         try {
-          await this.syncChargesFromStripe(tx);
+          await this.dehubPayService.syncChargesFromStripe(tx);
           this.addJobsBulk([
             {
               name: 'transferToken',
@@ -106,20 +106,29 @@ export class DpayMonitor implements OnModuleInit {
                 sid: tx.sessionId,
               },
               opts: {
-                jobId: `transferToken-${tx.sessionId}`, // unique identifier
+                // jobId: `transferToken-${tx.sessionId}`, // unique identifier
               },
             },
           ]);
-          await this.dehubPayService.updateTransaction(tx.sessionId, {
-            tokenSendStatus: 'processing',
-          });
-          this.logger.log('👇 Push job for token transfer', tx.sessionId);
+          if (tx.tokenSendStatus != 'sent') {
+            await this.dehubPayService.updateTransaction(tx.sessionId, {
+              tokenSendStatus: 'processing',
+            });
+          }
+          if (tx.ethSendStatus != 'sent') {
+            await this.dehubPayService.updateTransaction(tx.sessionId, {
+              ethSendStatus: 'processing',
+            });
+          }
+          this.logger.log('👇 Push job for token or gas transfer', tx.sessionId);
         } catch (error) {
           this.logger.error(error);
-          await this.dehubPayService.updateTransaction(tx.sessionId, {
-            tokenSendStatus: 'failed',
+          const failUpdate: any = {
             note: error.toString(),
-          });
+          };
+          if (tx.tokenSendStatus != 'sent') failUpdate.tokenSendStatus = 'failed';
+          if (tx.ethSendStatus != 'sent') failUpdate.ethSendStatus = 'failed';
+          await this.dehubPayService.updateTransaction(tx.sessionId, failUpdate);
         }
       }
     } catch (error) {
@@ -129,9 +138,7 @@ export class DpayMonitor implements OnModuleInit {
   @Cron(CronExpression.EVERY_5_MINUTES)
   async reTryJobTokenTransfer() {
     try {
-      // console.log('Retry Job: Starting update for failed or processing transactions...');
-
-      const result = await DpayTnxModel.updateMany(
+      const resultForToken = await DpayTnxModel.updateMany(
         {
           status_stripe: { $in: ['succeeded', 'complete'] },
           tokenSendStatus: { $in: ['processing', 'failed'] },
@@ -141,9 +148,25 @@ export class DpayMonitor implements OnModuleInit {
           $set: { tokenSendStatus: 'not_sent' },
         },
       );
-      if (result.modifiedCount != 0) {
-        console.log('Retry Job: Update result:', result);
-        console.log(`Retry Job: Matched ${result.matchedCount}, Modified ${result.modifiedCount}`);
+      if (resultForToken.modifiedCount != 0) {
+        console.log('Retry Job: Update resultForToken:', resultForToken);
+        console.log(`Retry Job: Matched ${resultForToken.matchedCount}, Modified ${resultForToken.modifiedCount}`);
+      }
+
+      const resultForGas = await DpayTnxModel.updateMany(
+        {
+          status_stripe: { $in: ['succeeded', 'complete'] },
+          tokenSendStatus: { $in: ['sent'] },
+          ethSendStatus: { $in: ['processing', 'failed'] },
+          tokenSendRetryCount: { $lt: 3 },
+        },
+        {
+          $set: { ethSendStatus: 'not_sent' },
+        },
+      );
+      if (resultForGas.modifiedCount != 0) {
+        console.log('Retry Job: Update resultForGas:', resultForGas);
+        console.log(`Retry Job: Matched ${resultForGas.matchedCount}, Modified ${resultForGas.modifiedCount}`);
       }
     } catch (error) {
       console.error('Retry Job: Error occurred while updating transactions:', error);
@@ -222,24 +245,5 @@ export class DpayMonitor implements OnModuleInit {
     }
 
     this.logger.log('✅ All jobs cleared from transactionQueue.');
-  }
-
-  async syncChargesFromStripe(tx) {
-    const tnx = await this.dehubPayService.stripeLatestChargeByIntentOrSessionId(tx.sessionId);
-    if (!tnx || !tnx.net) {
-      return;
-    }
-    // If all already set, skip updating
-    if (tx.fee != null && tx.net != null && tx.exchange_rate != null) {
-      console.log(`syncChargesFromStripe: Skipping update for sessionId=${tx.sessionId} - already synced`);
-      return;
-    }
-    // Log before update
-    console.log(`syncChargesFromStripe: Updating fee/net/exchange_rate for sessionId=${tx.sessionId}`);
-    await this.dehubPayService.updateTransaction(tx.sessionId, {
-      fee: tnx.fee / 100,
-      net: tnx.net / 100,
-      exchange_rate: tnx.exchange_rate,
-    });
   }
 }
