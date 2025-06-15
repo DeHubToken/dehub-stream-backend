@@ -118,13 +118,23 @@ export class CustomUserRateLimitGuard implements CanActivate {
         `Rate limit exceeded for user '${normalizedUserAddress}' on '${description}'. Limit: ${limit}/${ttl}ms. Requests: ${record.timestamps.length}`,
       );
       this.chatbotMetricsService.incrementCustomRateLimitBlocks(); 
+
+      let retryAfterSeconds = 1; // Default fallback
+      if (record.timestamps.length > 0) {
+        const oldestRequestTime = record.timestamps[0];
+        const windowEndTime = oldestRequestTime + ttl;
+        const waitMilliseconds = windowEndTime - now;
+        retryAfterSeconds = Math.max(1, Math.ceil(waitMilliseconds / 1000)); // En az 1 saniye
+      }
+
       if (type === 'ws' && clientSocket) {
         clientSocket.emit('error', { 
           event: rateLimitKey,
           code: 'TOO_MANY_REQUESTS',
           message: `Rate limit exceeded for ${description}. Please try again later.`,
           timestamp: new Date().toISOString(),
-          details: `Limit: ${limit} requests per ${ttl / 1000} seconds. Current: ${record.timestamps.length}`
+          details: `Limit: ${limit} requests per ${ttl / 1000} seconds. Current: ${record.timestamps.length}`,
+          retryAfterSeconds,
         });
         return false;
       }
@@ -133,7 +143,8 @@ export class CustomUserRateLimitGuard implements CanActivate {
             statusCode: HttpStatus.TOO_MANY_REQUESTS,
             message: `Rate limit exceeded for ${description}. Please try again later.`,
             error: "Too Many Requests",
-            details: `Limit: ${limit} requests per ${ttl / 1000} seconds. Current: ${record.timestamps.length}`
+            details: `Limit: ${limit} requests per ${ttl / 1000} seconds. Current: ${record.timestamps.length}`,
+            retryAfterSeconds,
         },
         HttpStatus.TOO_MANY_REQUESTS,
       );
