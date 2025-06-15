@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString, Validate, ValidationArguments, ValidatorConstraint, ValidatorConstraintInterface } from 'class-validator';
+import { IsOptional, IsString, Validate, ValidationArguments, ValidatorConstraint, ValidatorConstraintInterface, MaxLength, MinLength, IsUrl, IsNotEmpty, IsMongoId } from 'class-validator';
 
 // Custom validator to ensure exactly one of the fields is provided
 @ValidatorConstraint({ name: 'isExactlyOneOf', async: false })
@@ -45,17 +45,17 @@ export class IsBase64StringConstraint implements ValidatorConstraintInterface {
   
   private isBase64(str: string): boolean {
     // Regular expression to check if string is base64 encoded
-    const base64Regex = /^[A-Za-z0-9+/=]+$/;
+    const base64Regex = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
     
     // Check if it's a valid base64 pattern
     if (!base64Regex.test(str)) {
       return false;
     }
     
+    // Buffer.from itself can throw an error if the string is not valid base64 or is too long
+    // but the primary check is the regex and ensuring it re-encodes to the same value for padding validation
     try {
-      // Additional validation by trying to decode
-      const decoded = Buffer.from(str, 'base64').toString('base64');
-      return decoded === str;
+      return Buffer.from(str, 'base64').toString('base64') === str;
     } catch (e) {
       return false;
     }
@@ -68,16 +68,25 @@ export class IsBase64StringConstraint implements ValidatorConstraintInterface {
 
 export class AnalyzeImageDto {
   @IsString()
+  @IsNotEmpty({ message: 'Conversation ID is required' })
+  @IsMongoId({ message: 'Conversation ID must be a valid MongoDB ID' })
+  conversationId: string;
+
   @IsOptional()
+  @IsString()
+  @IsUrl({}, { message: 'Valid image URL is required' })
+  @MaxLength(2048, { message: 'Image URL is too long (maximum 2048 characters)' })
   imageUrl?: string;
 
-  @IsString()
   @IsOptional()
+  @IsString()
   @Validate(IsBase64StringConstraint)
   imageData?: string;  // Base64 encoded image
 
-  @IsString()
   @IsOptional()
+  @IsString()
+  @MinLength(1, { message: 'Prompt must be provided if provided' })
+  @MaxLength(1000, { message: 'Prompt must be less than 1000 characters' })
   prompt?: string;  // Optional prompt to guide the analysis
   
   // Class-level validation to ensure exactly one of imageUrl or imageData is provided
