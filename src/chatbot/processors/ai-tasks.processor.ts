@@ -9,6 +9,7 @@ import { ChatbotGateway } from '../chatbot.gateway';
 import { AI_SYSTEM_ADDRESS } from '../chatbot.service';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
+import { ChatbotMetricsService } from '../services/chatbot-metrics.service';
 
 interface ImageAnalysisJobData {
   userAddress: string;
@@ -30,6 +31,7 @@ export class AITasksProcessor {
     @InjectModel(Conversation.name) private conversationModel: Model<ConversationDocument>,
     private chatbotGateway: ChatbotGateway,
     private configService: ConfigService,
+    private chatbotMetricsService: ChatbotMetricsService,
   ) {
     this.togetherApiKey = this.configService.get<string>('TOGETHER_API_KEY');
     
@@ -120,6 +122,8 @@ export class AITasksProcessor {
         analysis: analysisResult,
       });
 
+      this.chatbotMetricsService.incrementImagesAnalyzed();
+
       this.logger.debug(`Image analysis for conversation ${conversationId} completed successfully`);
     } catch (error) {
       this.logger.error(
@@ -147,6 +151,8 @@ export class AITasksProcessor {
       } catch (e) {
         this.logger.error('Failed to send error notification', e);
       }
+      
+      this.chatbotMetricsService.incrementErrors();
       
       // Re-throw the error to allow Bull to mark the job as failed and handle retries
       throw error;

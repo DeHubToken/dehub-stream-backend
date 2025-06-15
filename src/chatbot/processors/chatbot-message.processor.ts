@@ -16,6 +16,7 @@ import { RunnableSequence } from "@langchain/core/runnables";
 import { LangSmithService } from '../../tracing/langsmith.service';
 import { AgenticRAGService } from '../services/agentic-rag.service';
 import { HumanMessage, AIMessage, BaseMessage } from '@langchain/core/messages';
+import { ChatbotMetricsService } from '../services/chatbot-metrics.service';
 
 interface MessageProcessingJobData {
   userAddress: string;
@@ -41,6 +42,7 @@ export class ChatbotMessageProcessor {
     private chromaService: ChromaService,
     private langsmithService: LangSmithService,
     private agenticRAGService: AgenticRAGService,
+    private chatbotMetricsService: ChatbotMetricsService,
   ) {
     // Initialize LLM for fallback scenarios only
     const apiKey = this.configService.get<string>('TOGETHER_API_KEY');
@@ -167,6 +169,7 @@ export class ChatbotMessageProcessor {
         if (!this.agenticRAGService) {
           this.logger.warn('AgenticRAGService not available, using fallback LLM');
           aiResponseText = await this.fallbackLLMResponse(message, historyMessages);
+          this.chatbotMetricsService.incrementErrors();
         } else {
           // Use agentic RAG for processing
           aiResponseText = await this.agenticRAGService.processQuery(message, historyMessages);
@@ -218,6 +221,7 @@ export class ChatbotMessageProcessor {
         message: aiMessage,
       });
 
+      this.chatbotMetricsService.incrementMessagesProcessed();
       this.logger.debug(`Message ${userMessageId} processed successfully with agentic RAG`);
       
       if (mainRunTree) {
@@ -249,6 +253,7 @@ export class ChatbotMessageProcessor {
     this.logger.debug('Using fallback LLM response');
     
     if (!this.llm) {
+      this.chatbotMetricsService.incrementErrors();
       return "I'm sorry, I can't process your request right now due to configuration issues. Please try again later or contact support.";
     }
 
@@ -276,6 +281,7 @@ Answer:`;
       return response.content.toString().trim();
     } catch (error) {
       this.logger.error(`Fallback LLM error: ${error.message}`);
+      this.chatbotMetricsService.incrementErrors();
       return "I'm sorry, I encountered an error while processing your request. Please try again later.";
     }
   }

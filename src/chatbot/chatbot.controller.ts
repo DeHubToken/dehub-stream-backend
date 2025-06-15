@@ -1,120 +1,98 @@
-import { Controller, Get, Post, Body, UseGuards, Req, Query, Param, NotFoundException, BadRequestException, HttpCode, HttpStatus, InternalServerErrorException, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Req, Query, Param, NotFoundException, BadRequestException, HttpCode, HttpStatus, InternalServerErrorException, Logger, ValidationPipe, HttpException } from '@nestjs/common';
 import { ChatbotService } from './chatbot.service';
 import { SendMessageDto } from './dto/send-message.dto';
-import { AuthGuard } from 'common/guards/auth.guard';
 import { CreateConversationDto } from './create-conversation.dto';
 import { ConversationDocument } from '../../models/Conversation';
 import { ChatMessageDocument } from '../../models/ChatMessage';
+import { CustomUserRateLimitGuard, RateLimit } from './guards/custom-user-rate-limit.guard';
+import { AgenticRAGService } from './services/agentic-rag.service';
+import { ChromaService } from '../embedding/chroma.service';
 
-/**
- * Controller for HTTP endpoints for the chatbot
- * Note: WebSocket communication via ChatbotGateway is the primary method for chatbot interaction
- * These HTTP endpoints provide alternative access for testing and integrations
- */
+const validationPipeOptions = {
+  transform: true,
+  whitelist: true,
+  forbidNonWhitelisted: true,
+  transformOptions: { enableImplicitConversion: true },
+};
+
 @Controller('chatbot')
 export class ChatbotController {
   private readonly logger = new Logger(ChatbotController.name);
 
-  constructor(private readonly chatbotService: ChatbotService) {}
+  constructor(
+    private readonly chatbotService: ChatbotService,
+    private readonly agenticRAGService: AgenticRAGService,
+    private readonly chromaService: ChromaService,
+  ) {}
 
-  /**
-   * Get all conversations for a user
-   * @param address User's blockchain address
-   */
+  @Get('health')
+  @HttpCode(HttpStatus.OK)
+  async healthCheck(): Promise<any> {
+    this.logger.log('Chatbot health check requested.');
+    const checks = {
+      aiService: 'pending',
+      vectorDb: 'pending',
+    };
+    let overallStatus = 'ok';
+    let httpStatus = HttpStatus.OK;
+    const errors: string[] = [];
+
+    try {
+      if (this.agenticRAGService) {
+        checks.aiService = 'ok';
+      } else {
+        throw new Error('AgenticRAGService not available');
+      }
+    } catch (error) {
+      this.logger.error(`AI Service health check failed: ${error.message}`, error.stack);
+      checks.aiService = 'error';
+      errors.push(`AI Service Error: ${error.message}`);
+      overallStatus = 'error';
+      httpStatus = HttpStatus.SERVICE_UNAVAILABLE;
+    }
+
+    try {
+      await this.chromaService.getDocumentCount();
+      checks.vectorDb = 'ok';
+    } catch (error) {
+      this.logger.error(`Vector DB (Chroma) health check failed: ${error.message}`, error.stack);
+      checks.vectorDb = 'error';
+      errors.push(`VectorDB Error: ${error.message}`);
+      overallStatus = 'error';
+      httpStatus = HttpStatus.SERVICE_UNAVAILABLE;
+    }
+
+    const response = {
+      status: overallStatus,
+      timestamp: new Date().toISOString(),
+      checks,
+      errors: errors.length > 0 ? errors : undefined,
+    };
+
+    if (overallStatus === 'error') {
+      throw new HttpException(response, httpStatus);
+    }
+    
+    return response;
+  }
+
   @Get()
   async getUserConversations(@Query('address') address: string): Promise<ConversationDocument[]> {
-    // Temporary auth check - will be replaced with proper auth in the future
     if (!address) {
       throw new BadRequestException('Address parameter is required');
     }
-
-    // In a production app, we would verify that the address is valid
-    // TODO: Add proper authentication
-
     return this.chatbotService.getConversationsForUser(address);
   }
 
-  /**
-   * Create a new conversation
-   */
   @Post('conversations')
   @HttpCode(HttpStatus.CREATED)
   async createConversation(
     @Query('address') address: string,
-    @Body() createConversationDto: CreateConversationDto
+    @Body(new ValidationPipe(validationPipeOptions)) createConversationDto: CreateConversationDto,
   ): Promise<ConversationDocument> {
-    // Temporary auth check
     if (!address) {
       throw new BadRequestException('Address parameter is required');
     }
-
     return this.chatbotService.createConversation(address, createConversationDto.title);
-  }
-
-  /**
-   * Get messages for a specific conversation
-   */
-  @Get('conversations/:conversationId/messages')
-  async getConversationMessages(
-    @Query('address') address: string,
-    @Param('conversationId') conversationId: string
-  ): Promise<ChatMessageDocument[]> {
-    // Temporary auth check
-    if (!address) {
-      throw new BadRequestException('Address parameter is required');
-    }
-
-    try {
-      return await this.chatbotService.getMessagesForConversation(address, conversationId);
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-      this.logger.error(`Error retrieving messages: ${error.message}`, error.stack);
-      throw new BadRequestException('Failed to retrieve conversation messages');
-    }
-  }
-
-  /**
-   * Send a message to a conversation
-   */
-  @Post('conversations/:conversationId/messages')
-  @HttpCode(HttpStatus.CREATED)
-  async sendMessage(
-    @Query('address') address: string,
-    @Param('conversationId') conversationId: string,
-    @Body() sendMessageDto: SendMessageDto
-  ): Promise<{
-    success: boolean;
-    message: string;
-    messageId: string;
-    conversationId: string;
-  }> {
-    // Temporary auth check
-    if (!address) {
-      throw new BadRequestException('Address parameter is required');
-    }
-
-    try {
-      // Process the incoming message
-      const result = await this.chatbotService.handleIncomingMessage(
-        address,
-        conversationId,
-        sendMessageDto.text,
-      );
-
-      return {
-        success: true,
-        message: 'Message received and queued for processing',
-        messageId: result.messageId,
-        conversationId: result.conversationId
-      };
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-      this.logger.error(`Error sending message: ${error.message}`, error.stack);
-      throw new BadRequestException('Failed to process message');
-    }
   }
 } 

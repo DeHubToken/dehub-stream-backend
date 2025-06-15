@@ -14,6 +14,9 @@ import { AITasksProcessor } from './processors/ai-tasks.processor';
 import { CdnModule } from '../cdn/cdn.module';
 import { TracingModule } from '../tracing/tracing.module';
 import { AgenticRAGService } from './services/agentic-rag.service';
+import { CustomUserRateLimitGuard } from './guards/custom-user-rate-limit.guard';
+import { ScheduleModule } from '@nestjs/schedule';
+import { ChatbotMetricsService } from './services/chatbot-metrics.service';
 
 @Module({
   imports: [
@@ -36,9 +39,19 @@ import { AgenticRAGService } from './services/agentic-rag.service';
     ConfigModule,
     CdnModule,
     TracingModule,
+    ScheduleModule.forRoot(),
   ],
   controllers: [ChatbotController],
-  providers: [ChatbotService, ChatbotGateway, ChatbotMessageProcessor, ImageProcessor, AITasksProcessor, AgenticRAGService],
+  providers: [
+    ChatbotService, 
+    ChatbotGateway, 
+    ChatbotMessageProcessor, 
+    ImageProcessor, 
+    AITasksProcessor, 
+    AgenticRAGService,
+    CustomUserRateLimitGuard,
+    ChatbotMetricsService,
+  ],
   exports: [ChatbotService],
 })
 export class ChatbotModule {} 

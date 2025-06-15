@@ -12,6 +12,7 @@ import { CdnService } from '../../cdn/cdn.service';
 import * as fs from 'fs';
 import * as path from 'path';
 import axios from 'axios';
+import { ChatbotMetricsService } from '../services/chatbot-metrics.service';
 
 interface ImageGenerationJobData {
   userAddress: string;
@@ -35,6 +36,7 @@ export class ImageProcessor {
     private chatbotGateway: ChatbotGateway,
     private configService: ConfigService,
     private cdnService: CdnService,
+    private chatbotMetricsService: ChatbotMetricsService,
   ) {
     this.isProd = this.configService.get<string>('NODE_ENV') === 'production';
     this.localImagesDir = path.join(process.cwd(), 'docs', 'images');
@@ -48,7 +50,7 @@ export class ImageProcessor {
     
     // Verify that API key is available
     if (!this.apiKey) {
-      throw new Error('TOGETHER_API_KEY env var is required for image generation');
+      this.logger.error('TOGETHER_API_KEY env var is required for image generation. Image generation will fail.');
     } else {
       this.logger.log('Image processor initialized with Together AI integration');
     }
@@ -74,7 +76,8 @@ export class ImageProcessor {
 
       // 3. Check if API key is available
       if (!this.apiKey) {
-        throw new Error('Together AI API key not found');
+        this.logger.error('TOGETHER_API_KEY not configured. Cannot generate image.');
+        throw new Error('Image generation service is not configured (missing API key).');
       }
 
       let enhancedPrompt = prompt;
@@ -86,7 +89,7 @@ export class ImageProcessor {
       const imageData = await this.generateImageWithTogetherAI(enhancedPrompt);
       
       if (!imageData) {
-        throw new Error('Failed to generate image');
+        throw new Error('Failed to generate image data from provider.');
       }
       
       let imageUrl: string;
@@ -151,6 +154,8 @@ export class ImageProcessor {
         message: aiMessage,
       });
 
+      this.chatbotMetricsService.incrementImagesGenerated();
+
       this.logger.debug(`Image generation for message ${userMessageId} processed successfully`);
     } catch (error) {
       this.logger.error(
@@ -180,8 +185,9 @@ export class ImageProcessor {
           message: errorMessage,
         });
       } catch (e) {
-        this.logger.error('Failed to send error notification', e);
+        this.logger.error('Failed to send error notification or save error message', e);
       }
+      this.chatbotMetricsService.incrementErrors();
     }
   }
 
