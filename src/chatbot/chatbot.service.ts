@@ -8,6 +8,7 @@ import { Conversation, ConversationDocument } from '../../models/Conversation';
 import { GenerateImageDto } from './dto/generate-image.dto';
 import { AnalyzeImageDto } from './dto/analyze-image.dto';
 import * as crypto from 'crypto';
+import { normalizeAddress as normalizeAddressUtil } from '../../common/util/format';
 
 // Define a constant system address for AI responses
 export const AI_SYSTEM_ADDRESS = "0x0000000000000000000000000000000000000000"; // Zero address for AI
@@ -24,13 +25,25 @@ export class ChatbotService {
     @InjectQueue('image-analysis') private imageAnalysisQueue: Queue,
   ) {}
 
+  // Helper for normalization to avoid undefined issues if util returns undefined
+  private normalizeAddress(address: string): string {
+    const normalized = normalizeAddressUtil(address);
+    if (normalized === undefined) {
+        // This case should ideally not happen if input address is always a valid string
+        this.logger.warn(`Address normalization resulted in undefined for input: ${address}. Using original.`);
+        return address; 
+    }
+    return normalized;
+  }
+
   /**
    * Get or create a conversation for a user
    */
   async getOrCreateConversation(userAddress: string, title?: string): Promise<ConversationDocument> {
+    const normalizedUserAddress = this.normalizeAddress(userAddress);
     // Try to find the most recent non-archived conversation for this user
     const existingConversation = await this.conversationModel.findOne({
-      userAddress,
+      userAddress: normalizedUserAddress,
       isArchived: false,
     }).sort({ lastMessageAt: -1 });
 
@@ -39,21 +52,22 @@ export class ChatbotService {
     }
 
     // Create a new conversation if none exists
-    return this.createConversation(userAddress, title);
+    return this.createConversation(normalizedUserAddress, title);
   }
 
   /**
    * Create a new conversation for a user
    */
   async createConversation(userAddress: string, title?: string): Promise<ConversationDocument> {
+    const normalizedUserAddress = this.normalizeAddress(userAddress);
     const newConversation = new this.conversationModel({
-      userAddress,
+      userAddress: normalizedUserAddress,
       title: title || 'New Conversation',
       lastMessageAt: new Date(),
     });
 
     await newConversation.save();
-    this.logger.debug(`Created new conversation ${newConversation._id} for user ${userAddress}`);
+    this.logger.debug(`Created new conversation ${newConversation._id} for user ${normalizedUserAddress}`);
     
     return newConversation;
   }
@@ -62,8 +76,9 @@ export class ChatbotService {
    * Get all conversations for a user
    */
   async getConversationsForUser(userAddress: string): Promise<ConversationDocument[]> {
+    const normalizedUserAddress = this.normalizeAddress(userAddress);
     return this.conversationModel.find({ 
-      userAddress 
+      userAddress: normalizedUserAddress 
     }).sort({ lastMessageAt: -1 });
   }
 
@@ -74,10 +89,11 @@ export class ChatbotService {
     userAddress: string, 
     conversationId: string
   ): Promise<ChatMessageDocument[]> {
+    const normalizedUserAddress = this.normalizeAddress(userAddress);
     // First, verify that the conversation belongs to this user
     const conversation = await this.conversationModel.findOne({
       _id: conversationId,
-      userAddress,
+      userAddress: normalizedUserAddress,
     });
 
     if (!conversation) {
@@ -99,19 +115,20 @@ export class ChatbotService {
     conversationId: string | null, 
     messageText: string,
   ): Promise<{ success: boolean; conversationId: string; messageId: string }> {
-    this.logger.log(`Received message from user ${userAddress}: ${messageText}`);
+    const normalizedUserAddress = this.normalizeAddress(userAddress);
+    this.logger.log(`Received message from user ${normalizedUserAddress}: ${messageText}`);
     
     try {
       // Validate message text
       this.validateTextInput(messageText, 'Message text');
       
       // Get and validate conversation
-      const conversation = await this.resolveConversation(userAddress, conversationId);
+      const conversation = await this.resolveConversation(normalizedUserAddress, conversationId);
         
       // Create and save the user message
       const userMessage = new this.chatMessageModel({
         conversationId: conversation._id,
-        senderAddress: userAddress,
+        senderAddress: normalizedUserAddress,
         senderType: MessageSenderType.USER,
         text: messageText,
       });
@@ -123,7 +140,7 @@ export class ChatbotService {
       // Queue the message for processing with retry options
       const jobId = `msg-${crypto.randomUUID()}`;
       await this.messageProcessingQueue.add({
-        userAddress,
+        userAddress: normalizedUserAddress,
         conversationId: conversation._id.toString(),
         userMessageId: userMessage._id.toString(),
         message: messageText,
@@ -158,19 +175,20 @@ export class ChatbotService {
     conversationId: string,
     dto: GenerateImageDto,
   ): Promise<{ success: boolean; conversationId: string }> {
-    this.logger.log(`Received image generation request from user ${userAddress}: ${dto.prompt}`);
+    const normalizedUserAddress = this.normalizeAddress(userAddress);
+    this.logger.log(`Received image generation request from user ${normalizedUserAddress}: ${dto.prompt}`);
     
     try {
       // Validate prompt is not empty
       this.validateTextInput(dto.prompt, 'Image prompt');
       
       // Validate and get the conversation
-      const conversation = await this.resolveConversation(userAddress, conversationId);
+      const conversation = await this.resolveConversation(normalizedUserAddress, conversationId);
       
       // Create user message for the image request
       const userMessage = new this.chatMessageModel({
         conversationId: conversation._id,
-        senderAddress: userAddress,
+        senderAddress: normalizedUserAddress,
         senderType: MessageSenderType.USER,
         text: `[Image Request] ${dto.prompt}`,
         metadata: { 
@@ -187,7 +205,7 @@ export class ChatbotService {
       // Queue the image generation request with retry options
       const jobId = `img-${crypto.randomUUID()}`;
       await this.imageGenerationQueue.add({
-        userAddress,
+        userAddress: normalizedUserAddress,
         conversationId: conversation._id.toString(),
         userMessageId: userMessage._id.toString(),
         prompt: dto.prompt,
@@ -219,13 +237,14 @@ export class ChatbotService {
    */
   async requestImageAnalysis(
     userAddress: string,
-    dto: AnalyzeImageDto & { conversationId: string },
+    dto: AnalyzeImageDto,
   ): Promise<{ success: boolean; conversationId: string }> {
-    this.logger.log(`Received image analysis request from user ${userAddress} for conversation ${dto.conversationId}`);
+    const normalizedUserAddress = this.normalizeAddress(userAddress);
+    this.logger.log(`Received image analysis request from user ${normalizedUserAddress} for conversation ${dto.conversationId}`);
     
     try {
       // Validate and get the conversation
-      const conversation = await this.validateAndGetConversation(userAddress, dto.conversationId);
+      const conversation = await this.validateAndGetConversation(normalizedUserAddress, dto.conversationId);
       
      // Update conversation timestamp
      await this.updateConversationTimestamp(conversation);
@@ -233,7 +252,7 @@ export class ChatbotService {
       // Queue the image analysis request with retry options
       const jobId = `analysis-${crypto.randomUUID()}`;
       await this.imageAnalysisQueue.add('analyzeImage', {
-        userAddress,
+        userAddress: normalizedUserAddress,
         conversationId: conversation._id.toString(),
         imageUrl: dto.imageUrl,
         imageData: dto.imageData,
@@ -309,9 +328,10 @@ export class ChatbotService {
     userAddress: string, 
     conversationId: string
   ): Promise<ConversationDocument> {
+    const normalizedUserAddress = this.normalizeAddress(userAddress);
     const conversation = await this.conversationModel.findOne({
       _id: conversationId,
-      userAddress,
+      userAddress: normalizedUserAddress,
     });
     
     if (!conversation) {
