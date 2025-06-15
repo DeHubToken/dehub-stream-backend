@@ -46,6 +46,7 @@ export class EmbeddingController {
    * @param chunkOverlap Overlap between chunks (optional)
    * @returns Processing result
    */
+  /* TODO: Add admin guard */
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
   async uploadFile(
