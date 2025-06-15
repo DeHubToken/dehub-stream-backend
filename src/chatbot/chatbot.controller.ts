@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, UseGuards, Req, Query, Param, NotFoundException, BadRequestException, HttpCode, HttpStatus, InternalServerErrorException, Logger, ValidationPipe, HttpException } from '@nestjs/common';
 import { ChatbotService } from './chatbot.service';
 import { SendMessageDto } from './dto/send-message.dto';
-import { CreateConversationDto } from './create-conversation.dto';
+import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ConversationDocument } from '../../models/Conversation';
 import { ChatMessageDocument } from '../../models/ChatMessage';
 import { CustomUserRateLimitGuard, RateLimit } from './guards/custom-user-rate-limit.guard';

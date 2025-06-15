@@ -13,7 +13,7 @@ import { UseGuards, Logger, ValidationPipe } from '@nestjs/common';
 import { ChatbotService } from './chatbot.service';
 import { SendMessageDto } from './dto/send-message.dto';
 import { ChatbotSocketEvent } from './types';
-import { CreateConversationDto } from './create-conversation.dto';
+import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ChatMessageDocument } from '../../models/ChatMessage';
 import { GenerateImageDto } from './dto/generate-image.dto';
 import { AnalyzeImageDto } from './dto/analyze-image.dto';
