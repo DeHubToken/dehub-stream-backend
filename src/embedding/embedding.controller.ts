@@ -29,6 +29,22 @@ const SUPPORTED_FILE_TYPES = {
   'pdf': 'pdf',
 };
 
+/**
+ * Embedding Controller - Document Processing & Vector Store Management
+ * 
+ * This controller provides endpoints for:
+ * 1. Document Upload & Embedding: Upload documents (MD, PDF, TXT) and process them into vector embeddings for RAG (Retrieval-Augmented Generation)
+ * 2. Vector Store Management: Manage the Chroma vector database for chatbot knowledge base
+ * 
+ * Use Cases:
+ * - Upload platform documentation for chatbot to reference
+ * - Update knowledge base with new content  
+ * - Clear outdated information from vector store
+ * - Build RAG knowledge base for AI assistants
+ * 
+ * Supported File Types: .md, .mdx, .markdown, .txt, .text, .pdf
+ * Vector Database: ChromaDB for similarity search and retrieval
+ */
 @Controller('embedding')
 export class EmbeddingController {
   private readonly logger = new Logger(EmbeddingController.name);
@@ -39,14 +55,22 @@ export class EmbeddingController {
   ) {}
 
   /**
-   * Upload and process a document for embedding
+   * Upload and process a document for embedding into the knowledge base
    * 
-   * @param file File to upload and process
-   * @param chunkSize Size of chunks to split document into (optional)
-   * @param chunkOverlap Overlap between chunks (optional)
-   * @returns Processing result
+   * USE CASE: Upload platform documentation, FAQs, guides, or any text-based content 
+   * that the chatbot should be able to reference when answering user questions.
+   * 
+   * PROCESS:
+   * 1. Upload file (MD/PDF/TXT)
+   * 2. Split into chunks (1000 chars with 200 overlap)
+   * 3. Generate embeddings for each chunk
+   * 4. Store in ChromaDB vector database
+   * 5. Chatbot can now retrieve relevant information during conversations
+   * 
+   * @param file File to upload and process (MD, PDF, TXT formats supported)
+   * @returns Processing result with chunk count and success status
    */
-  /* TODO: Add admin guard */
+  /* TODO: Add admin guard for production security */
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
   async uploadFile(
@@ -137,7 +161,14 @@ export class EmbeddingController {
   /**
    * Delete all documents from the vector store
    * 
-   * @returns Deletion result
+   * USE CASE: Clear entire knowledge base when updating platform documentation
+   * or when resetting the chatbot's knowledge base. Use this before uploading
+   * new documentation to avoid conflicting or outdated information.
+   * 
+   * WARNING: This permanently removes all embedded documents from ChromaDB.
+   * The chatbot will have no knowledge base until new documents are uploaded.
+   * 
+   * @returns Deletion result with before/after document counts
    */
   @Post('delete-all')
   async deleteAllDocuments() {

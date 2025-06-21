@@ -20,6 +20,7 @@ import { AnalyzeImageDto } from './dto/analyze-image.dto';
 import { CustomUserRateLimitGuard, RateLimit } from './guards/custom-user-rate-limit.guard';
 import { GetMessagesDto } from './dto/get-messages.dto';
 import { ChatbotMetricsService } from './services/chatbot-metrics.service';
+import { WsAuthGuard } from '../../common/guards/ws.guard';
 
 interface ChatbotResponse {
   conversationId: string;
@@ -106,6 +107,7 @@ export class ChatbotGateway implements OnGatewayConnection, OnGatewayDisconnect 
 
   @UseGuards(CustomUserRateLimitGuard)
   @RateLimit('chatbot-user-message')
+  @UseGuards(WsAuthGuard)
   @SubscribeMessage(ChatbotSocketEvent.SEND_MESSAGE)
   async handleMessage(
     @ConnectedSocket() client: Socket,
@@ -155,7 +157,8 @@ export class ChatbotGateway implements OnGatewayConnection, OnGatewayDisconnect 
     }
   }
 
-  @SubscribeMessage(ChatbotSocketEvent.CREATE_CONVERSATION) // Bu metod için rate limit eklenmemişti, şimdilik öyle kalıyor.
+  @UseGuards(WsAuthGuard)
+  @SubscribeMessage(ChatbotSocketEvent.CREATE_CONVERSATION)
   async handleCreateConversation(
     @ConnectedSocket() client: Socket,
     @MessageBody(new ValidationPipe(validationPipeOptions)) payload: CreateConversationDto,
@@ -181,6 +184,7 @@ export class ChatbotGateway implements OnGatewayConnection, OnGatewayDisconnect 
     }
   }
 
+  @UseGuards(WsAuthGuard)
   @SubscribeMessage(ChatbotSocketEvent.GET_CONVERSATIONS)
   async handleGetConversations(@ConnectedSocket() client: Socket): Promise<WsResponse<any>> {
     try {
@@ -204,6 +208,7 @@ export class ChatbotGateway implements OnGatewayConnection, OnGatewayDisconnect 
     }
   }
 
+  @UseGuards(WsAuthGuard)
   @SubscribeMessage(ChatbotSocketEvent.GET_MESSAGES)
   async handleGetMessages(
     @ConnectedSocket() client: Socket,
@@ -232,6 +237,7 @@ export class ChatbotGateway implements OnGatewayConnection, OnGatewayDisconnect 
 
   @UseGuards(CustomUserRateLimitGuard)
   @RateLimit('chatbot-user-image')
+  @UseGuards(WsAuthGuard)
   @SubscribeMessage(ChatbotSocketEvent.ANALYZE_IMAGE)
   async handleAnalyzeImage(
     @ConnectedSocket() client: Socket,

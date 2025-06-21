@@ -79,20 +79,21 @@ export class AITasksProcessor {
           prompt: prompt,
         };
       }
+      // 3. Perform the analysis with Together AI
+      if (!this.togetherApiKey) {
+        throw new Error('Together AI API key not configured');
+      }
+      
       
       const userMessage = new this.chatMessageModel(userMessageData);
       await userMessage.save();
 
-      // 3. Update the conversation's lastMessageAt timestamp using atomic update
+      // 4. Update the conversation's lastMessageAt timestamp using atomic update
       await this.conversationModel.updateOne(
         { _id: conversationId },
         { $set: { lastMessageAt: new Date() } }
       );
 
-      // 4. Perform the analysis with Together AI
-      if (!this.togetherApiKey) {
-        throw new Error('Together AI API key not configured');
-      }
 
       let analysisResult: string;
       

@@ -103,27 +103,10 @@ export class AgenticRAGService {
     try {
       this.logger.debug(`Processing query with agentic RAG: ${query}`);
 
-      // Step 1: Quick check - is this even DeHub related?
-      if (!this.isDehubRelated(query)) {
-        this.logger.debug('Query not DeHub-related, generating direct response without translation or retrieval');
-        
-        // Generate response directly without any translation or retrieval
-        const result = await this.workflow.invoke({
-          messages: [...conversationHistory, new HumanMessage(query)],
-          query,
-          originalLanguage: 'unknown', // We don't need to detect language for non-DeHub queries
-          retrievalNeeded: false, // Force no retrieval
-        }, {
-          recursionLimit: 50,
-        });
-        
-        return result.finalResponse || 'I can help you with DeHub platform questions. What would you like to know about live streaming, chat, or other DeHub features?';
-      }
-
-      // Step 2: Detect language for DeHub-related queries
+      // Step 1: Detect language and translate if needed
       const { translatedQuery, originalLanguage } = await this.translateQueryIfNeeded(query);
 
-      // Step 3: Process with agentic RAG workflow (using translated query if needed)
+      // Step 2: Process with agentic RAG workflow (using translated query if needed)
       const result = await this.workflow.invoke({
         messages: [...conversationHistory, new HumanMessage(translatedQuery)],
         query: translatedQuery,
@@ -132,7 +115,7 @@ export class AgenticRAGService {
         recursionLimit: 50,
       });
       
-      // Step 4: Translate response back to original language if needed
+      // Step 3: Translate response back to original language if needed
       const finalResponse = result.finalResponse || 'I apologize, but I encountered an issue processing your request.';
       const translatedResponse = await this.translateResponseIfNeeded(finalResponse, originalLanguage);
       
@@ -283,30 +266,7 @@ export class AgenticRAGService {
     }
   }
 
-  /**
-   * Quick domain relevance check for DeHub-related keywords
-   */
-  private isDehubRelated(query: string): boolean {
-    const dehubKeywords = [
-      // Platform name
-      'dehub', 
-      // Core features - English
-      'live stream', 'livestream', 'streaming', 'stream', 'broadcast',
-      'chat', 'message', 'moderation', 'moderator', 
-      'nft', 'marketplace', 'payment', 'pay', 'monetization',
-      'profile', 'account', 'user', 'follow', 'subscriber', 'subscription',
-      // Core features - Turkish  
-      'canlı yayın', 'yayın', 'sohbet', 'mesaj', 'moderasyon',
-      'profil', 'hesap', 'kullanıcı', 'takip', 'abone', 'ödeme'
-    ];
-    
-    const queryLower = query.toLowerCase();
-    const hasDeHubKeyword = dehubKeywords.some(keyword => queryLower.includes(keyword));
-    
-    this.logger.debug(`Domain check for "${query}": ${hasDeHubKeyword ? 'DeHub-related' : 'Not DeHub-related'}`);
-    
-    return hasDeHubKeyword;
-  }
+
 
   /**
    * Query Analysis Agent: Determines if query needs decomposition
