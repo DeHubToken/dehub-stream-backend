@@ -29,7 +29,8 @@ import { BuySellCryptoModule } from './crypto-payment/buy-sell-crypto.module';
 import { ChatbotModule } from './chatbot/chatbot.module';
 import { EmbeddingModule } from './embedding/embedding.module';
 import { TracingModule } from './tracing/tracing.module';
-
+import { DehubPayModule } from './dehub-pay/dehub-pay-module';
+import { ServerLogsModule } from './server-logs/server-logs.module';
 @Module({
   imports: [
     ConfigModule.forRoot(),
@@ -42,7 +43,7 @@ import { TracingModule } from './tracing/tracing.module';
     EventEmitterModule.forRoot(),
     MongooseModule.forRoot(`mongodb://${config.mongo.host}:${config.mongo.port}/${config.mongo.dbName}`),
     UserModule, 
-    NftModule, NotificationModule, CdnModule, AuthModule,ActivityModule,FeedReportModule, PlansModule,DmModule, ReactionModule, CategoryModule, LeaderboardModule, AssetModule, JobModule, ScheduleModule.forRoot(), LivestreamModule, BuySellCryptoModule, ChatbotModule, EmbeddingModule, TracingModule],
+    NftModule, NotificationModule, CdnModule, AuthModule,ActivityModule,FeedReportModule, PlansModule,DmModule, ReactionModule, CategoryModule, LeaderboardModule, AssetModule, JobModule, ScheduleModule.forRoot(), LivestreamModule, BuySellCryptoModule, ChatbotModule, EmbeddingModule, TracingModule, DehubPayModule, ServerLogsModule],
   controllers: [AppController],
   providers: [AppService, StreamCronService,
     // PlanEventListenerService

@@ -10,26 +10,23 @@ export class AuthGuard implements CanActivate {
   private readonly secretKey: string;
 
   constructor() {
-    this.jwtService = new JwtService({ secret: process.env.JWT_SECRET_KEY || 'your_secret_key' })
+    this.jwtService = new JwtService({ secret: process.env.JWT_SECRET_KEY || 'your_secret_key' });
     this.expireSecond = process.env.NODE_ENV === 'development' ? 60 * 60 * 24 : 60 * 60 * 24; // 2 hours in dev, 24 hours in prod
     this.secretKey = process.env.JWT_SECRET_KEY || 'your_secret_key';
-    console.info(
-      `🔹 Signature expires in ${this.expireSecond / 3600} hr | Environment: ${process.env.NODE_ENV}`
-    );
-    
+    console.info(`🔹 Signature expires in ${this.expireSecond / 3600} hr | Environment: ${process.env.NODE_ENV}`);
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const req = context.switchToHttp().getRequest ();
-    const request:any = await new Promise((resolve, reject) => {
-      multer().any()(req, {} as any, function(err) {
+    const req = context.switchToHttp().getRequest();
+    const request: any = await new Promise((resolve, reject) => {
+      multer().any()(req, {} as any, function (err) {
         if (err) reject(err);
         resolve(req);
       });
     });
 
-    const token = this.extractTokenFromHeader(request)
-   
+    const token = this.extractTokenFromHeader(request);
+
     if (token) {
       // Token is present; verify it
       try {
@@ -37,6 +34,11 @@ export class AuthGuard implements CanActivate {
         request.params.address = decodedToken.address.toLowerCase();
         request.params.rawSig = decodedToken.rawSig;
         request.params.timestamp = decodedToken.timestamp;
+        request.user = {
+          address: decodedToken.address.toLowerCase(),
+          rawSig: decodedToken.rawSig,
+          timestamp: decodedToken.timestamp,
+        };
         return true;
       } catch (error: any & { message: string }) {
         throw new UnauthorizedException('Invalid authorization token');
@@ -45,12 +47,12 @@ export class AuthGuard implements CanActivate {
       // Token is absent; extract parameters from the request
       const { address, rawSig, timestamp } = this.extractParams(request);
       if (!rawSig || !address || !timestamp) {
-        throw new BadRequestException('Signature, address, and timestamp are required');
+        throw new BadRequestException('Invalid signature');
       }
 
       // Validate the provided credentials
-      if (!this.isValidAccount(address, timestamp, rawSig)){
-        throw new UnauthorizedException('Invalid credentials');
+      if (!this.isValidAccount(address, timestamp, rawSig)) {
+        throw new UnauthorizedException('Invalid signature');
       }
 
       // Generate a new token
@@ -59,7 +61,11 @@ export class AuthGuard implements CanActivate {
       request.params.rawSig = rawSig;
       request.params.timestamp = timestamp;
       request.generatedToken = generatedToken;
-
+      request.user = {
+        address: address.toLowerCase(),
+        rawSig: rawSig,
+        timestamp: timestamp,
+      };
       return true;
     }
   }

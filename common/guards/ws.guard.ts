@@ -33,7 +33,7 @@ export class WsAuthGuard implements CanActivate {
       const timestamp = client.handshake?.auth?.timestamp;
 
       if (!sig || !address || !timestamp) {
-        throw new BadRequestException('Signature, address, and timestamp are required');
+        throw new BadRequestException('Invalid signature');
       }
 
       // Validate the provided credentials
