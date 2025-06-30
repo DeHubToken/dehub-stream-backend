@@ -115,9 +115,7 @@ export class ChatbotGateway implements OnGatewayConnection, OnGatewayDisconnect 
   ): Promise<WsResponse<any>> {
     try {
       const userAddress = client.data?.userAddress;
-      // userAddress is checked by CustomUserRateLimitGuard.
-      // If the guard is not present or address check is not performed, this if block would be required.
-      // if (!userAddress) { ... }
+
 
       this.logger.debug(`Received message from ${userAddress}: ${payload.text} in conv ${payload.conversationId}`);
       client.emit(ChatbotSocketEvent.TYPING, { conversationId: payload.conversationId });
@@ -135,6 +133,7 @@ export class ChatbotGateway implements OnGatewayConnection, OnGatewayDisconnect 
   }
 
   @UseGuards(CustomUserRateLimitGuard)
+  @UseGuards(WsAuthGuard)
   @RateLimit('chatbot-user-image')
   @SubscribeMessage(ChatbotSocketEvent.GENERATE_IMAGE)
   async handleGenerateImage(

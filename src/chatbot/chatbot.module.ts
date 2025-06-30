@@ -7,13 +7,12 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Conversation, ConversationSchema } from '../../models/Conversation';
 import { ChatMessage, ChatMessageSchema } from '../../models/ChatMessage';
 import { ChatbotMessageProcessor } from './processors/chatbot-message.processor';
-import { EmbeddingModule } from '../embedding/embedding.module';
 import { ConfigModule } from '@nestjs/config';
 import { ImageProcessor } from './processors/image.processor';
 import { AITasksProcessor } from './processors/ai-tasks.processor';
 import { CdnModule } from '../cdn/cdn.module';
 import { TracingModule } from '../tracing/tracing.module';
-import { AgenticRAGService } from './services/agentic-rag.service';
+import { DeHubChatbotService } from './services/dehub-chatbot.service';
 import { CustomUserRateLimitGuard } from './guards/custom-user-rate-limit.guard';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ChatbotMetricsService } from './services/chatbot-metrics.service';
@@ -35,7 +34,6 @@ import { ChatbotMetricsService } from './services/chatbot-metrics.service';
         name: 'image-analysis',
       }
     ),
-    EmbeddingModule,
     ConfigModule,
     CdnModule,
     TracingModule,
@@ -48,7 +46,7 @@ import { ChatbotMetricsService } from './services/chatbot-metrics.service';
     ChatbotMessageProcessor, 
     ImageProcessor, 
     AITasksProcessor, 
-    AgenticRAGService,
+    DeHubChatbotService,
     CustomUserRateLimitGuard,
     ChatbotMetricsService,
   ],

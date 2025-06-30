@@ -1,12 +1,9 @@
 import { Controller, Get, Post, Body, UseGuards, Req, Query, Param, NotFoundException, BadRequestException, HttpCode, HttpStatus, InternalServerErrorException, Logger, ValidationPipe, HttpException } from '@nestjs/common';
 import { ChatbotService } from './chatbot.service';
-import { SendMessageDto } from './dto/send-message.dto';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ConversationDocument } from '../../models/Conversation';
-import { ChatMessageDocument } from '../../models/ChatMessage';
-import { CustomUserRateLimitGuard, RateLimit } from './guards/custom-user-rate-limit.guard';
-import { AgenticRAGService } from './services/agentic-rag.service';
-import { ChromaService } from '../embedding/chroma.service';
+import { DeHubChatbotService } from './services/dehub-chatbot.service';
+import { ConfigService } from '@nestjs/config';
 
 const validationPipeOptions = {
   transform: true,
@@ -21,8 +18,8 @@ export class ChatbotController {
 
   constructor(
     private readonly chatbotService: ChatbotService,
-    private readonly agenticRAGService: AgenticRAGService,
-    private readonly chromaService: ChromaService,
+    private readonly deHubChatbotService: DeHubChatbotService,
+    private readonly configService: ConfigService,
   ) {}
 
   @Get('health')
@@ -31,17 +28,18 @@ export class ChatbotController {
     this.logger.log('Chatbot health check requested.');
     const checks = {
       aiService: 'pending',
-      vectorDb: 'pending',
     };
     let overallStatus = 'ok';
     let httpStatus = HttpStatus.OK;
     const errors: string[] = [];
 
+    // Check DeHubChatbotService
     try {
-      if (this.agenticRAGService) {
+      if (this.deHubChatbotService) {
         checks.aiService = 'ok';
+        this.logger.debug('DeHubChatbotService health check passed');
       } else {
-        throw new Error('AgenticRAGService not available');
+        throw new Error('DeHubChatbotService not available');
       }
     } catch (error) {
       this.logger.error(`AI Service health check failed: ${error.message}`, error.stack);
@@ -51,20 +49,10 @@ export class ChatbotController {
       httpStatus = HttpStatus.SERVICE_UNAVAILABLE;
     }
 
-    try {
-      await this.chromaService.getDocumentCount();
-      checks.vectorDb = 'ok';
-    } catch (error) {
-      this.logger.error(`Vector DB (Chroma) health check failed: ${error.message}`, error.stack);
-      checks.vectorDb = 'error';
-      errors.push(`VectorDB Error: ${error.message}`);
-      overallStatus = 'error';
-      httpStatus = HttpStatus.SERVICE_UNAVAILABLE;
-    }
-
     const response = {
       status: overallStatus,
       timestamp: new Date().toISOString(),
+      serviceMode: 'dehub',
       checks,
       errors: errors.length > 0 ? errors : undefined,
     };

@@ -116,7 +116,7 @@ export class ChatbotService {
     messageText: string,
   ): Promise<{ success: boolean; conversationId: string; messageId: string }> {
     const normalizedUserAddress = this.normalizeAddress(userAddress);
-    this.logger.log(`Received message from user ${normalizedUserAddress}: ${messageText}`);
+    
     
     try {
       // Validate message text

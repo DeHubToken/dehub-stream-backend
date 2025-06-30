@@ -7,14 +7,10 @@ import { ChatMessage, ChatMessageDocument, MessageSenderType } from '../../../mo
 import { Conversation, ConversationDocument } from '../../../models/Conversation';
 import { ChatbotGateway } from '../chatbot.gateway';
 import { AI_SYSTEM_ADDRESS } from '../chatbot.service';
-import { ChromaService } from '../../embedding/chroma.service';
 import { ConfigService } from '@nestjs/config';
 import { ChatOpenAI } from "@langchain/openai";
-import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts";
-import { StringOutputParser } from "@langchain/core/output_parsers";
-import { RunnableSequence } from "@langchain/core/runnables";
 import { LangSmithService } from '../../tracing/langsmith.service';
-import { AgenticRAGService } from '../services/agentic-rag.service';
+import { DeHubChatbotService } from '../services/dehub-chatbot.service';
 import { HumanMessage, AIMessage, BaseMessage } from '@langchain/core/messages';
 import { ChatbotMetricsService } from '../services/chatbot-metrics.service';
 
@@ -22,7 +18,7 @@ interface MessageProcessingJobData {
   userAddress: string;
   conversationId: string;
   userMessageId: string;
-  message: string; // User message (for RAG processing)
+  message: string;
 }
 
 @Injectable()
@@ -30,20 +26,18 @@ interface MessageProcessingJobData {
 export class ChatbotMessageProcessor {
   private readonly logger = new Logger(ChatbotMessageProcessor.name);
   private readonly llm: ChatOpenAI;
-  private readonly llmModel: string ;
-  private readonly standardPrompt: ChatPromptTemplate;
-  private readonly conversationalPrompt: ChatPromptTemplate;
+  private readonly llmModel: string;
 
   constructor(
     @InjectModel(ChatMessage.name) private chatMessageModel: Model<ChatMessageDocument>,
     @InjectModel(Conversation.name) private conversationModel: Model<ConversationDocument>,
     private chatbotGateway: ChatbotGateway,
     private configService: ConfigService,
-    private chromaService: ChromaService,
     private langsmithService: LangSmithService,
-    private agenticRAGService: AgenticRAGService,
+    private deHubChatbotService: DeHubChatbotService,
     private chatbotMetricsService: ChatbotMetricsService,
   ) {
+
     // Initialize LLM for fallback scenarios only
     const apiKey = this.configService.get<string>('TOGETHER_API_KEY');
     this.llmModel = this.configService.get<string>('AI_LLM_MODEL');
@@ -58,40 +52,6 @@ export class ChatbotMessageProcessor {
     } else {
       this.logger.warn('TOGETHER_API_KEY not found, LLM features may not work');
     }
-
-    // Initialize prompts for fallback scenarios
-    this.standardPrompt = ChatPromptTemplate.fromTemplate(`
-      You are a helpful AI assistant for DeHub, a live streaming platform.
-      Based on the following context and user query, provide a helpful response.
-      
-      Context: {context}
-      Query: {query}
-      
-      Respond naturally and be helpful. If the context doesn't contain relevant information, 
-      use your general knowledge to assist the user.
-      
-      Response:
-    `);
-
-    this.conversationalPrompt = ChatPromptTemplate.fromTemplate(`
-      You are a helpful AI assistant for DeHub, a live streaming platform.
-      
-      Conversation History:
-      {history}
-      
-      Context from knowledge base:
-      {context}
-      
-      User Query: {query}
-      
-      Instructions:
-      - Consider the conversation history for context
-      - Use the knowledge base context if relevant
-      - Be conversational and helpful
-      - Keep responses concise but complete
-      
-      Response:
-    `);
   }
 
   @Process()
@@ -99,19 +59,20 @@ export class ChatbotMessageProcessor {
     const { userAddress, conversationId, userMessageId, message } = job.data;
     
     // Create a tracing run for the entire job
+    const workflowType = 'dehub';
     const mainRunTree = await this.langsmithService.createRunTree({
-      name: 'Agentic_RAG_Processing',
+      name: `${workflowType}_processing`,
       run_type: 'chain',
       inputs: { 
         userAddress, 
         conversationId, 
         userMessageId, 
         message,
-        processor: 'agentic'
+        processor: workflowType
       },
       metadata: {
         model: this.llmModel,
-        workflow: 'agentic_rag'
+        workflow: workflowType
       },
     });
 
@@ -140,7 +101,7 @@ export class ChatbotMessageProcessor {
       // Reverse to get chronological order (oldest first)
       const orderedHistory = [...conversationHistory].reverse();
 
-      // 4. Convert conversation history to BaseMessage format for agentic RAG
+      // 4. Convert conversation history to BaseMessage format
       const historyMessages: BaseMessage[] = orderedHistory.slice(0, -1).map(msg => {
         if (msg.senderType === MessageSenderType.USER) {
           return new HumanMessage(msg.text);
@@ -149,57 +110,56 @@ export class ChatbotMessageProcessor {
         }
       });
 
-      // 5. Process with Agentic RAG
+      // 5. Process with DeHubChatbotService
       let aiResponseText: string;
       
-      const agenticRAGRunTree = mainRunTree ? 
+      const processingRunTree = mainRunTree ? 
         await mainRunTree.createChild({
-          name: 'Agentic_RAG_Workflow',
+          name: `${workflowType}_workflow`,
           run_type: 'chain',
           inputs: { 
             query: message,
             historyLength: historyMessages.length,
+            serviceType: workflowType
           },
         }) : null;
         
-      if (agenticRAGRunTree) {
-        await agenticRAGRunTree.postRun();
+      if (processingRunTree) {
+        await processingRunTree.postRun();
       }
       
       try {
-        if (!this.agenticRAGService) {
-          this.logger.warn('AgenticRAGService not available, using fallback LLM');
+        if (!this.deHubChatbotService) {
+          this.logger.warn('DeHubChatbotService not available, using fallback LLM');
           aiResponseText = await this.fallbackLLMResponse(message, historyMessages);
-          this.chatbotMetricsService.incrementErrors();
         } else {
-          // Use agentic RAG for processing
-          aiResponseText = await this.agenticRAGService.processQuery(message, historyMessages);
-          this.logger.debug('Generated AI response successfully using Agentic RAG');
+          aiResponseText = await this.deHubChatbotService.processQuery(message, historyMessages);
+          this.logger.debug('Generated AI response successfully using DeHub Service');
         }
         
-        if (agenticRAGRunTree) {
-          await agenticRAGRunTree.end({
+        if (processingRunTree) {
+          await processingRunTree.end({
             outputs: { 
               response: aiResponseText,
-              workflow: 'agentic_rag_success'
+              workflow: `${workflowType}_success`
             }
           });
-          await agenticRAGRunTree.patchRun();
+          await processingRunTree.patchRun();
         }
       } catch (error) {
-        this.logger.error(`Error in agentic RAG processing: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        this.logger.error(`Error in ${workflowType} processing: ${error instanceof Error ? error.message : 'Unknown error'}`);
         // Fallback to simple response
         aiResponseText = await this.fallbackLLMResponse(message, historyMessages);
         
-        if (agenticRAGRunTree) {
-          await agenticRAGRunTree.end({
-            error: `Agentic RAG failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        if (processingRunTree) {
+          await processingRunTree.end({
+            error: `${workflowType} failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
             outputs: { 
               fallback_response: aiResponseText,
               workflow: 'fallback_llm'
             }
           });
-          await agenticRAGRunTree.patchRun();
+          await processingRunTree.patchRun();
         }
       }
       
@@ -223,14 +183,14 @@ export class ChatbotMessageProcessor {
       });
 
       this.chatbotMetricsService.incrementMessagesProcessed();
-      this.logger.debug(`Message ${userMessageId} processed successfully with agentic RAG`);
+      this.logger.debug(`Message ${userMessageId} processed successfully with ${workflowType}`);
       
       if (mainRunTree) {
         await mainRunTree.end({
           outputs: { 
             success: true, 
             aiMessageId: aiMessage._id.toString(),
-            workflow: 'agentic_rag_complete'
+            workflow: `${workflowType}_complete`
           }
         });
         await mainRunTree.patchRun();
@@ -248,7 +208,7 @@ export class ChatbotMessageProcessor {
   }
 
   /**
-   * Fallback LLM response when agentic RAG fails
+   * Fallback LLM response when both services fail
    */
   private async fallbackLLMResponse(message: string, historyMessages: BaseMessage[]): Promise<string> {
     this.logger.debug('Using fallback LLM response');
