@@ -6,22 +6,3 @@ services:
       context: .
       dockerfile: Dockerfile.redis
     network_mode: "host"
-    
-  chroma:
-    image: chromadb/chroma
-    container_name: chroma_db
-    restart: unless-stopped
-    volumes:
-      - chroma-data:/chroma/chroma
-    ports:
-      - "8000:8000"
-    environment:
-      - ANONYMIZED_TELEMETRY=False
-      - ALLOW_RESET=True
-      - CHROMA_SERVER_AUTH_CREDENTIALS_FILE=none
-      - CHROMA_SERVER_AUTH_CREDENTIALS=none
-      - CHROMA_SERVER_AUTH_PROVIDER=none
-
-volumes:
-  chroma-data:
-    name: chroma-data
