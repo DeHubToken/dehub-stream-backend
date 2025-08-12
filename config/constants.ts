@@ -443,7 +443,8 @@ const mainNetworks = [
   {
     chainId: ChainId.BSC_MAINNET,
     shortName: `bsc`,
-    rpcUrls: [`https://bsc-mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`],
+    // rpcUrls: [`https://bsc-mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`],
+    rpcUrls: [`https://bnb-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`],
     startBlockNumber: 25834000,
     graphUrl: process.env.BSC_GRAPH_API_ENDPOINT,
     eventRpc: [`https://bnb-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`],
@@ -451,7 +452,8 @@ const mainNetworks = [
   {
     chainId: ChainId.BASE_MAINNET,
     shortName: `base`,
-    rpcUrls: [`https://base-mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`],
+    // rpcUrls: [`https://base-mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`],
+    rpcUrls: [`https://base-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`],
     startBlockNumber: 14205375,
     graphUrl: process.env.BASE_GRAPH_API_ENDPOINT,
     eventRpc: [`https://base-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`],

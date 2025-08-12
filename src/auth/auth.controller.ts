@@ -1,4 +1,4 @@
-import { Controller, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Controller, Post, Req, Res, UseGuards, Body } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { AuthGuard } from 'common/guards/auth.guard';
 import { AuthService } from './auth.service';
@@ -25,6 +25,18 @@ export class AuthController {
     console.log("loginWithWallet")
     try {
       return await this.authService.login(req, res); 
+    } catch (error: any & { message: string }) {
+      return res.status(500).json({ error: true, message: error.message });
+    }
+  }
+
+  @Post('mobile/auth')
+  @UseGuards(AuthGuard)
+  async mobileAuth(@Req() req: Request, @Res() res: Response) {
+    try {
+      console.log("Mobile JWT authentication");
+      const result = await this.authService.mobileAuth(req, res);
+      return res.json(result);
     } catch (error: any & { message: string }) {
       return res.status(500).json({ error: true, message: error.message });
     }
