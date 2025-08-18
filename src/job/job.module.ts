@@ -4,8 +4,10 @@ import { BullModule } from '@nestjs/bull';
 import { VideoQueueProcessor ,DmQueueProcessor} from './job.processor';
 import { CdnModule } from 'src/cdn/cdn.module';
 import { JobGateway } from './job.socket';
+import { JobController } from './job.controller';
 
 @Module({
+   controllers: [JobController],
   providers: [JobService, VideoQueueProcessor, DmQueueProcessor,JobGateway],
   imports: [
     BullModule.registerQueue({ name: 'transcode' }),
