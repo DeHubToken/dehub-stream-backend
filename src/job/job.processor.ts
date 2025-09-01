@@ -108,16 +108,49 @@ export class VideoQueueProcessor {
   ) {}
   @Process()
   async handleJob(job: Job) {
-    console.log('Job received:');
-    const { buffer, slug, filename, mimeType, videoId, imageUrl } = job.data;
+    console.log('Job received:', job.id, Object.keys(job.data || {}));
 
-    const video = await TokenModel.findById(videoId);
+    // Destructure with filePath support
+    let { buffer, slug, filename, mimeType, videoId, imageUrl, filePath } = job.data as any;
+
+    if (!videoId) {
+      console.error('[transcode] Missing videoId in job payload', job.id);
+      throw new Error('Missing videoId');
+    }
+
+    // Load video document (try _id then tokenId if numeric)
+    let video = await TokenModel.findById(videoId);
+    if (!video && /^\d+$/.test(videoId)) {
+      video = await TokenModel.findOne({ tokenId: Number(videoId) });
+    }
     if (!video) {
+      console.error('[transcode] Video not found for id:', videoId);
       throw new Error('Video not found');
     }
 
     try {
       video.transcodingStatus = 'on';
+      await video.save();
+
+      // If we have a file path and no raw buffer, read it
+      if (!buffer && filePath) {
+        try {
+          buffer = await fs.readFile(filePath);
+        } catch (e: any) {
+          console.error('[transcode] Failed reading temp file', filePath, e?.message);
+          throw new Error('Failed to read temp video file');
+        }
+      }
+
+      // Rehydrate Bull serialized Buffer ( { type: 'Buffer', data: [...] } )
+      if (buffer && typeof buffer === 'object' && (buffer as any).type === 'Buffer' && Array.isArray((buffer as any).data)) {
+        buffer = Buffer.from((buffer as any).data);
+      }
+
+      if (!Buffer.isBuffer(buffer)) {
+        throw new Error('Invalid or missing video buffer');
+      }
+
       const url = await this.transcodeAndUploadFile(buffer, filename, mimeType, video);
       video.videoUrl = url;
       video.imageUrl = imageUrl;
@@ -127,14 +160,29 @@ export class VideoQueueProcessor {
       if (!baseUrl) {
         throw new Error('CDN_BASE_URL is not configured');
       }
-      video.videoDuration = await this.cdnService.getFileDuration(baseUrl + url);
+      try {
+        video.videoDuration = await this.cdnService.getFileDuration(baseUrl + url);
+      } catch (durationErr: any) {
+        console.warn('[transcode] Unable to get video duration:', durationErr?.message);
+      }
       video.transcodingStatus = 'done';
       await video.save();
+
+      // Cleanup temp file if provided
+      if (filePath) {
+        fs.unlink(filePath).catch(() => {});
+      }
 
       console.log('Video processed and uploaded:', url);
     } catch (error: any & { message: string }) {
       console.error('Error processing video:', error);
-      throw error; // Optionally handle error
+      video.transcodingStatus = 'failed';
+      await video.save().catch(() => {});
+      // Attempt cleanup
+      if (filePath) {
+        fs.unlink(filePath).catch(() => {});
+      }
+      throw error; // maintain Bull retry behavior
     }
   }
 

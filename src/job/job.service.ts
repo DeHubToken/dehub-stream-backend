@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
+import fs from 'fs/promises';
+import path from 'path';
 interface MediaJobPayload {
   buffer: Buffer;
   slug: string;
@@ -24,15 +26,22 @@ export class JobService {
     videoId: string,
     imageUrl: string,
   ) {
+    // Persist buffer to a temporary file to keep Redis payload small
+    const tempDir = process.env.TMP_UPLOAD_DIR || path.join('/tmp', 'uploads');
+    await fs.mkdir(tempDir, { recursive: true });
+    const safeFilename = filename.replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const tempFilePath = path.join(tempDir, `${videoId}-${Date.now()}-${safeFilename}`);
+    await fs.writeFile(tempFilePath, buffer);
+
     await this.transcodeQueue.add({
-      buffer,
+      filePath: tempFilePath,
       slug,
-      filename,
+      filename: safeFilename,
       mimeType,
       videoId,
       imageUrl,
     });
-    console.log('Job added to queue:', { slug, filename });
+    console.log('Job added to queue (metadata only):', { slug, filename: safeFilename, videoId });
 
     return { msg: 'successful' };
   }
