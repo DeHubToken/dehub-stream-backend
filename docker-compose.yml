@@ -1,8 +1,16 @@
-version: '3'
-
 services:
   redis:
-    build:
-      context: .
-      dockerfile: Dockerfile.redis
-    network_mode: "host"
+    image: redis:latest
+    ports:
+      - "6379:6379"  # Map container port to host port
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
+
+volumes:
+  redis_data:
+
+networks:
+  app-network:
+    driver: bridge
