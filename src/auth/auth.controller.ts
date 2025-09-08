@@ -41,4 +41,13 @@ export class AuthController {
       return res.status(500).json({ error: true, message: error.message });
     }
   }
+
+  @Post('username/check')
+  async checkUsername(@Body('username') username: string, @Res() res: Response) {
+    const result = await this.authService.checkUsernameAvailability(username);
+    if (!result.status) {
+      return res.status(result.code || 400).json(result);
+    }
+    return res.json(result);
+  }
 }

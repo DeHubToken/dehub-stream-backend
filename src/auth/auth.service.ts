@@ -134,4 +134,34 @@ export class AuthService {
       });
     }
   }
+
+  async checkUsernameAvailability(rawUsername: string) {
+    if (!rawUsername || typeof rawUsername !== 'string') {
+      return { status: false, error: true, code: 400, message: 'Username required' };
+    }
+
+    const username = rawUsername.trim();
+
+    if (username.length < 3 || username.length > 30) {
+      return { status: false, error: true, code: 400, message: 'Username length must be 3-30 chars' };
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      return { status: false, error: true, code: 400, message: 'Only letters, numbers and underscore allowed' };
+    }
+
+    try {
+      const existing = await AccountModel.findOne({ username })
+        .collation({ locale: 'en', strength: 2 }) // case-insensitive
+        .select('_id')
+        .lean();
+      return {
+        status: true,
+        code: 200,
+        available: !existing,
+        username
+      };
+    } catch {
+      return { status: false, error: true, code: 500, message: 'Lookup failed' };
+    }
+  }
 }
