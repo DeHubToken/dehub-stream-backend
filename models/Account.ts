@@ -74,6 +74,12 @@ export class Account  extends Document  {
 
   @Prop({ default: false })
   online: boolean; // Online status
+
+  @Prop()
+  createdAt: Date;
+
+  @Prop()
+  updatedAt: Date;
 }
 
 // Create the schema
