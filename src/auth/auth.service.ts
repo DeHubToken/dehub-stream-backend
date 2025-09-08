@@ -102,18 +102,36 @@ export class AuthService {
       // const isNewAccount = account.createdAt && 
       //   new Date(account.createdAt).getTime() > (Date.now() - 5000); // Created within last 5 seconds
 
+      // Build user profile object (lightweight)
+      const userProfile = {
+        address: account.address,
+        username: account.username || null,
+        displayName: account.displayName || null,
+        avatarImageUrl: account.avatarImageUrl || null,
+        coverImageUrl: account.coverImageUrl || null,
+        aboutMe: account.aboutMe || null,
+        followers: account.followers ?? 0,
+        likes: account.likes ?? 0,
+        uploads: account.uploads ?? 0,
+        sentTips: account.sentTips ?? 0,
+        receivedTips: account.receivedTips ?? 0,
+        customs: account.customs || {},
+        seenModal: account.seenModal ?? false,
+        online: account.online ?? true,
+        createdAt: account.createdAt,
+        lastLoginTimestamp: account.lastLoginTimestamp,
+      };
+
       return res.json({
         status: true,
         token: token,
+        user: userProfile,
         result: {
           address: address,
           isMobile: user?.isMobile || true,
           lastLoginTimestamp: account.lastLoginTimestamp,
           tokenExpiry: user?.isMobile ? '1 year' : '24 hours',
-          // isNewAccount: isNewAccount,
-          // accountCreated: account.createdAt
         },
-        // message: isNewAccount ? 'Account created and authenticated successfully' : 'Mobile authentication successful'
         message: "Account authenticated successfully"
       });
 
