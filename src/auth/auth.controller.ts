@@ -1,4 +1,4 @@
-import { Controller, Post, Req, Res, UseGuards, Body } from '@nestjs/common';
+import { Controller, Post, Get, Req, Res, UseGuards, Body, Query } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { AuthGuard } from 'common/guards/auth.guard';
 import { AuthService } from './auth.service';
@@ -42,8 +42,18 @@ export class AuthController {
     }
   }
 
+  @Get('username/check')
+  async checkUsernameGet(@Query('username') username: string, @Res() res: Response) {
+    const result = await this.authService.checkUsernameAvailability(username);
+    if (!result.status) {
+      return res.status(result.code || 400).json(result);
+    }
+    return res.json(result);
+  }
+
+  // (Optional) Keep POST for backward compatibility; can be removed later.
   @Post('username/check')
-  async checkUsername(@Body('username') username: string, @Res() res: Response) {
+  async checkUsernamePost(@Body('username') username: string, @Res() res: Response) {
     const result = await this.authService.checkUsernameAvailability(username);
     if (!result.status) {
       return res.status(result.code || 400).json(result);
