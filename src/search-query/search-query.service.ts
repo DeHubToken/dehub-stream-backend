@@ -9,7 +9,7 @@ import { NftService } from 'src/nft/nft.service';
 
 @Injectable()
 export class SearchQueryService {
-    constructor(
+  constructor(
     @InjectModel(SearchQuery.name)
     private searchModel: Model<SearchQuery>,
     @InjectModel(LiveStream.name) private livestreamModel: Model<LiveStream>,
@@ -21,7 +21,7 @@ export class SearchQueryService {
     const normalized = term.trim().toLowerCase();
     await this.searchModel.findOneAndUpdate(
       { term: normalized },
-    //   { term: normalized, address },
+      //   { term: normalized, address },
       { $inc: { count: 1 }, lastSearchedAt: new Date() },
       { upsert: true, new: true },
     );
@@ -43,41 +43,58 @@ export class SearchQueryService {
     search,
     page = 0,
     unit = 20,
+    type, // <-- optional
     address,
   }: {
     search: string;
     page?: number;
     unit?: number;
+    type?: 'accounts' | 'livestreams' | 'videos';
     address?: string;
   }) {
     const regex = new RegExp(search, 'i');
 
-    // 🔹 Accounts
-    const accounts = await AccountModel.find({ username: regex }).limit(unit);
+    // 🔹 Default empty
+    let accounts: any = [];
+    let livestreams: any = [];
+    let videos: any = [];
 
-    // 🔹 Livestreams
-    const livestreams = await this.livestreamModel
-      .find({ $or: [{ title: regex }, { description: regex }] })
-      .sort({ createdAt: -1 })
-      .skip(page * unit)
-      .limit(unit);
+    // --- Accounts ---
+    if (!type || type === 'accounts') {
+      accounts = await AccountModel.find({ username: regex })
+        .skip(page * unit)
+        .limit(unit);
+    }
 
-    // 🔹 Videos/NFTs
-    const videos: any = await this.nftService.getStreamNfts(
-      { $or: [{ name: regex }, { description: regex }, { owner: regex }] },
-      page * unit,
-      page * unit + unit,
-      { createdAt: -1 },
-      address,
-    );
+    // --- Livestreams ---
+    if (!type || type === 'livestreams') {
+      livestreams = await this.livestreamModel
+        .find({ $or: [{ title: regex }, { description: regex }] })
+        .sort({ createdAt: -1 })
+        .skip(page * unit)
+        .limit(unit);
+    }
 
-    // Add `isLiked` check
-    for (let video of videos) {
-      const userLike = await VoteModel.findOne({
-        tokenId: video.tokenId,
+    // --- Videos ---
+    if (!type || type === 'videos') {
+      videos = await this.nftService.getStreamNfts(
+        { $or: [{ name: regex }, { description: regex }, { owner: regex }] },
+        page * unit,
+        unit,
+        { createdAt: -1 },
         address,
-      });
-      video.isLiked = Boolean(userLike);
+      );
+
+      // Add `isLiked` check
+      if (address) {
+        for (let video of videos) {
+          const userLike = await VoteModel.findOne({
+            tokenId: video.tokenId,
+            address,
+          });
+          video.isLiked = Boolean(userLike);
+        }
+      }
     }
 
     return { accounts, livestreams, videos };

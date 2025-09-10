@@ -7,19 +7,26 @@ export class SearchQueryController {
   constructor(private readonly searchQueryService: SearchQueryService) {}
 
   @Get()
-  async search(@Query('q') q: string, @Query('page') page: number, @Query('unit') unit: number, @Req() req: Request) {
-    if (!q) return { result: [] };
+  async search(
+    @Query('q') q: string,
+    @Query('page') page: number,
+    @Query('unit') unit: number,
+    @Query('type') type: 'accounts' | 'livestreams' | 'videos',
+    @Req() req: Request,
+  ) {
+    if (!q) {
+      return { result: { accounts: [], livestreams: [], videos: [] } };
+    }
 
     const address = req.query.address as string; // optional wallet
 
-    // 🔹 log search
     await this.searchQueryService.logSearch(q, address);
 
-    // 🔹 perform search
     const result = await this.searchQueryService.searchAll({
       search: q,
       page: Number(page) || 0,
       unit: Number(unit) || 20,
+      type,
       address,
     });
 
