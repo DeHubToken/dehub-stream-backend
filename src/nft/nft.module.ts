@@ -10,12 +10,10 @@ import { LiveStream, LiveStreamSchema } from 'models/LiveStream';
 @Module({
   controllers: [NFTController],
   providers: [
-    NftService
+    NftService,
     // , NftIndexer
-    ],
-  imports:[
-    CdnModule,
-     JobModule, MongooseModule.forFeature([{ name: LiveStream.name, schema: LiveStreamSchema }])
-    ]
+  ],
+  imports: [CdnModule, JobModule, MongooseModule.forFeature([{ name: LiveStream.name, schema: LiveStreamSchema }])],
+  exports: [NftService],
 })
 export class NftModule {}
