@@ -12,6 +12,7 @@ export class SearchQueryController {
     @Query('page') page: number,
     @Query('unit') unit: number,
     @Query('type') type: 'accounts' | 'livestreams' | 'videos',
+    @Query('postType') postType: string,
     @Req() req: Request,
   ) {
     if (!q) {
@@ -28,6 +29,7 @@ export class SearchQueryController {
       unit: Number(unit) || 20,
       type,
       address,
+      postType
     });
 
     return { result };

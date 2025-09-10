@@ -45,12 +45,14 @@ export class SearchQueryService {
     unit = 20,
     type, // <-- optional
     address,
+    postType = 'video',
   }: {
     search: string;
     page?: number;
     unit?: number;
     type?: 'accounts' | 'livestreams' | 'videos';
     address?: string;
+    postType?: string;
   }) {
     const regex = new RegExp(search, 'i');
 
@@ -77,23 +79,37 @@ export class SearchQueryService {
 
     // --- Videos ---
     if (!type || type === 'videos') {
-      videos = await this.nftService.getStreamNfts(
-        { $or: [{ name: regex }, { description: regex }, { owner: regex }] },
-        page * unit,
-        unit,
-        { createdAt: -1 },
-        address,
-      );
+      const postFilter: any = {};
+      const contentFilter: Record<string, any> = {
+        video: { $or: [{ postType: { $nin: ['feed-simple', 'feed-images', 'live'] } }] },
+        'feed-all': { $or: [{ postType: 'feed-simple' }, { postType: 'feed-images' }] },
+        feed: { $or: [{ postType: 'feed-simple' }, { postType: 'feed-images' }] },
+        'feed-images': { postType: 'feed-images' },
+        'feed-simple': { postType: 'feed-simple' },
+      };
+      if (contentFilter[postType]) Object.assign(postFilter, contentFilter[postType]);
 
-      // Add `isLiked` check
-      if (address) {
-        for (let video of videos) {
-          const userLike = await VoteModel.findOne({
-            tokenId: video.tokenId,
-            address,
-          });
-          video.isLiked = Boolean(userLike);
-        }
+      // Build pipeline $match similar to nft.service searchQuery
+      const searchQuery: any = {
+        $match: {
+          $and: [{ status: 'minted' }, { $or: [{ isHidden: false }, { isHidden: { $exists: false } }] }, postFilter],
+        },
+      };
+
+      const textFilter = { $or: [{ name: regex }, { description: regex }, { owner: regex }] };
+
+      videos = await this.nftService.getStreamNfts(textFilter, page * unit, unit, { createdAt: -1 }, address, [
+        searchQuery,
+      ]);
+
+      // Batch `isLiked` calculation (avoid N+1)
+      if (address && Array.isArray(videos) && videos.length) {
+        const tokenIds = videos.map(v => v.tokenId).filter(Boolean);
+        const likedDocs = await VoteModel.find({ tokenId: { $in: tokenIds }, address }, { tokenId: 1 }).lean();
+        const likedSet = new Set(likedDocs.map(ld => ld.tokenId));
+        videos.forEach(v => (v.isLiked = likedSet.has(v.tokenId)));
+      } else if (Array.isArray(videos)) {
+        videos.forEach(v => (v.isLiked = false));
       }
     }
 
