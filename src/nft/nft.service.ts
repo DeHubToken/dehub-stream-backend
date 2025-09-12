@@ -521,9 +521,9 @@ export class NftService {
           sortRule,
           address,
         );
-        // Include userLike logic
+        // Include userVote logic
         for (let video of videos) {
-          const userVote = await VoteModel.findOne({ tokenId: video.tokenId, address });
+          const userVote = await VoteModel.findOne({ tokenId: video.tokenId, address: normalizeAddress(address) });
           video.isLiked = userVote ? userVote.vote === true : false;
           video.isDisliked = userVote ? userVote.vote === false : false;
         }
