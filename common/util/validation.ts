@@ -205,6 +205,16 @@ const getIsSubscriptionRequired = async (
   };
 };
 
+// Helper to derive maximum staked amount across balanceData entries
+export const maxStaked = (balanceData: any): number => {
+  return (
+    balanceData?.reduce(
+      (max: number, item: any) => Math.max(max, item?.staked || 0),
+      0
+    ) ?? 0
+  );
+};
+
 export {
   removeDuplicatedObject,
   removeDuplicatedElementsFromArray,

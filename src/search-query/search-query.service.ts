@@ -6,6 +6,8 @@ import { SearchQuery } from 'models/SearchQuery';
 import { VoteModel } from 'models/Vote';
 import { Model } from 'mongoose';
 import { NftService } from 'src/nft/nft.service';
+import { Balance } from 'models/Balance';
+import { maxStaked } from 'common/util/validation';
 
 @Injectable()
 export class SearchQueryService {
@@ -70,11 +72,54 @@ export class SearchQueryService {
 
     // --- Livestreams ---
     if (!type || type === 'livestreams') {
-      livestreams = await this.livestreamModel
+      const rawStreams = await this.livestreamModel
         .find({ $or: [{ title: regex }, { description: regex }] })
         .sort({ createdAt: -1 })
         .skip(page * unit)
         .limit(unit);
+
+      const addresses = rawStreams
+        .map(s => (s as any)?.address?.toLowerCase())
+        .filter((a): a is string => Boolean(a));
+
+      // Fetch related accounts in one query
+      const relatedAccounts = await AccountModel.find({ address: { $in: addresses } }).lean();
+      const accountByAddress = new Map<string, any>(
+        relatedAccounts.map(a => [a.address?.toLowerCase(), a]),
+      );
+
+      // Fetch balances for all addresses and compute max staked per address
+      const balances = await Balance.find(
+        { address: { $in: addresses } },
+        { address: 1, staked: 1, _id: 0 },
+      ).lean();
+      const byAddr: Record<string, any[]> = {};
+      for (const b of balances) {
+        const addr = (b as any).address?.toLowerCase();
+        if (!addr) continue;
+        (byAddr[addr] ||= []).push(b);
+      }
+      const stakedByAddress = new Map<string, number>();
+      for (const addr of Object.keys(byAddr)) {
+        stakedByAddress.set(addr, maxStaked(byAddr[addr]));
+      }
+
+      livestreams = rawStreams.map(stream => {
+        const addr = (stream as any)?.address?.toLowerCase();
+        const account = addr ? accountByAddress.get(addr) : undefined;
+        const minterStaked = addr ? stakedByAddress.get(addr) ?? 0 : 0;
+        return {
+          ...stream.toObject(),
+          minterStaked,
+          account: account
+            ? {
+                username: account.username,
+                displayName: account.displayName,
+                avatarImageUrl: account.avatarImageUrl,
+              }
+            : null,
+        };
+      });
     }
 
     // --- Videos ---

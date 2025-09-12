@@ -13,6 +13,7 @@ import {
   isUnlockedLockedContent,
   isUnlockedPPVStream,
   isValidSearch,
+  maxStaked,
   removeDuplicatedElementsFromArray,
 } from 'common/util/validation';
 import { CategoryModel } from 'models/Category';
@@ -39,6 +40,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { LiveStream, StreamDocument } from 'models/LiveStream';
 import { Model } from 'mongoose';
 import { ActivityService } from 'src/activity/activity.service';
+import { Balance } from 'models/Balance';
 
 const signer = new ethers.Wallet(process.env.SIGNER_KEY || '');
 
@@ -404,11 +406,13 @@ export class NftService {
             address: { $in: liveStreams.map(stream => stream.address.toLowerCase()) },
           });
 
-          const augmentedLiveStreams = liveStreams.map(stream => {
+          const augmentedLiveStreams = liveStreams.map(async stream => {
             const account = accounts.find(acc => acc.address.toLowerCase() === stream.address.toLowerCase());
-
+            const balanceData = await Balance.find({ address: account?.address?.toLowerCase() }, { staked: 1, _id: 0 });
+            const minterStaked = maxStaked(balanceData);
             return {
               ...stream.toObject(),
+              minterStaked,
               account: account
                 ? {
                     username: account.username,
@@ -619,7 +623,6 @@ export class NftService {
     // const address = reqParam(req, paramNames.address);
     const nftInfo = (await this.getStreamNfts({ tokenId: Number(tokenId) }, 0, 1, null, address))?.[0];
     const userLike = await VoteModel.findOne({ tokenId, address }, { vote: 1 }).lean();
-    // console.log({ userLike, address, tokenId });
     const isLiked = userLike?.vote === true;
     const isDisliked = userLike?.vote === false;
     if (!nftInfo) return res.status(404).json({ error: 'Not Found: NFT does not exist' });
