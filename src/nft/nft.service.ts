@@ -406,22 +406,28 @@ export class NftService {
             address: { $in: liveStreams.map(stream => stream.address.toLowerCase()) },
           });
 
-          const augmentedLiveStreams = liveStreams.map(async stream => {
-            const account = accounts.find(acc => acc.address.toLowerCase() === stream.address.toLowerCase());
-            const balanceData = await Balance.find({ address: account?.address?.toLowerCase() }, { staked: 1, _id: 0 });
-            const minterStaked = maxStaked(balanceData);
-            return {
-              ...stream.toObject(),
-              minterStaked,
-              account: account
-                ? {
-                    username: account.username,
-                    displayName: account.displayName,
-                    avatarImageUrl: account.avatarImageUrl,
-                  }
-                : null,
-            };
-          });
+          const augmentedLiveStreams = await Promise.all(
+            liveStreams.map(async stream => {
+              const account = accounts.find(acc => acc.address.toLowerCase() === stream.address.toLowerCase());
+              const balanceData = await Balance.find(
+                { address: account?.address?.toLowerCase() },
+                { staked: 1, _id: 0 },
+              );
+              const minterStaked = maxStaked(balanceData);
+
+              return {
+                ...stream.toObject(),
+                minterStaked,
+                account: account
+                  ? {
+                      username: account.username,
+                      displayName: account.displayName,
+                      avatarImageUrl: account.avatarImageUrl,
+                    }
+                  : null,
+              };
+            }),
+          );
 
           return res.send({ result: augmentedLiveStreams });
           break;
