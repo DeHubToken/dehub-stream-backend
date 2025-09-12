@@ -615,13 +615,23 @@ export class NftService {
 
     if (!tokenId) return res.status(400).json({ error: 'Bad request: No token id' });
     // const nftInfo = await Token.findOne({ tokenId }, tokenTemplate).lean();
-    const address = reqParam(req, 'address');
-    const nftInfo = (await this.getStreamNfts({ tokenId: Number(tokenId) }, 0, 1, null, address))?.[0];
-    const userLike = await VoteModel.findOne({ tokenId, address: req.query?.address });
+    const rawAddress = reqParam(req, paramNames.address);
+    const normalizedAddress = rawAddress ? normalizeAddress(rawAddress) : undefined;
+    const numericTokenId = Number(tokenId);
+    const nftInfo = (await this.getStreamNfts({ tokenId: numericTokenId }, 0, 1, null, rawAddress))?.[0];
+    let isLiked = false;
+    let isDisliked = false;
+    if (normalizedAddress) {
+      const userVote = await VoteModel.findOne({ tokenId: numericTokenId, address: normalizedAddress }, { vote: 1 }).lean();
+      if (userVote) {
+        isLiked = userVote.vote === true;
+        isDisliked = userVote.vote === false;
+      }
+    }
     if (!nftInfo) return res.status(404).json({ error: 'Not Found: NFT does not exist' });
     const comments = await this.commentsForTokenId(tokenId);
     nftInfo.comments = comments;
-    return res.json({ result: { ...nftInfo, isLiked: Boolean(userLike) } });
+    return res.json({ result: { ...nftInfo, isLiked, isDisliked } });
   }
 
   async commentsForTokenId(tokenId: any) {
