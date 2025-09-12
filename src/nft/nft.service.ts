@@ -612,13 +612,14 @@ export class NftService {
 
   async getNftInfo(req: Request, res: Response) {
     let tokenId = req.query.id || req.query.id || req.params?.id;
+    let address = req.query.address || req.query.address || req.params?.address;
 
     if (!tokenId) return res.status(400).json({ error: 'Bad request: No token id' });
     // const nftInfo = await Token.findOne({ tokenId }, tokenTemplate).lean();
-    const address = reqParam(req, paramNames.address);
+    // const address = reqParam(req, paramNames.address);
     const nftInfo = (await this.getStreamNfts({ tokenId: Number(tokenId) }, 0, 1, null, address))?.[0];
     const userLike = await VoteModel.findOne({ tokenId, address }, { vote: 1 }).lean();
-    console.log({ userLike, address, tokenId });
+    // console.log({ userLike, address, tokenId });
     const isLiked = userLike?.vote === true;
     const isDisliked = userLike?.vote === false;
     if (!nftInfo) return res.status(404).json({ error: 'Not Found: NFT does not exist' });
