@@ -523,11 +523,9 @@ export class NftService {
         );
         // Include userLike logic
         for (let video of videos) {
-          const userLike = await VoteModel.findOne({
-            tokenId: video.tokenId,
-            address,
-          });
-          video.isLiked = Boolean(userLike);
+          const userVote = await VoteModel.findOne({ tokenId: video.tokenId, address });
+          video.isLiked = userVote ? userVote.vote === true : false;
+          video.isDisliked = userVote ? userVote.vote === false : false;
         }
         return res.send({
           result: {
@@ -573,8 +571,9 @@ export class NftService {
       // Include userLike logic
       if (ret.length > 0) {
         for (let nft of ret) {
-          const userLike = await VoteModel.findOne({ tokenId: nft?.tokenId, address: address?.toLowerCase() });
-          nft.isLiked = Boolean(userLike);
+          const userVote = await VoteModel.findOne({ tokenId: nft?.tokenId, address: address?.toLowerCase() });
+          nft.isLiked = userVote ? userVote.vote === true : false;
+          nft.isDisliked = userVote ? userVote.vote === false : false;
         }
         const userSavedPromises = ret?.map(async nft => {
           const userSaved = await SavedPost?.findOne({ tokenId: nft?.tokenId, address: address?.toLowerCase() });

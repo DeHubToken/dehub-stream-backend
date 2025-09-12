@@ -102,14 +102,25 @@ export class SearchQueryService {
         searchQuery,
       ]);
 
-      // Batch `isLiked` calculation (avoid N+1)
+      // Batch like/dislike calculation (avoid N+1)
       if (address && Array.isArray(videos) && videos.length) {
         const tokenIds = videos.map(v => v.tokenId).filter(Boolean);
-        const likedDocs = await VoteModel.find({ tokenId: { $in: tokenIds }, address }, { tokenId: 1 }).lean();
-        const likedSet = new Set(likedDocs.map(ld => ld.tokenId));
-        videos.forEach(v => (v.isLiked = likedSet.has(v.tokenId)));
+        const votes = await VoteModel.find(
+          { tokenId: { $in: tokenIds }, address },
+          { tokenId: 1, vote: 1, _id: 0 },
+        ).lean();
+        const voteMap = new Map<number, boolean>();
+        votes.forEach(v => voteMap.set(v.tokenId as any, v.vote));
+        videos.forEach(v => {
+          const vote = voteMap.get(v.tokenId);
+          v.isLiked = vote === true;
+          v.isDisliked = vote === false;
+        });
       } else if (Array.isArray(videos)) {
-        videos.forEach(v => (v.isLiked = false));
+        videos.forEach(v => {
+          v.isLiked = false;
+          v.isDisliked = false;
+        });
       }
     }
 
