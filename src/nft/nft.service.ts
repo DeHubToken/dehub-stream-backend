@@ -523,7 +523,7 @@ export class NftService {
         );
         // Include userVote logic
         for (let video of videos) {
-          const userVote = await VoteModel.findOne({ tokenId: video.tokenId, address }, { vote: 1}).lean();
+          const userVote = await VoteModel.findOne({ tokenId: video.tokenId, address }, { vote: 1 }).lean();
           video.isLiked = userVote ? userVote.vote === true : false;
           video.isDisliked = userVote ? userVote.vote === false : false;
         }
@@ -582,7 +582,7 @@ export class NftService {
         await Promise.all(userSavedPromises);
       }
       res.send({ result: ret });
-    } catch (error:any&{message:string}) {
+    } catch (error: any & { message: string }) {
       console.log('   ...', new Date(), ' -- index/tokens-search err: ', error);
       res.status(500).send({ error: error.message });
     }
@@ -617,8 +617,8 @@ export class NftService {
     // const nftInfo = await Token.findOne({ tokenId }, tokenTemplate).lean();
     const address = reqParam(req, paramNames.address);
     const nftInfo = (await this.getStreamNfts({ tokenId: Number(tokenId) }, 0, 1, null, address))?.[0];
-    const userLike = await VoteModel.findOne({ tokenId, address }, { vote: 1}).lean();
-    console.log({userLike})
+    const userLike = await VoteModel.findOne({ tokenId, address }, { vote: 1 }).lean();
+    console.log({ userLike, address, tokenId });
     const isLiked = userLike?.vote === true;
     const isDisliked = userLike?.vote === false;
     if (!nftInfo) return res.status(404).json({ error: 'Not Found: NFT does not exist' });
@@ -734,7 +734,7 @@ export class NftService {
       } catch (error: any & { message: string }) {
         res.status(500).json({ error: error.message });
       }
-    } catch (error:any&{message:string}) {
+    } catch (error: any & { message: string }) {
       res.status(500).json({ error: error.message });
     }
   }
