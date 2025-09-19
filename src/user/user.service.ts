@@ -187,41 +187,62 @@ export class UserService {
     try {
       let address = reqParam(req, paramNames.address);
       address = normalizeAddress(address);
-      const updateAccountOptions = {};
-      let username = reqParam(req, userProfileKeys.username);
 
-      // Process editable profile keys
+      // Build $set and $unset for PATCH semantics
+      const setOps: Record<string, any> = {};
+      const unsetOps: Record<string, ''> = {};
+
+      // Handle editable fields
       Object.entries(editableProfileKeys).forEach(([, profileKey]) => {
-        let reqVal = reqParam(req, profileKey);
+        let rawVal = reqParam(req, profileKey);
+
+        // If field is not present in the request at all => do not modify
+        if (typeof rawVal === 'undefined') {
+          return;
+        }
+
+        // Special handling for 'customs'
         if (profileKey === 'customs') {
           try {
-            if (!reqVal) return;
-            reqVal = JSON.parse(reqVal);
-            Object.keys(reqVal).forEach(key => {
-              if (!(Number(key) >= 1 && Number(key) <= 5)) delete reqVal[key];
-            });
+            if (rawVal) {
+              rawVal = JSON.parse(rawVal);
+              Object.keys(rawVal).forEach(key => {
+                if (!(Number(key) >= 1 && Number(key) <= 5)) delete rawVal[key];
+              });
+            }
           } catch {
-            console.log('---error updating custom links');
-            reqVal = undefined;
+            // Bad JSON => ignore this field rather than breaking the whole update
+            return;
           }
         }
-        if (!reqVal || reqVal === 'undefined' || reqVal === 'null' || reqVal === '') reqVal = null;
-        if (!reqVal && profileKey === 'username') return;
-        updateAccountOptions[profileKey] = reqVal;
+
+        // Treat explicit clear signals as unset
+        const isClear = rawVal === null || rawVal === '' || rawVal === 'null' || rawVal === 'NULL';
+
+        if (isClear) {
+          // do not accidentally unset username via empty value
+          if (profileKey !== 'username') {
+            unsetOps[profileKey] = '';
+          }
+          return;
+        }
+
+        // Normal set
+        setOps[profileKey] = rawVal;
       });
 
-      // Validate and update username
-      if (username) {
-        username = username.toLowerCase();
+      // Validate and update username only if explicitly provided and non-empty
+      let username = reqParam(req, userProfileKeys.username);
+      if (typeof username !== 'undefined' && username !== null && `${username}`.trim() !== '') {
+        username = `${username}`.toLowerCase();
         const validation = await isValidUsername(address, username);
         if (validation.error) return res.json(validation);
-        updateAccountOptions[userProfileKeys.username] = username;
+        setOps[userProfileKeys.username] = username;
       }
 
-      // File upload handling with cdnService
+      // File upload handling with cdnService (only if files are sent)
       const coverImgFile = coverImage;
       const avatarImgFile = avatarImage;
-      // const convertImageBuffer = async(fileBuffer: Buffer):Promise<Buffer> => await sharp(fileBuffer).toFormat(targetFormat).toBuffer()
 
       if (coverImgFile) {
         const coverImagePath = await this.cdnService.uploadFile(
@@ -229,8 +250,7 @@ export class UserService {
           'covers',
           normalizeAddress(address) + '.jpg',
         );
-        updateAccountOptions[userProfileKeys.coverImageUrl] = coverImagePath;
-        console.log(coverImagePath);
+        setOps[userProfileKeys.coverImageUrl] = coverImagePath;
       }
 
       if (avatarImgFile) {
@@ -239,30 +259,60 @@ export class UserService {
           'avatars',
           normalizeAddress(address) + '.jpg',
         );
-        updateAccountOptions[userProfileKeys.avatarImageUrl] = avatarImagePath;
+        setOps[userProfileKeys.avatarImageUrl] = avatarImagePath;
       }
 
-      // Update account in the database
+      // Build update document
+      const updateDoc: any = {};
+      if (Object.keys(setOps).length) updateDoc.$set = setOps;
+      if (Object.keys(unsetOps).length) updateDoc.$unset = unsetOps;
+
+      // Nothing to update
+      if (!Object.keys(updateDoc).length) {
+        return res.json({ result: true });
+      }
+
+      // Apply update
+      // const updatedAccount = await AccountModel.findOneAndUpdate(
+      //   { address: address.toLowerCase() },
+      //   updateDoc,
+      //   { ...overrideOptions, new: true, upsert: false, runValidators: true },
+      // );
+
       const updatedAccount = await AccountModel.findOneAndUpdate(
         { address: address.toLowerCase() },
-        updateAccountOptions,
-        overrideOptions,
+        {
+          ...(Object.keys(setOps).length ? { $set: setOps } : {}),
+          ...(Object.keys(unsetOps).length ? { $unset: unsetOps } : {}),
+          $setOnInsert: {
+            address: address.toLowerCase(),
+            createdAt: new Date(),
+            // optional defaults to mirror mobileAuth:
+            sentTips: 0,
+            receivedTips: 0,
+            uploads: 0,
+            followers: 0,
+            likes: 0,
+            customs: {},
+            online: true,
+            seenModal: false,
+          },
+        },
+        { ...overrideOptions, new: true, upsert: true, runValidators: true },
       );
-      console.log(updatedAccount);
 
-      // Set a default username if necessary
-      if (updatedAccount.displayName && !updatedAccount.username) {
-        username = updatedAccount.displayName.toLowerCase().replace(' ', '_');
-        let tailNumber = 0;
+      // Auto-generate username only if displayName just got set and username is still missing
+      if (updatedAccount?.displayName && !updatedAccount.username) {
+        let base = updatedAccount.displayName.toLowerCase().replace(/\s+/g, '_');
+        let tail = 0;
         for (let i = 0; i < 10000; i++) {
-          const updatedUsername = tailNumber === 0 ? username : `${username}_${tailNumber}`;
-          const validation = await isValidUsername(address, updatedUsername);
+          const candidate = tail === 0 ? base : `${base}_${tail}`;
+          const validation = await isValidUsername(address, candidate);
           if (validation.result) {
-            await AccountModel.updateOne({ address }, { username: updatedUsername });
+            await AccountModel.updateOne({ address }, { $set: { username: candidate } });
             break;
-          } else {
-            tailNumber++;
           }
+          tail++;
         }
       }
 
@@ -328,7 +378,7 @@ export class UserService {
         avatarImageUrl: 1,
       };
       return res.json({ result: await AccountModel.find({ address: { $in: addressList } }, accountTemplate) });
-    } catch (error:any&{message:string}) {
+    } catch (error: any & { message: string }) {
       console.log('-----public account data', error);
       return res.status(500).json({ result: false, error: error.message || 'Could not fetch account data' });
     }

@@ -66,6 +66,8 @@ export class AuthService {
         });
       }
 
+      const now = new Date();
+
       // Create or update account - this endpoint doubles as account creation
       const account = await AccountModel.findOneAndUpdate(
         { address },
@@ -80,11 +82,20 @@ export class AuthService {
             likes: 0,
             customs: {},
             online: true,
-            seenModal: false
+            seenModal: false,
+            createdAt: now,
           }
         },
         { upsert: true, new: true, setDefaultsOnInsert: true },
       ).lean();
+
+       // Backfill createdAt for legacy docs missing it
+      // if (!account?.createdAt) {
+      //   await AccountModel.updateOne(
+      //     { address, createdAt: { $exists: false } },
+      //     { $set: { createdAt: now } }
+      //   );
+      // }
 
       // Get the generated token from the request (set by AuthGuard)
       const req_any: any = req;
