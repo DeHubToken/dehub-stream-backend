@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Req, Res, UploadedFiles, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Post, Req, Res, UploadedFiles, UseGuards, Logger } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { AuthGuard } from 'common/guards/auth.guard';
 import { NftService } from './nft.service';
@@ -7,6 +7,7 @@ import { reqParam } from './nft.imports';
 
 @Controller()
 export class NFTController {
+  private readonly logger = new Logger('NFTController');
   constructor(private readonly nftServices: NftService) { }
 
   @Get('getServerTime')
@@ -96,7 +97,14 @@ export class NFTController {
       );
       return res.json(nft);
     } catch (error: any & { message: string }) {
-      console.error('Failed to mint NFT:', error);
+      const filesMeta = Array.isArray(files)
+        ? files.map(f => ({ name: f.originalname, mime: f.mimetype, size: f.size }))
+        : [];
+      this.logger.error(
+        `Failed to mint NFT for address ${address} postType ${postType}`,
+        error?.stack,
+        JSON.stringify({ path: req.originalUrl, query: req.query, bodyFields: Object.keys(req.body || {}), files: filesMeta })
+      );
       return res.status(500).json({ message: 'Failed to mint NFT', error: error.message });
     }
   }
