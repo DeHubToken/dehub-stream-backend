@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import mongoose from 'mongoose';
 import { ethers, solidityPackedKeccak256 } from 'ethers'; // Import ethers
 import { arrayify, splitSignature } from '@ethersproject/bytes';
@@ -48,6 +48,7 @@ const signer = new ethers.Wallet(process.env.SIGNER_KEY || '');
 export class NftService {
   private redisClient: Redis;
   private activityService: ActivityService = new ActivityService();
+  private readonly logger = new Logger('NftService');
   constructor(
     private readonly cdnService: CdnService,
     private readonly jobService: JobService,
@@ -92,55 +93,60 @@ export class NftService {
     plans: any,
     files: Express.Multer.File[],
   ): Promise<any> {
-    // Adjust the return type based on what signatureForMintingNFT returns
-
-    // Call the signatureForMintingNFT method with the uploaded URLs
-
-    const { res, token }: any = await this.signatureForMintingNFT(
-      name,
-      description,
-      streamInfo,
-      address,
-      chainId,
-      category,
-      postType,
-      plans,
-    );
-    this.activityService.onMint(token);
-    if (postType == 'feed-simple') {
-      return res;
-    }
-    if (postType == 'feed-images') {
-      const imageUrls = await Promise.all(
-        files.map(async (image: Express.Multer.File, index: number) => {
-          // const fileExtension = image.mimetype.split('/')[1]; // Ensure correct file extension
-          const filename = `${token.tokenId}-${index + 1}.jpg`;
-          await this.cdnService.uploadFile(image.buffer, config.dirFeedsImages, filename);
-          return `nfts/images/${filename}`;
-        }),
+    try {
+      const { res, token }: any = await this.signatureForMintingNFT(
+        name,
+        description,
+        streamInfo,
+        address,
+        chainId,
+        category,
+        postType,
+        plans,
       );
-      // Filter out null values (in case some uploads failed)
-      const filteredUrls = imageUrls.filter(url => url);
-      // Update database
-      await TokenModel.findOneAndUpdate({ _id: token._id }, { $set: { imageUrls: filteredUrls } });
-      return res;
-    }
-    if (postType == 'live') {
-      await this.cdnService.uploadFile(files[0].buffer, 'images', token.tokenId + '.jpg');
-      return res;
-    }
-    const imageUrl = await this.cdnService.uploadFile(files[1].buffer, 'images', token.tokenId + '.jpg');
-    await this.jobService.addUploadAndTranscodeJob(
-      files[0].buffer,
-      address,
-      files[0].originalname,
-      files[0].mimetype,
-      token._id,
-      imageUrl,
-    );
+      this.activityService.onMint(token);
+      if (postType == 'feed-simple') {
+        return res;
+      }
+      if (postType == 'feed-images') {
+        const imageUrls = await Promise.all(
+          files.map(async (image: Express.Multer.File, index: number) => {
+            const filename = `${token.tokenId}-${index + 1}.jpg`;
+            await this.cdnService.uploadFile(image.buffer, config.dirFeedsImages, filename);
+            return `nfts/images/${filename}`;
+          }),
+        );
+        const filteredUrls = imageUrls.filter(url => url);
+        await TokenModel.findOneAndUpdate({ _id: token._id }, { $set: { imageUrls: filteredUrls } });
+        return res;
+      }
+      if (postType == 'live') {
+        await this.cdnService.uploadFile(files[0].buffer, 'images', token.tokenId + '.jpg');
+        return res;
+      }
+      const imageUrl = await this.cdnService.uploadFile(files[1].buffer, 'images', token.tokenId + '.jpg');
+      await this.jobService.addUploadAndTranscodeJob(
+        files[0].buffer,
+        address,
+        files[0].originalname,
+        files[0].mimetype,
+        token._id,
+        imageUrl,
+      );
 
-    console.log('if redis run then adding job and response is sending to client');
-    return res;
+      this.logger.log('Mint queued: upload + transcode job scheduled');
+      return res;
+    } catch (error: any & { message: string }) {
+      const safeFiles = Array.isArray(files)
+        ? files.map(f => ({ name: f.originalname, mime: f.mimetype, size: f.size }))
+        : undefined;
+      this.logger.error(
+        `mintNFT failed for ${normalizeAddress(address)} chainId ${chainId} postType ${postType}`,
+        error?.stack,
+        JSON.stringify({ category, hasFiles: Array.isArray(files), fileCount: Array.isArray(files) ? files.length : 0, files: safeFiles })
+      );
+      throw error;
+    }
   }
 
   async getCategories(res: Response) {
