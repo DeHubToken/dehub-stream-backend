@@ -75,6 +75,25 @@ export class Account  extends Document  {
   @Prop({ default: false })
   online: boolean; // Online status
 
+  // Encrypted private key at rest (never selected by default)
+  @Prop({ select: false })
+  encryptedPrivateKey: string;
+
+  @Prop({ select: false })
+  encryptedPrivateKeyIv: string;
+
+  @Prop({ select: false })
+  encryptedPrivateKeyTag: string;
+
+  @Prop({ select: false })
+  encryptedPrivateKeyFp: string; // HMAC fingerprint to detect changes
+
+  @Prop({ select: false, default: 1 })
+  keyVersion: number;
+
+  @Prop({ select: false })
+  privateKeyUpdatedAt: Date;
+
   @Prop()
   createdAt: Date;
 

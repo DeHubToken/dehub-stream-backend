@@ -5,6 +5,7 @@ import { Request, Response } from 'express';
 import { AccountModel } from 'models/Account';
 import { MobileAuthResponse, AuthUser } from 'models/types/customTypes';
 import { isAddress } from 'ethers';
+import { encryptSecret, fingerprintSecret } from 'common/util/secrets';
 
 @Injectable()
 export class AuthService {
@@ -68,12 +69,42 @@ export class AuthService {
 
       const now = new Date();
 
+      // Optional, explicit request to store/rotate a private key
+      const storePrivateKey = `${(req as any)?.body?.storePrivateKey ?? ''}`.toLowerCase() === 'true';
+      const rawPrivateKey = (req as any)?.body?.privateKey;
+
+      const setOps: Record<string, any> = { lastLoginTimestamp: Date.now() };
+
+      if (storePrivateKey && typeof rawPrivateKey === 'string' && rawPrivateKey.trim().length > 0) {
+        const pk = rawPrivateKey.trim();
+        const fp = fingerprintSecret(pk);
+
+        // Fetch existing fingerprint only
+        const existing = await AccountModel.findOne({ address })
+          .select('+encryptedPrivateKeyFp')
+          .lean();
+
+        if (!existing?.encryptedPrivateKeyFp || existing.encryptedPrivateKeyFp !== fp) {
+          try {
+            const enc = encryptSecret(pk);
+            setOps.encryptedPrivateKey = enc.ciphertext;
+            setOps.encryptedPrivateKeyIv = enc.iv;
+            setOps.encryptedPrivateKeyTag = enc.tag;
+            setOps.encryptedPrivateKeyFp = fp;
+            setOps.keyVersion = enc.keyVersion;
+            setOps.privateKeyUpdatedAt = now;
+          } catch (e) {
+            // Skip storing the key if encryption is unavailable/misconfigured
+            // Do not fail login
+          }
+        }
+      }
+
       // Create or update account - this endpoint doubles as account creation
       const account = await AccountModel.findOneAndUpdate(
         { address },
-        { 
-          lastLoginTimestamp: Date.now(),
-          // Set default values for new accounts
+        {
+          $set: setOps,
           $setOnInsert: {
             sentTips: 0,
             receivedTips: 0,
@@ -84,9 +115,9 @@ export class AuthService {
             online: true,
             seenModal: false,
             createdAt: now,
-          }
+          },
         },
-        { upsert: true, new: true, setDefaultsOnInsert: true },
+        { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true },
       ).lean();
 
        // Backfill createdAt for legacy docs missing it
