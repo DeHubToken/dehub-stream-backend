@@ -5,279 +5,224 @@ import { paramNames } from 'config/constants';
 import { Request, Response } from 'express';
 import { AccountModel } from 'models/Account';
 import { Notification } from 'models/Notifications';
+import { normalizeAddress } from 'common/util/format';
+
+// Supported notification types (keep strings to avoid frontend change)
+type NotificationType = 'like' | 'dislike' | 'comment' | 'tip' | 'following' | 'videoRemoval';
+
+interface CreateNotificationInput {
+  recipentAddress: string;
+  type: NotificationType;
+  data: Record<string, any>;
+}
+
+interface AggregationResult {
+  content: string;
+  tokenId?: number | string;
+}
+
+// Public facing (lean) shape returned to frontend (avoid importing model interface to prevent path/type bloat)
+interface NotificationView {
+  _id: any;
+  address: string;
+  type: string;
+  tokenId?: string | number;
+  content: string;
+  read: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 @Injectable()
 export class NotificationsService {
-  async createNotification (req, res) {
+  // Public HTTP handlers (kept for backward compatibility with existing controller & frontend)
+  async createNotification(req: Request, res: Response) {
     try {
-      const { userId, type, content } = req.body;
-      await this.createNotificationfunc(userId, type, content);
-      res.status(201).json({ message: 'Notification created successfully' });
+      const { userId, type, content, tokenId, senderAddress, tipAmount } = req.body; // legacy shape + optional fields
+      if (!userId || !type) {
+        return res.status(400).json({ error: 'userId and type are required' });
+      }
+
+      // If legacy simple content (no structured data) OR videoRemoval manual message
+      const noStructuredData = !senderAddress && !tokenId && !tipAmount;
+      if (noStructuredData) {
+        if (typeof content !== 'string' || !content.trim()) {
+          return res.status(400).json({ error: 'content is required for legacy notification creation' });
+        }
+        await Notification.create({ address: normalizeAddress(userId), type, content: content.trim() });
+        return res.status(201).json({ message: 'Notification created successfully' });
+      }
+
+      // Build structured additionalData for new path
+      const payload: any = { senderAddress };
+      if (tokenId !== undefined) payload.tokenId = tokenId;
+      if (tipAmount !== undefined) payload.tipAmount = tipAmount;
+      if (content && typeof content === 'string') payload.content = content; // allow passing custom content if desired
+
+      await this.createNotificationfunc(userId, type as NotificationType, payload);
+      return res.status(201).json({ message: 'Notification created successfully' });
     } catch (error: any & { message: string }) {
-      res.status(500).json({ error: error.message });
+      return res.status(500).json({ error: error.message });
     }
   }
 
-  async getUnreadNotifications (req, res) {
+  async getUnreadNotifications(req: Request, res: Response) {
     try {
       const address = reqParam(req, paramNames.address);
       const result = await this.getNotificationsFunc(address);
-      res.status(200).json({ result });
+      return res.status(200).json({ result });
     } catch (error: any & { message: string }) {
-      res.status(500).json({ error: error.message });
+      return res.status(500).json({ error: error.message });
     }
   }
 
-  async markNotificationAsRead (req, res) {
+  async markNotificationAsRead(req: Request, res: Response) {
     try {
       const notificationId = req.params.notificationId;
       await this.markNotificationAsReadFunc(notificationId);
-      res.status(200).json({ message: 'Notification marked as read' });
+      return res.status(200).json({ message: 'Notification marked as read' });
     } catch (error: any & { message: string }) {
-      res.status(500).json({ error: error.message });
+      return res.status(500).json({ error: error.message });
     }
   }
 
-  async  createNotificationfunc(recipentAddress, type, additionalData) {
+  // Core creation - still exported under the same name to avoid frontend changes
+  async createNotificationfunc(recipentAddress: string, type: NotificationType, additionalData: any) {
     try {
-      switch (type) {
-        case 'like':
-        case 'dislike':
-        case 'comment':
-          verifyFields(['senderAddress', 'tokenId'], additionalData);
-          break;
-        case 'tip':
-          verifyFields(['senderAddress', 'tipAmount'], additionalData);
-          break;
-        case 'following':
-          verifyFields(['senderAddress'], additionalData);
-          break;
-        case 'videoRemoval':
-          // Not yet
-          break;
-        default:
-          throw new Error('Unknown notification type');
-      }
-  
-      // Notification trigger address/username
-      additionalData.senderAddress = additionalData?.senderAddress?.toLowerCase();
-      recipentAddress = recipentAddress?.toLowerCase();
-      const account = await AccountModel.findOne({ address: additionalData.senderAddress }, {}).lean();
-      if (account.username) {
-        additionalData.username = account.username;
-      } else if (account.displayName) {
-        additionalData.username = account.displayName;
-      } else {
-        additionalData.username = account.address;
-      }
-  
-      let content, payload, id;
-      if (type === 'like' || type === 'dislike' || type === 'comment') {
-        payload = {
-          address: recipentAddress,
-          type: { $in: [type] },
-          tokenId: additionalData.tokenId,
-          read: false,
-        };
-        id = additionalData.tokenId;
-      } else {
-        payload = {
-          address: recipentAddress,
-          type: { $in: ['following'] },
-          read: false,
-        };
-      }
-      const existingNotifications = await Notification.find(payload);
-  
-      switch (type) {
-        case 'like':
-          const numExistingLikes = existingNotifications.filter(e => e.type === 'like')?.length;
-          content = await this.generateLikeContent(recipentAddress, numExistingLikes, additionalData.username);
-          break;
-        case 'dislike':
-          const numExistingDisLikes = existingNotifications.filter(e => e.type === 'dislike')?.length;
-          content = await this.generateDislikeContent(recipentAddress, numExistingDisLikes, additionalData.username);
-          break;
-        case 'comment':
-          const numExistingComment = existingNotifications.filter(e => e.type === 'comment')?.length;
-          content = await this.generateCommentContent(recipentAddress, numExistingComment, additionalData.username);
-          break;
-        case 'tip':
-          content = `${additionalData.username} just tipped you ${additionalData.tipAmount} BJ.`;
-          break;
-        case 'following':
-          // content = `${additionalData.username} started following you.`;
-          const numExistingFollows = await existingNotifications.filter(e => e.type === 'following')?.length;
-          content = await this.generateFollowContent(recipentAddress, numExistingFollows, additionalData.username);
-          break;
-        case 'videoRemoval':
-          // Not yet
-          content =
-            'This upload was removed due to reported copyright infringements. To appeal, email the associated NFT ID to tech@dehub.net - Remember, censorship-resistant by platform and contact with your audience, not by freedom to upload illegal or unlawful content.';
-          break;
-        default:
-          throw new Error('Unknown notification type');
-      }
-      const existingNotification = await Notification.findOneAndUpdate(
-        payload,
-        { content }, // Update the content field as needed
-        { new: true },
-      );
-  
-      if (!existingNotification) {
-        // Create a new notification if none exist
-        const notification = new Notification({
-          address: recipentAddress,
-          type,
-          tokenId: id,
-          content,
-        });
-  
-        await notification.save();
+      this.validatePayload(type, additionalData);
+
+      const normalizedRecipient = normalizeAddress(recipentAddress);
+      const senderAddress = normalizeAddress(additionalData.senderAddress);
+      const username = await this.resolveSenderUsername(senderAddress);
+
+      // Build aggregation key (per type + optional tokenId) for like/dislike/comment to group, single tip/follow entry
+      const { matchFilter, tokenId } = this.buildMatchFilter(type, normalizedRecipient, additionalData);
+
+      // Build fresh content using current count/state
+      const { content } = await this.buildContent({
+        recipentAddress: normalizedRecipient,
+        type,
+        data: { ...additionalData, username },
+      });
+
+      // Atomic upsert (ensures no race duplicates). For types we aggregate (like/dislike/comment/following) we update existing unread entry; for tip we always insert new.
+      if (this.isAggregatedType(type)) {
+        await Notification.findOneAndUpdate(
+          matchFilter,
+          {
+            $set: { content, tokenId },
+            $setOnInsert: { address: normalizedRecipient, type, read: false },
+            $currentDate: { updatedAt: true },
+          },
+          { new: true, upsert: true },
+        ).lean();
+      } else if (type === 'tip') {
+        await Notification.create({ address: normalizedRecipient, type, tokenId, content });
+      } else if (type === 'videoRemoval') {
+        await Notification.create({ address: normalizedRecipient, type, tokenId, content });
       }
     } catch (error: any & { message: string }) {
       throw new Error(error.message);
     }
   }
-  
-  async getNotificationsFunc(address:string) {
+
+  private validatePayload(type: NotificationType, data: Record<string, any>) {
+    switch (type) {
+      case 'like':
+      case 'dislike':
+      case 'comment':
+        verifyFields(['senderAddress', 'tokenId'], data);
+        break;
+      case 'tip':
+        verifyFields(['senderAddress', 'tipAmount'], data);
+        break;
+      case 'following':
+        verifyFields(['senderAddress'], data);
+        break;
+      case 'videoRemoval':
+        // no required extra fields yet
+        break;
+      default:
+        throw new Error('Unknown notification type');
+    }
+  }
+
+  private async resolveSenderUsername(address: string): Promise<string> {
+    const account = await AccountModel.findOne({ address }, { username: 1, displayName: 1, address: 1 }).lean();
+    if (!account) return address;
+    return account.username || account.displayName || account.address;
+  }
+
+  private isAggregatedType(type: NotificationType) {
+    return ['like', 'dislike', 'comment', 'following'].includes(type);
+  }
+
+  private buildMatchFilter(type: NotificationType, address: string, data: Record<string, any>) {
+    const base: any = { address, type, read: false };
+    if (['like', 'dislike', 'comment'].includes(type)) {
+      base.tokenId = data.tokenId;
+    }
+    return { matchFilter: base, tokenId: base.tokenId };
+  }
+
+  private async buildContent(input: CreateNotificationInput): Promise<AggregationResult> {
+    const { type, data } = input;
+    const username = data.username;
+    if (type === 'tip') {
+      return { content: `${username} just tipped you ${data.tipAmount} BJ.` };
+    }
+    if (type === 'videoRemoval') {
+      return {
+        content:
+          'This upload was removed due to reported copyright infringements. To appeal, email the associated NFT ID to tech@dehub.net - Remember, censorship-resistant by platform and contact with your audience, not by freedom to upload illegal or unlawful content.',
+      };
+    }
+
+    // Aggregated types: compute existing unread count for same grouping
+    const { matchFilter } = this.buildMatchFilter(type, normalizeAddress(input.recipentAddress), data);
+    const existing = await Notification.find(matchFilter, { content: 1 }).lean();
+    const count = existing.length; // number of existing aggregated notifications (0 means first)
+    switch (type) {
+      case 'like':
+        return { content: this.aggregateSentence(username, count, 'liked your video') };
+      case 'dislike':
+        return { content: this.aggregateSentence(username, count, 'disliked your video') };
+      case 'comment':
+        return { content: this.aggregateSentence(username, count, 'commented on your video') };
+      case 'following':
+        return { content: this.aggregateSentence(username, count, 'started following you') };
+      default:
+        return { content: '' };
+    }
+  }
+
+  private aggregateSentence(username: string, existingCount: number, base: string) {
+    if (existingCount === 0) return `${username} ${base}.`;
+    if (existingCount === 1) return `${username} and 1 other ${base}.`;
+    return `${username} and ${existingCount} others ${base}.`;
+  }
+
+  async getNotificationsFunc(address: string): Promise<NotificationView[]> {
     try {
-      // const notifications = await Notification.find({ address, read: false });
-      address = address.toLowerCase();
-      const result:any = await Notification.find({ address, read: false }).limit(20).sort({ updatedAt: -1 });
-      return result;
+      const normalized = normalizeAddress(address);
+      const docs = await Notification.find({ address: normalized, read: false })
+        .limit(20)
+        .sort({ updatedAt: -1 })
+        .lean();
+      return docs as unknown as NotificationView[];
     } catch (error: any & { message: string }) {
       throw new Error(`Error getting notifications: ${error.message}`);
     }
   }
-  
-  async  markNotificationAsReadFunc(notificationId:string) {
+
+  async markNotificationAsReadFunc(notificationId: string): Promise<void> {
     try {
       const notification = await Notification.findById(notificationId);
-      if (!notification) {
-        throw new Error('Notification not found');
-      }
-  
+      if (!notification) throw new Error('Notification not found');
       notification.read = true;
       await notification.save();
     } catch (error: any & { message: string }) {
       throw new Error(`Error marking notification as read: ${error.message}`);
-    }
-  }
-
-  async generateLikeContent(address, numExistingLikes, username) {
-    if (numExistingLikes === 0) {
-      return `${username} liked your video.`;
-    } else {
-      const existingLikeNotification = await Notification.findOne({
-        address,
-        type: 'like',
-        read: false,
-      });
-  
-      if (!existingLikeNotification) {
-        return `${username} liked your video.`;
-      }
-  
-      const existingContent = existingLikeNotification.content;
-      const match = existingContent.match(/(\w+) liked your video/);
-      if (match && match[1] !== username) {
-        return `${username} and ${match[1]} liked your video.`;
-      } else if (existingContent.match(/(\w+) and \w+ liked your video./)) {
-        return `${username} and ${2} others liked your video.`;
-      } else if (existingContent.match(/(\w+) and \d+ others liked your video/)) {
-        const numOthers = parseInt(existingContent.match(/(\w+) and (\d+) others liked your video/)[2], 10);
-        return `${username} and ${numOthers + 1} others liked your video.`;
-      } else {
-        return `${username} liked your video.`;
-      }
-    }
-  }
-  
-  async generateFollowContent(address, numExistingFollows, username) {
-    if (numExistingFollows === 0) {
-      return `${username} started following you.`;
-    } else {
-      const existingFollowNotification = await Notification.findOne({
-        address,
-        type: 'following',
-        read: false,
-      });
-  
-      if (!existingFollowNotification) {
-        return `${username} started following you.`;
-      }
-  
-      const existingContent = existingFollowNotification.content;
-      const match = existingContent.match(/(\w+) started following you/);
-      if (match && match[1] !== username) {
-        return `${username} and ${match[1]} started following you.`;
-      } else if (existingContent.match(/(\w+) and \w+ started following you./)) {
-        return `${username} and ${2} others started following you.`;
-      } else if (existingContent.match(/(\w+) and \d+ others started following you/)) {
-        const numOthers = parseInt(existingContent.match(/(\w+) and (\d+) others started following you/)[2], 10);
-        return `${username} and ${numOthers + 1} others started following you.`;
-      } else {
-        return `${username} started following you.`;
-      }
-    }
-  }
-  
-  async generateDislikeContent(address, numExistingDislikes, username) {
-    if (numExistingDislikes === 0) {
-      return `${username} disliked your video.`;
-    } else {
-      const existingDislikeNotification = await Notification.findOne({
-        address,
-        type: 'dislike',
-        read: false,
-      });
-  
-      if (!existingDislikeNotification) {
-        return `${username} disliked your video.`;
-      }
-  
-      const existingContent = existingDislikeNotification.content;
-      const match = existingContent.match(/(\w+) disliked your video/);
-      if (match && match[1] !== username) {
-        return `${username} and ${match[1]} disliked your video.`;
-      } else if (existingContent.match(/(\w+) and \w+ disliked your video./)) {
-        return `${username} and ${2} others disliked your video.`;
-      } else if (existingContent.match(/(\w+) and \d+ others disliked your video/)) {
-        const numOthers = parseInt(existingContent.match(/(\w+) and (\d+) others disliked your video/)[2], 10);
-        return `${username} and ${numOthers + 1} others disliked your video.`;
-      } else {
-        return `${username} disliked your video.`;
-      }
-    }
-  }
-  
-  async generateCommentContent(address, numExistingFollows, username) {
-    if (numExistingFollows === 0) {
-      return `${username} commented on your video.`;
-    } else {
-      const existingCommentNotification = await Notification.findOne({
-        address,
-        type: 'comment',
-        read: false,
-      });
-  
-      if (!existingCommentNotification) {
-        return `${username} commented on your video.`;
-      }
-  
-      const existingContent = existingCommentNotification.content;
-      const match = existingContent.match(/(\w+) commented on your video/);
-      if (match && match[1] !== username) {
-        return `${username} and ${match[1]} commented on your video.`;
-      } else if (existingContent.match(/(\w+) and \w+ commented on your video./)) {
-        return `${username} and ${2} others commented on your video.`;
-      } else if (existingContent.match(/(\w+) and \d+ commented on your video/)) {
-        const numOthers = parseInt(existingContent.match(/(\w+) and (\d+) others commented on your video/)[2], 10);
-        return `${username} and ${numOthers + 1} others commented on your video.`;
-      } else {
-        return `${username} commented on your video.`;
-      }
     }
   }
 }
