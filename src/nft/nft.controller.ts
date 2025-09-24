@@ -77,12 +77,16 @@ export class NFTController {
   @Post('user_mint')
   @UseGuards(AuthGuard)
   async userMint(@Req() req: Request, @Res() res: Response, @UploadedFiles() files?: Express.Multer.File[]) {
+    const address = req.params.address; 
     const { postType = 'video' } = req.body;
+    if(!address){
+      return res.status(400).json({ message: 'No address provided for minting' });
+    }
     if (postType != 'feed-simple' && (!files || files.length === 0)) {
       return res.status(400).json({ message: 'No files provided for minting' });
     }
 
-    const { address, name, description, streamInfo, chainId, category, plans = null } = req.body;
+    const { name, description, streamInfo, chainId, category, plans = null } = req.body;
 
     try {
       const nft = await this.nftServices.mintNFT(
