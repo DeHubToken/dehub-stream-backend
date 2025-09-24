@@ -53,6 +53,19 @@ export class LivestreamController {
     return this.livestreamService.getUserStreams(address);
   }
 
+  @Get('user/:address/scheduled')
+  getUserScheduledStreams(
+    @Param('address') address: string,
+    @Req() req,
+  ) {
+    const { limit, offset, futureOnly } = req.query || {};
+    return this.livestreamService.getUserScheduledStreams(address, {
+      limit: limit ? Number(limit) : 20,
+      offset: offset ? Number(offset) : 0,
+      futureOnly: futureOnly !== undefined ? futureOnly !== 'false' : true,
+    });
+  }
+
   @Get(':streamId')
   getStreamDetails(@Param('streamId') streamId: string) {
     return this.livestreamService.getStream(streamId);

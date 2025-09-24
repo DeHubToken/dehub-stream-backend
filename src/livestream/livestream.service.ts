@@ -707,6 +707,65 @@ export class LivestreamService {
     return this.livestreamModel.find({ address }).sort({ createdAt: -1 }).skip(offset).limit(limit).exec();
   }
 
+  async getUserScheduledStreams(
+    address: string,
+    options: { limit?: number; offset?: number; futureOnly?: boolean } = {},
+  ) {
+    const { limit = 20, offset = 0, futureOnly = true } = options;
+    const normalizedAddress = normalizeAddress(address);
+
+    const match: any = {
+      address: normalizedAddress,
+      status: StreamStatus.SCHEDULED,
+    };
+
+    if (futureOnly) {
+      match.scheduledFor = { $gte: new Date() };
+    }
+
+    return this.livestreamModel
+      .aggregate([
+        { $match: match },
+        { $sort: { scheduledFor: 1 } },
+        { $skip: offset },
+        { $limit: limit },
+        {
+          $lookup: {
+            from: 'accounts',
+            localField: 'address',
+            foreignField: 'address',
+            as: 'account',
+          },
+        },
+        {
+          $addFields: {
+            account: { $arrayElemAt: ['$account', 0] },
+          },
+        },
+        {
+          $project: {
+            title: 1,
+            description: 1,
+            thumbnail: 1,
+            status: 1,
+            scheduledFor: 1,
+            categories: 1,
+            address: 1,
+            likes: 1,
+            totalTips: 1,
+            tokenId: 1,
+            streamInfo: 1,
+            account: {
+              username: 1,
+              displayName: 1,
+              avatarImageUrl: 1,
+            },
+          },
+        },
+      ])
+      .exec();
+  }
+
   async updateStreamSettings(streamId: string, address: string, settings: Partial<LiveStream['settings']>) {
     const stream = await this.livestreamModel.findById(streamId).exec();
 
