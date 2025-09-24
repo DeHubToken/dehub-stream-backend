@@ -35,8 +35,9 @@ export class AuthController {
   async mobileAuth(@Req() req: Request, @Res() res: Response) {
     try {
       console.log("Mobile JWT authentication");
-      const result = await this.authService.mobileAuth(req, res);
-      return res.json(result);
+      // Service method already writes to res
+      await this.authService.mobileAuth(req, res);
+      return;
     } catch (error: any & { message: string }) {
       return res.status(500).json({ error: true, message: error.message });
     }
