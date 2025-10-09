@@ -25,7 +25,7 @@ export class WsAuthGuard implements CanActivate {
     const handshake = client.handshake || {};
     const token = handshake?.auth?.token || this.extractTokenFromHeader(handshake);
 
-    console.log('WebSocket connection attempt with token:', {token}, 'and handshake:', {handshake});
+    console.log('WebSocket connection attempt with token:', {token:token.slice(10)}, 'and handshake:', {handshake});
     if (token) {
       try {
         const decoded = this.jwtService.verify(token, { secret: this.secretKey });

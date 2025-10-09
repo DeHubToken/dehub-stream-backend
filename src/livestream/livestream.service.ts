@@ -291,6 +291,7 @@ export class LivestreamService {
   }
 
   async addViewer(streamId: string, address: string) {
+    console.log("adding viewer", streamId, address)
     const stream = await this.livestreamModel.findById(streamId);
     if (!stream) throw new NotFoundException('Stream not found');
 

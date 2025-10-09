@@ -175,6 +175,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @UseGuards(WsAuthGuard)
   @SubscribeMessage(LivestreamEvents.JoinRoom)
   async handleJoinRoom(@ConnectedSocket() client: Socket, @MessageBody() data: { streamId: string }) {
+    console.log('Joining room:', data.streamId);
     await client.join(`stream:${data.streamId}`);
   }
 
