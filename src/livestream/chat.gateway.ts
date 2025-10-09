@@ -1,4 +1,12 @@
-import { WebSocketGateway, WebSocketServer, SubscribeMessage, MessageBody, ConnectedSocket, OnGatewayDisconnect, OnGatewayConnection } from '@nestjs/websockets';
+import {
+  WebSocketGateway,
+  WebSocketServer,
+  SubscribeMessage,
+  MessageBody,
+  ConnectedSocket,
+  OnGatewayDisconnect,
+  OnGatewayConnection,
+} from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 // import { ChatService } from './chat.service';
 import { BadRequestException, forwardRef, Inject, UseGuards } from '@nestjs/common';
@@ -16,11 +24,11 @@ import { Interval } from '@nestjs/schedule';
 @WebSocketGateway({
   cors: {
     origin: '*',
-    path: 'socket.io',
+    path: '/socket.io',
     credentials: true,
   },
   pingInterval: 10000, // 10 seconds
-  pingTimeout: 5000,   // 5 seconds
+  pingTimeout: 5000, // 5 seconds
   transports: ['websocket', 'polling'],
   allowUpgrades: true,
 })
@@ -48,7 +56,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async handleConnection(client: Socket) {
     try {
       console.log(`Client attempting connection: ${client.id}`);
-      
+
       // Handle both auth methods (auth object and query params)
       const authUser = client.handshake.auth?.user;
       const queryAddress = client.handshake.query?.address as string;
@@ -65,7 +73,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       client.data.user = {
         ...user,
-        isAnonymous: false
+        isAnonymous: false,
       };
 
       console.log(`User connected: ${user.username || user.address}`);
@@ -138,7 +146,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('heartbeat')
   async handleHeartbeat(@ConnectedSocket() client: Socket) {
     try {
-      if (client.data.user?.address) {
+      const user = client.data.user;
+      if (user?.address) {
+        // Ensure the connection is tracked (handles cases where auth happened after connection)
+        const isActive = await this.connectionService.isConnectionActive(client.id);
+        if (!isActive) {
+          await this.connectionService.trackConnection(client.id, user.address);
+        }
         await this.connectionService.updateHeartbeat(client.id);
       }
     } catch (error) {
@@ -173,15 +187,15 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       console.log('Joining stream:', data.streamId);
       await client.join(`stream:${data.streamId}`);
-      
+
       // Track viewer in Redis
       await this.connectionService.trackViewer(data.streamId, user.address);
-      
+
       // Add viewer to database
       await this.livestreamService.addViewer(data.streamId, user.address);
 
       const viewerCount = await this.livestreamService.getViewerCount(data.streamId);
-      
+
       this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.JoinStream, {
         viewerCount,
         user: { address: user.address, username: user.username || user.address },
@@ -210,10 +224,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       await client.leave(`stream:${data.streamId}`);
-      
+
       // Remove viewer from Redis
       await this.connectionService.removeViewer(data.streamId, user.address);
-      
+
       // Remove viewer from database
       await this.livestreamService.removeViewer(data.streamId, user.address);
 
@@ -264,10 +278,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private async restoreUserSession(client: Socket, user: any) {
     // Get active sessions for user
     const activeSessions = await this.connectionService.getUserActiveSessions(user.address);
-    
+
     if (activeSessions.length > 0) {
       console.log(`Restoring sessions for user ${user.address}`);
-      
+
       // Restore stream sessions
       const activeStream = await this.livestreamService.getActiveStreamByUser(user.address);
       if (activeStream) {
@@ -298,7 +312,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       // Get all active connections
       const sockets = await this.server.sockets.sockets;
-      
+
       for (const [clientId, socket] of sockets.entries()) {
         const user = socket.data.user;
         if (!user?.address) continue;
@@ -320,7 +334,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Check if user was streaming
       const activeStream = await this.livestreamService.getActiveStreamByUser(user.address);
       if (activeStream) {
-        console.log(`Streamer ${user.address} disconnected from stream ${activeStream.id}. Stream will be ended by Livepeer webhook if no reconnection occurs.`);
+        console.log(
+          `Streamer ${user.address} disconnected from stream ${activeStream.id}. Stream will be ended by Livepeer webhook if no reconnection occurs.`,
+        );
         // Leave the stream room but don't end the stream - Livepeer webhook will handle that
         await client.leave(`stream:${activeStream.id}`);
       }

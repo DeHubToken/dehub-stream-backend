@@ -18,24 +18,6 @@ import { json } from 'express';
 import * as bodyParser from 'body-parser';
 // import { DMSocketController } from './dm/dm.socket.controller';
 
-// WebSocket logic
-const webSockets = (socket: any, io: socketIO.Server) => {
-  socket.on('join', async (userAddress: string) => {
-    if (userAddress) {
-      await addUserToOnlineList(userAddress.toLowerCase());
-      io.emit('update-online-users', getOnlineUsers());
-    }
-  });
-
-  socket.on('disconnect', async () => {
-    const userAddress = socket.handshake.query.address;
-    if (userAddress) {
-      await removeUserFromOnlineList(userAddress.toLowerCase());
-      io.emit('update-online-users', getOnlineUsers());
-    }
-  });
-};
-
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
 
@@ -77,25 +59,6 @@ async function bootstrap() {
 
   app.set('view engine', 'ejs');
 
-  // Create HTTP server and Socket.IO instance
-  const server = createServer(app.getHttpAdapter().getInstance());
-  const io = new socketIO.Server(server, {
-    cors: {
-      origin: '*',
-      methods: ["GET", "POST"],
-      credentials: true,
-    },
-    transports: ["websocket"], // Allow only WebSocket
-  });
-  // new DMSocketController(io);  
-  io.on('connection', (socket: any) => {
-    console.log('New client connected:', socket.id);
-    const userAddress = socket.handshake.query.address;
-
-    console.log('userAddress connection', userAddress);
-    webSockets(socket, io); // Initialize WebSocket handling
- 
-  });
   await app.listen(process.env.API_PORT);
 
   console.log(`Application is running on port :${process.env.API_PORT}`);
