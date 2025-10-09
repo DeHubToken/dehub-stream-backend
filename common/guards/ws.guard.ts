@@ -23,9 +23,11 @@ export class WsAuthGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const client = context.switchToWs().getClient();
     const handshake = client.handshake || {};
-    const token = handshake?.auth?.token || this.extractTokenFromHeader(handshake);
+    const token = handshake?.auth?.token || handshake?.query?.token || this.extractTokenFromHeader(handshake);
 
-    console.log('WebSocket connection attempt with token:', {token:token.slice(10)}, 'and handshake:', {handshake});
+    console.log('WebSocket connection attempt with token:', { token: token.slice(10) }, 'and handshake:', {
+      handshake,
+    });
     if (token) {
       try {
         const decoded = this.jwtService.verify(token, { secret: this.secretKey });
@@ -47,11 +49,11 @@ export class WsAuthGuard implements CanActivate {
       const { address, rawSig, timestamp, isMobile } = this.extractParams(handshake);
 
       if (!rawSig || !address || !timestamp) {
-        throw new BadRequestException('Invalid signature');
+        throw new BadRequestException('Invalid signature: incomplete signature parameters provided');
       }
 
       if (!this.isValidAccount(address, timestamp, rawSig, isMobile)) {
-        throw new UnauthorizedException('Invalid signature');
+        throw new UnauthorizedException('Invalid signature: signature validation failed');
       }
 
       const generatedToken = this.generateToken(address, rawSig, timestamp, isMobile);
