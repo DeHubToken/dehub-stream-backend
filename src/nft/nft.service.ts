@@ -395,6 +395,7 @@ export class NftService {
             status: owner
               ? { $in: [StreamStatus.LIVE, StreamStatus.SCHEDULED, StreamStatus.ENDED, StreamStatus.OFFLINE] }
               : { $in: [StreamStatus.LIVE, StreamStatus.SCHEDULED, StreamStatus.OFFLINE] },
+            isDeleted: { $ne: true },
           };
 
           if (search) {
