@@ -524,6 +524,7 @@ export class NftService {
         // search throuh livestreams
         const livestreamQuery: any = {
           $or: [{ title: re }, { description: re }],
+          isDeleted: { $ne: true },
         };
         const livestreams = await this.livestreamModel
           .find(livestreamQuery)
