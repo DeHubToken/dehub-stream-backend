@@ -9,7 +9,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 // import { ChatService } from './chat.service';
-import { BadRequestException, forwardRef, Inject, UseGuards } from '@nestjs/common';
+import { BadRequestException, forwardRef, Inject, UseGuards, Logger } from '@nestjs/common';
 import { WsAuthGuard } from 'common/guards/ws.guard';
 import { StreamChatService } from './chat.service';
 import { LivestreamService } from './livestream.service';
@@ -38,6 +38,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private readonly reconnectTimeout = 30000; // 30 seconds
   private disconnectTimers: Map<string, NodeJS.Timeout> = new Map();
+  private readonly logger = new Logger('ChatGateway');
 
   constructor(
     private chatService: StreamChatService,
@@ -50,12 +51,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private tempStorage: { [key: string]: fs.WriteStream } = {};
 
   afterInit(server: Server) {
-    console.log('WebSocket Gateway initialized');
+    this.logger.log('[ChatGateway.afterInit] WebSocket Gateway initialized');
   }
 
   async handleConnection(client: Socket) {
     try {
-      console.log(`Client attempting connection: ${client.id}`);
+      this.logger.log(`[ChatGateway.handleConnection] clientId=${client.id} attempting connection`);
 
       // Handle both auth methods (auth object and query params)
       const authUser = client.handshake.auth?.user;
@@ -65,7 +66,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const user = authUser || (queryAddress ? { address: queryAddress } : null);
 
       if (!user) {
-        console.log(`Client ${client.id} connected without authentication`);
+        this.logger.warn(
+          `[ChatGateway.handleConnection] clientId=${client.id} connected WITHOUT authentication (anonymous)`,
+        );
         // Don't disconnect - allow anonymous connections
         client.data.user = { address: null, isAnonymous: true };
         return;
@@ -76,7 +79,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         isAnonymous: false,
       };
 
-      console.log(`User connected: ${user.username || user.address}`);
+      this.logger.log(
+        `[ChatGateway.handleConnection] clientId=${client.id} connected as ${user.username || user.address}`,
+      );
 
       // Track connection in Redis only for authenticated users
       if (user.address) {
@@ -96,7 +101,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         this.emitOnlineUsers();
       }
     } catch (error) {
-      console.error('Error in handleConnection:', error);
+      this.logger.error(`[ChatGateway.handleConnection] clientId=${client.id} error: ${error?.message}`, error?.stack);
       // Don't disconnect on error, just log it
     }
   }
@@ -107,8 +112,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (!user || user.isAnonymous) {
         return;
       }
-
-      console.log(`Client disconnected: ${client.id} -- ${user.address}`);
+      this.logger.log(`[ChatGateway.handleDisconnect] clientId=${client.id} address=${user.address} disconnected`);
 
       // Set a timer for final cleanup if no reconnection occurs
       const timer = setTimeout(async () => {
@@ -123,7 +127,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Remove the connection from tracking
       await this.connectionService.removeConnection(client.id, user.address);
     } catch (error) {
-      console.error('Error in handleDisconnect:', error);
+      this.logger.error(`[ChatGateway.handleDisconnect] clientId=${client.id} error: ${error?.message}`, error?.stack);
     }
   }
 
@@ -137,9 +141,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         .filter((address, index, self) => self.indexOf(address) === index); // Remove duplicates
 
       // Emit to all connected clients
+      this.logger.debug(`[ChatGateway.emitOnlineUsers] emitting update-online-users count=${onlineUsers.length}`);
       this.server.emit('update-online-users', onlineUsers);
     } catch (error) {
-      console.error('Error emitting online users:', error);
+      this.logger.error(`[ChatGateway.emitOnlineUsers] error: ${error?.message}`, error?.stack);
     }
   }
 
@@ -154,17 +159,29 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
           await this.connectionService.trackConnection(client.id, user.address);
         }
         await this.connectionService.updateHeartbeat(client.id);
+
+        // Echo heartbeat back to the client for frontend listener
+        const payload = { clientId: client.id, address: user.address, serverTs: Date.now() };
+        this.logger.debug(
+          `[ChatGateway.handleHeartbeat] echo -> heartbeat clientId=${client.id} address=${user.address}`,
+        );
+        client.emit('heartbeat', payload);
       }
     } catch (error) {
-      console.error('Error in handleHeartbeat:', error);
+      this.logger.error(`[ChatGateway.handleHeartbeat] clientId=${client.id} error: ${error?.message}`, error?.stack);
     }
   }
 
   @UseGuards(WsAuthGuard)
   @SubscribeMessage(LivestreamEvents.EndStream)
   async handleEndStream(@ConnectedSocket() client: Socket, @MessageBody() data: { streamId: string }) {
-    console.log('Ending stream');
+    this.logger.log(
+      `[ChatGateway.handleEndStream] clientId=${client.id} address=${client?.data?.user?.address} streamId=${data?.streamId}`,
+    );
     await this.livestreamService.endStream(data.streamId, client.data.user.address);
+    this.logger.debug(
+      `[ChatGateway.handleEndStream] emit -> ${LivestreamEvents.EndStream} room=stream:${data.streamId}`,
+    );
     this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.EndStream, {
       streamId: data.streamId,
     });
@@ -175,7 +192,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @UseGuards(WsAuthGuard)
   @SubscribeMessage(LivestreamEvents.JoinRoom)
   async handleJoinRoom(@ConnectedSocket() client: Socket, @MessageBody() data: { streamId: string }) {
-    console.log('Joining room:', data.streamId);
+    this.logger.log(
+      `[ChatGateway.handleJoinRoom] clientId=${client.id} address=${client?.data?.user?.address} join room stream:${data?.streamId}`,
+    );
     await client.join(`stream:${data.streamId}`);
   }
 
@@ -185,7 +204,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       const user = client.data.user;
       if (!user?.address) return;
-      console.log('Joining stream:', data.streamId);
+      this.logger.log(
+        `[ChatGateway.handleJoinStream] clientId=${client.id} address=${user.address} streamId=${data?.streamId}`,
+      );
       await client.join(`stream:${data.streamId}`);
 
       // Track viewer in Redis
@@ -196,16 +217,22 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       const viewerCount = await this.livestreamService.getViewerCount(data.streamId);
 
+      this.logger.debug(
+        `[ChatGateway.handleJoinStream] emit -> ${LivestreamEvents.JoinStream} room=stream:${data.streamId} viewerCount=${viewerCount}`,
+      );
       this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.JoinStream, {
         viewerCount,
         user: { address: user.address, username: user.username || user.address },
       });
 
+      this.logger.debug(
+        `[ChatGateway.handleJoinStream] emit -> ${LivestreamEvents.ViewCountUpdate} room=stream:${data.streamId} viewerCount=${viewerCount}`,
+      );
       this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.ViewCountUpdate, {
         viewerCount,
       });
     } catch (error) {
-      console.error('Error in handleJoinStream:', error);
+      this.logger.error(`[ChatGateway.handleJoinStream] clientId=${client.id} error: ${error?.message}`, error?.stack);
     }
   }
 
@@ -219,7 +246,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Check if user is actually active in the stream
       const isActive = await this.connectionService.isViewerActive(data.streamId, user.address);
       if (!isActive) {
-        console.log(`User ${user.address} already left stream ${data.streamId}`);
+        this.logger.warn(
+          `[ChatGateway.handleLeaveStream] address=${user.address} already left streamId=${data.streamId}`,
+        );
         return;
       }
 
@@ -233,16 +262,22 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       const viewerCount = await this.livestreamService.getViewerCount(data.streamId);
 
+      this.logger.debug(
+        `[ChatGateway.handleLeaveStream] emit -> ${LivestreamEvents.LeaveStream} room=stream:${data.streamId} viewerCount=${viewerCount}`,
+      );
       this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.LeaveStream, {
         viewerCount,
         user: { address: user.address, username: user.username || user.address },
       });
 
+      this.logger.debug(
+        `[ChatGateway.handleLeaveStream] emit -> ${LivestreamEvents.ViewCountUpdate} room=stream:${data.streamId} viewerCount=${viewerCount}`,
+      );
       this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.ViewCountUpdate, {
         viewerCount,
       });
     } catch (error) {
-      console.error('Error in handleLeaveStream:', error);
+      this.logger.error(`[ChatGateway.handleLeaveStream] clientId=${client.id} error: ${error?.message}`, error?.stack);
     }
   }
 
@@ -255,7 +290,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const user = client.data.user;
 
     const message = await this.chatService.addChatMessage(data.streamId, user.address, data.content, {});
-
+    this.logger.debug(
+      `[ChatGateway.handleChatMessage] emit -> ${LivestreamEvents.SendMessage} room=stream:${data.streamId} from=${user.address}`,
+    );
     this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.SendMessage, {
       message: { ...message, user: { address: user.address, username: user.username || user.address } },
     });
@@ -280,19 +317,25 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const activeSessions = await this.connectionService.getUserActiveSessions(user.address);
 
     if (activeSessions.length > 0) {
-      console.log(`Restoring sessions for user ${user.address}`);
+      this.logger.log(
+        `[ChatGateway.restoreUserSession] address=${user.address} restoring sessions count=${activeSessions.length}`,
+      );
 
       // Restore stream sessions
       const activeStream = await this.livestreamService.getActiveStreamByUser(user.address);
       if (activeStream) {
-        console.log(`Restoring streamer session for user ${user.address}`);
+        this.logger.log(
+          `[ChatGateway.restoreUserSession] address=${user.address} restoring streamer room stream:${activeStream.id}`,
+        );
         await client.join(`stream:${activeStream.id}`);
       }
 
       // Restore viewer sessions
       const activeViewStreams = await this.livestreamService.getStreamsByViewer(user.address);
       for (const stream of activeViewStreams) {
-        console.log(`Restoring viewer session for user ${user.address} in stream ${stream.id}`);
+        this.logger.log(
+          `[ChatGateway.restoreUserSession] address=${user.address} restoring viewer room stream:${stream.id}`,
+        );
         await this.handleJoinStream(client, { streamId: stream.id });
       }
     }
@@ -320,12 +363,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         // Check if connection is still active in Redis
         const isActive = await this.connectionService.isConnectionActive(clientId);
         if (!isActive) {
-          console.log(`Cleaning up stale connection for user ${user.address}`);
+          this.logger.warn(
+            `[ChatGateway.cleanupStaleConnections] cleaning stale connection clientId=${clientId} address=${user.address}`,
+          );
           await this.handleFinalDisconnect(socket, user);
         }
       }
     } catch (error) {
-      console.error('Error in cleanupStaleConnections:', error);
+      this.logger.error(`[ChatGateway.cleanupStaleConnections] error: ${error?.message}`, error?.stack);
     }
   }
 
@@ -334,8 +379,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Check if user was streaming
       const activeStream = await this.livestreamService.getActiveStreamByUser(user.address);
       if (activeStream) {
-        console.log(
-          `Streamer ${user.address} disconnected from stream ${activeStream.id}. Stream will be ended by Livepeer webhook if no reconnection occurs.`,
+        this.logger.warn(
+          `[ChatGateway.handleFinalDisconnect] streamer address=${user.address} disconnected streamId=${activeStream.id} (Livepeer webhook will end if no reconnection)`,
         );
         // Leave the stream room but don't end the stream - Livepeer webhook will handle that
         await client.leave(`stream:${activeStream.id}`);
@@ -350,7 +395,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Clean up all user sessions
       await this.connectionService.cleanupUserSessions(user.address);
     } catch (error) {
-      console.error('Error in handleFinalDisconnect:', error);
+      this.logger.error(
+        `[ChatGateway.handleFinalDisconnect] clientId=${client.id} address=${user?.address} error: ${error?.message}`,
+        error?.stack,
+      );
     }
   }
 }
