@@ -195,6 +195,7 @@ export class LivestreamService {
 
     const existingStream = await this.livestreamModel.findOne({
       playbackId: stream.playbackId,
+      isDeleted: { $ne: true },
     });
 
     if (!existingStream) {
@@ -240,18 +241,26 @@ export class LivestreamService {
       ? Math.floor((Date.now() - existingStream.startedAt.getTime()) / 1000)
       : 0;
 
-    const updates = {
-      status: StreamStatus.ENDED,
-      endedAt: new Date(),
+    const isTest = !!existingStream.isTest;
+    const targetStatus = isTest ? StreamStatus.OFFLINE : StreamStatus.ENDED;
+
+    const updates: any = {
+      status: targetStatus,
       isActive: false,
       duration,
     };
+    if (!isTest) {
+      updates.endedAt = new Date();
+    }
 
-    await this.livepeerService.deleteStream(existingStream.livepeerId);
+    // Skip deleting the Livepeer stream for test streams
+    if (!isTest) {
+      await this.livepeerService.deleteStream(existingStream.livepeerId);
+    }
 
     this.chatGateway.server.to(`stream:${existingStream._id}`).emit(LivestreamEvents.EndStream, {
       streamId: existingStream._id,
-      status: StreamStatus.ENDED,
+      status: targetStatus,
       endedAt: updates.endedAt,
       duration,
     });
@@ -274,11 +283,16 @@ export class LivestreamService {
       throw new BadRequestException('Unauthorized');
     }
 
+    const isTest = !!stream.isTest;
     const endedAt = new Date();
     const duration = Math.floor((endedAt.getTime() - (stream.startedAt?.getTime() || 0)) / 1000);
 
-    stream.status = StreamStatus.ENDED;
-    stream.endedAt = endedAt;
+    stream.status = isTest ? StreamStatus.OFFLINE : StreamStatus.ENDED;
+    if (!isTest) {
+      stream.endedAt = endedAt;
+    } else {
+      stream.endedAt = undefined;
+    }
     stream.duration = duration;
     await stream.save();
 
@@ -291,7 +305,7 @@ export class LivestreamService {
   }
 
   async addViewer(streamId: string, address: string) {
-    console.log("adding viewer", streamId, address)
+    console.log('adding viewer', streamId, address);
     const stream = await this.livestreamModel.findById(streamId);
     if (!stream) throw new NotFoundException('Stream not found');
 
@@ -502,6 +516,7 @@ export class LivestreamService {
       .findOne({
         address: userAddress,
         status: StreamStatus.LIVE,
+        isDeleted: { $ne: true },
       })
       .exec();
   }
@@ -522,6 +537,7 @@ export class LivestreamService {
       .find({
         _id: { $in: streamIds },
         status: StreamStatus.LIVE,
+        isDeleted: { $ne: true },
       })
       .exec();
   }
@@ -529,7 +545,7 @@ export class LivestreamService {
   async getStream(streamId: string) {
     const streamWithAccount = await this.livestreamModel.aggregate([
       {
-        $match: { _id: new mongoose.Types.ObjectId(streamId) },
+        $match: { _id: new mongoose.Types.ObjectId(streamId), isDeleted: { $ne: true } },
       },
       {
         $lookup: {
@@ -603,15 +619,15 @@ export class LivestreamService {
 
   async getStreamKey(streamId: string, requesterAddress: string) {
     const stream = await this.livestreamModel.findById(streamId).lean();
-  
+
     if (!stream) {
       throw new NotFoundException('Stream not found');
     }
-  
+
     if (stream.address.toLowerCase() !== requesterAddress.toLowerCase()) {
       throw new ForbiddenException('You are not authorized to view the stream key');
     }
-  
+
     return { streamKey: stream.streamKey };
   }
 
@@ -648,7 +664,7 @@ export class LivestreamService {
   async getLiveStreams(limit = 20, offset = 0) {
     const liveStreamsWithAccounts = await this.livestreamModel.aggregate([
       {
-        $match: { status: { $in: [StreamStatus.LIVE, StreamStatus.SCHEDULED, StreamStatus.OFFLINE] } },
+        $match: { status: { $in: [StreamStatus.LIVE, StreamStatus.SCHEDULED, StreamStatus.OFFLINE] }, isDeleted: { $ne: true } },
       },
       {
         $sort: { startedAt: -1 },
@@ -705,7 +721,7 @@ export class LivestreamService {
   }
 
   async getUserStreams(address: string, limit = 20, offset = 0) {
-    return this.livestreamModel.find({ address }).sort({ createdAt: -1 }).skip(offset).limit(limit).exec();
+  return this.livestreamModel.find({ address, isDeleted: { $ne: true } }).sort({ createdAt: -1 }).skip(offset).limit(limit).exec();
   }
 
   async getUserScheduledStreams(
@@ -718,6 +734,7 @@ export class LivestreamService {
     const match: any = {
       address: normalizedAddress,
       status: StreamStatus.SCHEDULED,
+      isDeleted: { $ne: true },
     };
 
     if (futureOnly) {

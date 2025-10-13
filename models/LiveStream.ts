@@ -93,6 +93,12 @@ export class LiveStream {
 
   @Prop({ type: mongoose.Schema.Types.Mixed, default: {} })
   streamInfo: any;
+
+  @Prop({ type: Boolean, default: false })
+  isTest: boolean;
+
+  @Prop({ type: Boolean, default: false })
+  isDeleted: boolean;
 }
 
 export const LiveStreamSchema = SchemaFactory.createForClass(LiveStream);

@@ -185,7 +185,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       const user = client.data.user;
       if (!user?.address) return;
-console.log('Raw data received:', data, user);
       console.log('Joining stream:', data.streamId);
       await client.join(`stream:${data.streamId}`);
 
