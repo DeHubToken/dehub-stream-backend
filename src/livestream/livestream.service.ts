@@ -6,6 +6,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { LiveStream, StreamDocument } from 'models/LiveStream';
@@ -43,6 +44,8 @@ export class LivestreamService {
     @InjectRedis() private readonly redis: Redis,
     private livepeerService: LivepeerService,
   ) {}
+
+  private readonly logger = new Logger('LivestreamService');
 
   async getEssentialUserDetails(address: string): Promise<any> {
     if (!address) {
@@ -225,6 +228,9 @@ export class LivestreamService {
 
     await this.livestreamModel.findByIdAndUpdate(existingStream._id, updates, { new: true });
 
+    this.logger.debug(
+      `[LivestreamService.handleStreamStart] emit -> ${LivestreamEvents.StartStream} room=stream:${existingStream._id} status=${StreamStatus.LIVE}`,
+    );
     this.chatGateway.server.to(`stream:${existingStream._id}`).emit(LivestreamEvents.StartStream, {
       streamId: existingStream._id,
       status: StreamStatus.LIVE,
@@ -258,6 +264,9 @@ export class LivestreamService {
       await this.livepeerService.deleteStream(existingStream.livepeerId);
     }
 
+    this.logger.debug(
+      `[LivestreamService.handleStreamIdle] emit -> ${LivestreamEvents.EndStream} room=stream:${existingStream._id} status=${targetStatus} duration=${duration}`,
+    );
     this.chatGateway.server.to(`stream:${existingStream._id}`).emit(LivestreamEvents.EndStream, {
       streamId: existingStream._id,
       status: targetStatus,
@@ -437,6 +446,9 @@ export class LivestreamService {
       throw new NotFoundException('Stream not found during update');
     }
 
+    this.logger.debug(
+      `[LivestreamService.likeStream] emit -> ${LivestreamEvents.LikeStream} room=stream:${streamId} likes=${updatedStream.toObject().likes}`,
+    );
     this.chatGateway.server.to(`stream:${streamId}`).emit(LivestreamEvents.LikeStream, {
       likes: updatedStream.toObject().likes,
     });
@@ -495,6 +507,9 @@ export class LivestreamService {
     //     });
     //   }, stream.settings.tipDelay * 1000); // Convert seconds to milliseconds
     // } else {
+    this.logger.debug(
+      `[LivestreamService.handleGift] emit -> ${LivestreamEvents.TipStreamer} room=stream:${streamId} amount=${giftData.amount} token=${giftData.tokenAddress}`,
+    );
     this.chatGateway.server.to(`stream:${streamId}`).emit(LivestreamEvents.TipStreamer, {
       gift: activity,
     });
