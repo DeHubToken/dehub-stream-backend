@@ -314,9 +314,22 @@ export class LivestreamService {
   }
 
   async addViewer(streamId: string, address: string) {
-    console.log('adding viewer', streamId, address);
+    this.logger.debug(`[LivestreamService.addViewer] add address=${address} streamId=${streamId}`);
     const stream = await this.livestreamModel.findById(streamId);
     if (!stream) throw new NotFoundException('Stream not found');
+
+    // Idempotency: avoid duplicate active viewer entries
+    const existingActive = await this.streamViewerModel.findOne({
+      streamId,
+      address,
+      leftAt: { $exists: false },
+    });
+    if (existingActive) {
+      this.logger.debug(
+        `[LivestreamService.addViewer] address=${address} already active in streamId=${streamId}; skipping`,
+      );
+      return existingActive;
+    }
 
     const viewer = await this.streamViewerModel.create({
       streamId,
@@ -335,6 +348,7 @@ export class LivestreamService {
 
     await this.recordActivity(streamId, StreamActivityType.JOINED, { address });
 
+    // Only first active join should bump total views and peak
     stream.totalViews += 1;
 
     const currentViewers = await this.getViewerCount(streamId);
@@ -344,7 +358,7 @@ export class LivestreamService {
 
     await stream.save();
 
-    // Update Redis viewer count
+    // Update Redis viewer count only on first active join
     await this.redis.incr(`stream:${streamId}:viewers`);
 
     return viewer;

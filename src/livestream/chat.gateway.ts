@@ -207,6 +207,17 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.logger.log(
         `[ChatGateway.handleJoinStream] clientId=${client.id} address=${user.address} streamId=${data?.streamId}`,
       );
+
+      // If already an active viewer, ensure socket is in room but do not bump counts or emit
+      const alreadyActive = await this.connectionService.isViewerActive(data.streamId, user.address);
+      if (alreadyActive) {
+        this.logger.debug(
+          `[ChatGateway.handleJoinStream] address=${user.address} already active in streamId=${data.streamId}; skipping re-join side-effects`,
+        );
+        await client.join(`stream:${data.streamId}`);
+        return;
+      }
+
       await client.join(`stream:${data.streamId}`);
 
       // Track viewer in Redis
