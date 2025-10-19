@@ -174,4 +174,10 @@ export class NFTController {
     }
   }
 
+  @Get('savedPosts')
+  @UseGuards(AuthGuard)
+  async getSaved(@Req() req: Request, @Res() res: Response) {
+    return this.nftServices.getSavedPosts(req, res);
+  }
+
 }

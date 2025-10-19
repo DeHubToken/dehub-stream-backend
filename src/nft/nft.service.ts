@@ -225,7 +225,14 @@ export class NftService {
     return { res, token: tokenItem };
   }
 
-  async getStreamNfts(filter: any, skip: number, limit: number, sortOption = null, subscriber, pipeline = []) {
+  async getStreamNfts(
+    filter: any,
+    skip: number,
+    limit: number,
+    sortOption = null,
+    subscriber?,
+    pipeline: any[] = [],
+  ): Promise<any[]> {
     try {
       const user: any = await AccountModel.findOne({ address: subscriber?.toLowerCase() });
       // if (!user?._id) {
@@ -350,10 +357,10 @@ export class NftService {
       ];
 
       const result = await TokenModel.aggregate(query);
-      return result;
+      return result as any[];
     } catch (err) {
       console.log('-----get stream nfts:', err);
-      return { result: false, error: 'Fetching failed' };
+      return [];
     }
   }
 
@@ -784,6 +791,36 @@ export class NftService {
       res.status(200).json({ message: 'Liked Video deleted' });
     } catch (error: any & { message: string }) {
       res.status(500).json({ error: error.message });
+    }
+  }
+
+  async getSavedPosts(req: Request, res: Response) {
+    try {
+      const address = (req as any)?.user?.address || (req as any)?.params?.address;
+      if (!address) {
+        return res.status(400).json({ error: 'Address is required' });
+      }
+
+      const page = Number((req.query.page as any) ?? 0);
+      const unit = Math.min(Number((req.query.unit as any) ?? 20), 100);
+
+      const user = await AccountModel.findOne({ address: address.toLowerCase() }, { _id: 1 }).lean();
+      if (!user?._id) return res.json({ result: [] });
+
+      const tokenIds = await SavedPost.find({ userId: user._id, address: address.toLowerCase() })
+        .sort({ createdAt: -1 })
+        .skip(page * unit)
+        .limit(unit)
+        .distinct('tokenId');
+
+      if (!tokenIds?.length) return res.json({ result: [] });
+
+      const items: any[] = await this.getStreamNfts({ tokenId: { $in: tokenIds } }, 0, tokenIds.length, null, address);
+      // Mark them explicitly as saved for client convenience
+      items.forEach(i => (i.isSaved = true));
+      return res.json({ result: items });
+    } catch (err) {
+      return res.status(500).json({ error: 'Could not fetch saved posts' });
     }
   }
 
