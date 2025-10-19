@@ -140,8 +140,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         .filter(address => address) // Filter out null/undefined addresses
         .filter((address, index, self) => self.indexOf(address) === index); // Remove duplicates
 
-      // Emit to all connected clients
-      this.logger.debug(`[ChatGateway.emitOnlineUsers] emitting update-online-users count=${onlineUsers.length}`);
+  // Emit to all connected clients
       this.server.emit('update-online-users', onlineUsers);
     } catch (error) {
       this.logger.error(`[ChatGateway.emitOnlineUsers] error: ${error?.message}`, error?.stack);
@@ -162,9 +161,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
         // Echo heartbeat back to the client for frontend listener
         const payload = { clientId: client.id, address: user.address, serverTs: Date.now() };
-        this.logger.debug(
-          `[ChatGateway.handleHeartbeat] echo -> heartbeat clientId=${client.id} address=${user.address}`,
-        );
         client.emit('heartbeat', payload);
       }
     } catch (error) {
@@ -179,9 +175,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       `[ChatGateway.handleEndStream] clientId=${client.id} address=${client?.data?.user?.address} streamId=${data?.streamId}`,
     );
     await this.livestreamService.endStream(data.streamId, client.data.user.address);
-    this.logger.debug(
-      `[ChatGateway.handleEndStream] emit -> ${LivestreamEvents.EndStream} room=stream:${data.streamId}`,
-    );
     this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.EndStream, {
       streamId: data.streamId,
     });
@@ -211,9 +204,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // If already an active viewer, ensure socket is in room but do not bump counts or emit
       const alreadyActive = await this.connectionService.isViewerActive(data.streamId, user.address);
       if (alreadyActive) {
-        this.logger.debug(
-          `[ChatGateway.handleJoinStream] address=${user.address} already active in streamId=${data.streamId}; skipping re-join side-effects`,
-        );
         await client.join(`stream:${data.streamId}`);
         return;
       }
@@ -228,17 +218,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       const viewerCount = await this.livestreamService.getViewerCount(data.streamId);
 
-      this.logger.debug(
-        `[ChatGateway.handleJoinStream] emit -> ${LivestreamEvents.JoinStream} room=stream:${data.streamId} viewerCount=${viewerCount}`,
-      );
       this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.JoinStream, {
         viewerCount,
         user: { address: user.address, username: user.username || user.address },
       });
 
-      this.logger.debug(
-        `[ChatGateway.handleJoinStream] emit -> ${LivestreamEvents.ViewCountUpdate} room=stream:${data.streamId} viewerCount=${viewerCount}`,
-      );
       this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.ViewCountUpdate, {
         viewerCount,
       });
@@ -273,17 +257,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       const viewerCount = await this.livestreamService.getViewerCount(data.streamId);
 
-      this.logger.debug(
-        `[ChatGateway.handleLeaveStream] emit -> ${LivestreamEvents.LeaveStream} room=stream:${data.streamId} viewerCount=${viewerCount}`,
-      );
       this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.LeaveStream, {
         viewerCount,
         user: { address: user.address, username: user.username || user.address },
       });
 
-      this.logger.debug(
-        `[ChatGateway.handleLeaveStream] emit -> ${LivestreamEvents.ViewCountUpdate} room=stream:${data.streamId} viewerCount=${viewerCount}`,
-      );
       this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.ViewCountUpdate, {
         viewerCount,
       });
@@ -301,9 +279,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const user = client.data.user;
 
     const message = await this.chatService.addChatMessage(data.streamId, user.address, data.content, {});
-    this.logger.debug(
-      `[ChatGateway.handleChatMessage] emit -> ${LivestreamEvents.SendMessage} room=stream:${data.streamId} from=${user.address}`,
-    );
     this.server.to(`stream:${data.streamId}`).emit(LivestreamEvents.SendMessage, {
       message: { ...message, user: { address: user.address, username: user.username || user.address } },
     });

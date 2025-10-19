@@ -313,6 +313,21 @@ export class NftService {
           },
         },
 
+        // Lightweight comment count per token
+        {
+          $lookup: {
+            from: 'comments',
+            let: { tId: '$tokenId' },
+            pipeline: [
+              { $match: { $expr: { $eq: ['$tokenId', '$$tId'] } } },
+              { $count: 'count' },
+            ],
+            as: 'commentCountAgg',
+          },
+        },
+        { $addFields: { commentCount: { $ifNull: [{ $first: '$commentCountAgg.count' }, 0] } } },
+        { $project: { commentCountAgg: 0 } },
+
         // Final projection
         {
           $project: {
@@ -324,6 +339,7 @@ export class NftService {
             minterAboutMe: { $first: '$account.aboutMe' },
             minterStaked: { $first: '$balance.staked' },
             reportCount: 1,
+            commentCount: 1,
           },
         },
 
