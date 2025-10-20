@@ -78,4 +78,20 @@ export class UserController {
       return res.status(500).json({ message: 'Failed to validate username', error: error.message });
     }
   }
+
+  @Get('/is_following')
+  @UseGuards(AuthGuard)
+  async isFollowing(@Req() req: Request, @Res() res: Response) {
+    // AuthGuard sets req.user.address
+    const followerAddress = (req as any)?.user?.address;
+    const target = (req.query?.target as string) || (req.query?.address as string);
+    if (!target) return res.status(400).json({ result: false, error: 'target address is required' });
+
+    try {
+      const result = await this.userServices.isFollowing(followerAddress, target);
+      return res.json({ result });
+    } catch (error: any & { message: string }) {
+      return res.status(500).json({ message: 'Failed to check following', error: error.message });
+    }
+  }
 }

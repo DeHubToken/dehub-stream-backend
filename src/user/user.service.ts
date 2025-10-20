@@ -355,6 +355,24 @@ export class UserService {
     return followes;
   }
 
+  async isFollowing(follower: string, target: string) {
+    try {
+      const followerAddr = normalizeAddress(follower);
+      const targetAddr = normalizeAddress(target);
+      if (!followerAddr || !targetAddr) {
+        throw new BadRequestException('Invalid addresses');
+      }
+      if (followerAddr === targetAddr) {
+        return { isFollowing: false };
+      }
+      const exists = await Follow.exists({ address: followerAddr, following: targetAddr });
+      return { isFollowing: Boolean(exists) };
+    } catch (error: any & { message: string }) {
+      console.error('Error checking following:', error?.message);
+      throw error;
+    }
+  }
+
   async getUsernames() {
     try {
       const result = await AccountModel.find({}, { username: 1 }).distinct('username');

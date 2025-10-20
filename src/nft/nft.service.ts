@@ -143,7 +143,12 @@ export class NftService {
       this.logger.error(
         `mintNFT failed for ${normalizeAddress(address)} chainId ${chainId} postType ${postType}`,
         error?.stack,
-        JSON.stringify({ category, hasFiles: Array.isArray(files), fileCount: Array.isArray(files) ? files.length : 0, files: safeFiles })
+        JSON.stringify({
+          category,
+          hasFiles: Array.isArray(files),
+          fileCount: Array.isArray(files) ? files.length : 0,
+          files: safeFiles,
+        }),
       );
       throw error;
     }
@@ -325,10 +330,7 @@ export class NftService {
           $lookup: {
             from: 'comments',
             let: { tId: '$tokenId' },
-            pipeline: [
-              { $match: { $expr: { $eq: ['$tokenId', '$$tId'] } } },
-              { $count: 'count' },
-            ],
+            pipeline: [{ $match: { $expr: { $eq: ['$tokenId', '$$tId'] } } }, { $count: 'count' }],
             as: 'commentCountAgg',
           },
         },
@@ -662,10 +664,12 @@ export class NftService {
     const userLike = await VoteModel.findOne({ tokenId, address }, { vote: 1 }).lean();
     const isLiked = userLike?.vote === true;
     const isDisliked = userLike?.vote === false;
+    const userSaved = await SavedPost?.findOne({ tokenId, address }).lean();
+    const isSaved = Boolean(userSaved);
     if (!nftInfo) return res.status(404).json({ error: 'Not Found: NFT does not exist' });
     const comments = await this.commentsForTokenId(tokenId);
     nftInfo.comments = comments;
-    return res.json({ result: { ...nftInfo, isLiked, isDisliked } });
+    return res.json({ result: { ...nftInfo, isLiked, isDisliked, isSaved } });
   }
 
   async commentsForTokenId(tokenId: any) {
