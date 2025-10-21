@@ -1,16 +1,16 @@
 import { S3Client, ListObjectsV2Command, CopyObjectCommand } from "@aws-sdk/client-s3";
-import { config } from "../config";
+require('dotenv').config();
 
 const client = new S3Client({
-  region: config.s3.region,
-  endpoint: config.s3.endpoint,
+  region: process.env.DO_S3_REGION,
+  endpoint: process.env.DO_S3_ENDPOINT,
   credentials: {
-    accessKeyId: String(config.s3.accessKeyId || ""),
-    secretAccessKey: String(config.s3.secretAccessKey || ""),
+    accessKeyId: String(process.env.DO_S3_ACCESS_KEY || ""),
+    secretAccessKey: String(process.env.DO_S3_SECRET_ACCESS_KEY || ""),
   },
 });
 
-const bucket = String(config.s3.bucket || "");
+const bucket = String(process.env.DO_S3_SPACENAME || "");
 const folders = ["avatars/", "covers/"];
 const newCacheControl = "public, max-age=3600, must-revalidate";
 
