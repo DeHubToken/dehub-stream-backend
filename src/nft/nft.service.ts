@@ -726,6 +726,85 @@ export class NftService {
     return result;
   }
 
+  // New: paginated comments endpoint handler
+  async getCommentsForToken(req: Request, res: Response) {
+    try {
+      const tokenIdRaw = (req.params as any)?.tokenId || (req.query as any)?.tokenId || (req.params as any)?.id;
+      if (!tokenIdRaw) {
+        return res.status(400).json({ error: 'tokenId is required' });
+      }
+      const tokenId = Number(tokenIdRaw);
+      if (Number.isNaN(tokenId)) {
+        return res.status(400).json({ error: 'tokenId must be a number' });
+      }
+
+      // Support either skip/limit or page/unit
+      const page = Number(((req.query as any)?.page ?? 0) as any);
+      const unit = Math.min(Number(((req.query as any)?.unit ?? 0) as any) || 0, 200) || undefined;
+      let skip = Number(((req.query as any)?.skip ?? 0) as any) || 0;
+      let limit = Number(((req.query as any)?.limit ?? 0) as any) || 0;
+      if (!limit && unit !== undefined) {
+        limit = unit;
+      }
+      if (limit <= 0) limit = 20;
+      if (limit > 200) limit = 200;
+      if (page && !skip) skip = page * limit;
+
+      // total count for pagination UI
+      const totalCount = await CommentModel.countDocuments({ tokenId });
+
+      const pipeline: mongoose.PipelineStage[] = [
+        { $match: { tokenId } },
+        { $sort: { id: -1 } },
+        { $skip: skip },
+        { $limit: limit },
+        {
+          $lookup: {
+            from: 'accounts',
+            localField: 'address',
+            foreignField: 'address',
+            as: 'account',
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            address: 1,
+            content: 1,
+            imageUrl: 1,
+            account: 1,
+            createdAt: 1,
+            updatedAt: 1,
+            parentId: 1,
+            replyIds: 1,
+            id: 1,
+            tokenId: 1,
+          },
+        },
+      ];
+
+      const items = await CommentModel.aggregate(pipeline);
+      items.forEach(comment => {
+        if (comment.account?.[0]) {
+          comment.writor = {
+            username: comment.account?.[0]?.username,
+            avatarUrl: comment.account?.[0]?.avatarImageUrl
+              ? (process.env.DEFAULT_DOMAIN ? process.env.DEFAULT_DOMAIN + '/' : '') +
+                comment.account?.[0]?.avatarImageUrl
+              : undefined,
+          };
+          delete comment.account;
+        }
+      });
+
+      const hasMore = skip + items.length < totalCount;
+      return res.json({ result: { items, totalCount, skip, limit, hasMore } });
+    } catch (e: any & { message: string }) {
+      console.error('getCommentsForToken error', e);
+      return res.status(500).json({ error: 'Could not fetch comments' });
+    }
+  }
+
   async getUnlockedNfts(req: Request, res: Response) {
     /// walletAddress param can be username or address
     let walletAddress: any = req.query.id || req.query.id || req.params?.id;

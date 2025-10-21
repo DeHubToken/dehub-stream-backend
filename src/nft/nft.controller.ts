@@ -128,6 +128,11 @@ export class NFTController {
     }
   }
 
+  @Get('/nft/:tokenId/comments')
+  async getComments(@Req() req: Request, @Res() res: Response) {
+    return this.nftServices.getCommentsForToken(req, res);
+  }
+
   @Get('/nfts/images/:id')
   @UseGuards(MediaAuthGuard)
 
