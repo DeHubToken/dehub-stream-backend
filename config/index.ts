@@ -22,6 +22,13 @@ const config = {
     host: 'localhost',
     port: 6379,
   },
+  s3: {
+    region: process.env.DO_S3_REGION,
+    endpoint: process.env.DO_S3_ENDPOINT,
+    accessKeyId: process.env.DO_S3_ACCESS_KEY,
+    secretAccessKey: process.env.DO_S3_SECRET_ACCESS_KEY,
+    bucket: process.env.DO_S3_SPACENAME,
+  },
   graphQlUrl: 'https://api.thegraph.com/subgraphs/name/streaming-nft/streaming-nft',
   expireSigninTime: isDevMode ? 2 : 24 * 60 * 60, // 2 hours
   isDevMode,

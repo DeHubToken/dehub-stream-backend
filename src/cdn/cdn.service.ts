@@ -23,9 +23,19 @@ export class CdnService {
     });
   }
 
-  async uploadFile(buffer: Buffer, slug: string, filename: string, onProgress?: (percent: number) => void): Promise<string> {
+  async uploadFile(
+    buffer: Buffer,
+    slug: string,
+    filename: string,
+    onProgress?: (percent: number) => void,
+  ): Promise<string> {
     const key = `${generateSlug(slug)}/${filename}`;
     const body = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+
+    const isShortCache = slug === 'covers' || slug === 'avatars';
+    const cacheControl = isShortCache
+      ? 'public, max-age=3600, must-revalidate' // 1 hour
+      : 'public, max-age=31536000, immutable'; // 1 year
 
     const upload = new Upload({
       client: this.s3Client,
@@ -34,13 +44,14 @@ export class CdnService {
         Key: key,
         Body: body,
         ACL: 'public-read',
+        CacheControl: cacheControl,
       },
-    })
+    });
 
-    upload.on('httpUploadProgress', (progress) => {
+    upload.on('httpUploadProgress', progress => {
       if (progress.total && onProgress) {
         const percent = Math.floor((progress.loaded / progress.total) * 100);
-        console.log(percent)
+        console.log(percent);
         onProgress(percent);
       }
     });
@@ -52,7 +63,7 @@ export class CdnService {
 
   async getFileDuration(url: string): Promise<number> {
     return new Promise((resolve, reject) => {
-      ffmpeg.ffprobe(url, (err:any, metadata:any) => {
+      ffmpeg.ffprobe(url, (err: any, metadata: any) => {
         if (err) return reject(err);
         resolve(metadata.format.duration);
       });
@@ -63,11 +74,11 @@ export class CdnService {
     console.log(url);
     const duration = await this.getFileDuration(url);
     console.log(duration);
-    
+
     if (duration > 30) {
       throw new BadRequestException('File exceeds 30 seconds');
     }
-    return duration
+    return duration;
   }
 
   async generateThumbnail(videoUrl: string, folder: string, slug: string): Promise<string> {
@@ -86,7 +97,7 @@ export class CdnService {
             reject(err);
           }
         })
-        .on('error', (err) => {
+        .on('error', err => {
           reject(err);
         })
         .screenshots({
@@ -100,12 +111,14 @@ export class CdnService {
 
   async deleteFile(key: string): Promise<void> {
     const parsedUrl = new URL(key);
-      const keyg = decodeURIComponent(parsedUrl.pathname.substring(1));
+    const keyg = decodeURIComponent(parsedUrl.pathname.substring(1));
     try {
-      await this.s3Client.send(new DeleteObjectCommand({
-        Bucket: process.env.DO_S3_SPACENAME,
-        Key: keyg,
-      }));
+      await this.s3Client.send(
+        new DeleteObjectCommand({
+          Bucket: process.env.DO_S3_SPACENAME,
+          Key: keyg,
+        }),
+      );
     } catch (error: any & { message: string }) {
       throw new Error(`Failed to delete file from DigitalOcean: ${error.message}`);
     }
@@ -113,11 +126,11 @@ export class CdnService {
 
   async uploadHLSFolder(localFolderPath: string, slug: string): Promise<void> {
     const files = Fs.readdirSync(localFolderPath);
-  
+
     for (const file of files) {
       const filePath = path.join(localFolderPath, file);
       const fileBuffer = Fs.readFileSync(filePath);
-  
+
       await this.uploadFile(fileBuffer, slug, file);
     }
   }
