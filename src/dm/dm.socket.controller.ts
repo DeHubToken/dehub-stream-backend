@@ -3,14 +3,13 @@ import { Server, Namespace } from 'socket.io';
 import { DMSocketService } from './dm.socket.service';
 import { SocketEvent } from './types';
 import { AccountModel } from 'models/Account';
-import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EventEmitter, EventManager } from 'src/events/event-manager';
-import { Types } from 'mongoose';
 import { DmModel } from 'models/message/DM';
 import { dmTips } from './pipline';
 import Redis from 'ioredis';
 import { config } from '../../config/index';
-import { getUsersBlockingAllChats } from './util';
+import { WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 
 // interface Session {
 //   username: string;
@@ -20,19 +19,31 @@ import { getUsersBlockingAllChats } from './util';
 // }
 
 @Injectable()
+@WebSocketGateway({
+  namespace: '/dm',
+  cors: { origin: '*' },
+})
 export class DMSocketController {
+  @WebSocketServer()
+  private server: Server;
+
   private dmNamespace: Namespace;
   private eventEmitter: EventEmitter2;
   private dmSocketService: any;
   private redisClient: Redis;
 
-  constructor(private readonly io: Server) {
-    this.dmNamespace = this.io.of('/dm');
+  constructor() {
     this.eventEmitter = EventManager.getInstance();
     this.redisClient = new Redis({ ...config.redis, db: 2 });
+  }
+
+  // Called after the gateway is initialized
+  afterInit(server: Server) {
+    // With namespace defined in the decorator, server is already namespaced
+    this.dmNamespace = (server as unknown) as Namespace;
+    this.dmSocketService = new DMSocketService(this.dmNamespace);
     this.listenEvents();
     this.bootstrap();
-    this.listenEvents();
   }
 
   private bootstrap() {
@@ -40,14 +51,13 @@ export class DMSocketController {
 
     // Namespace for personal DMs
     this.dmNamespace.on(SocketEvent.connection, async socket => {
-      const userAddress = socket.handshake.query.address;
-      console.log('SocketEvent.connection userAddress', userAddress, socket.handshake);
+      const userAddress = socket.handshake.query.address as string;
+      console.log('SocketEvent.connection userAddress', userAddress);
 
-      if (!userAddress == undefined || !userAddress) {
+      // Fix incorrect precedence and handle falsy/undefined
+      if (userAddress === undefined || !userAddress) {
         console.log('need to reconnect...');
         socket.emit(SocketEvent.reConnect, { msg: 'connecting....' });
-      }
-      if (!userAddress) {
         return;
       }
       await this.sessionSet(socket, userAddress);
@@ -130,9 +140,10 @@ export class DMSocketController {
   }
 
   async withSession(socket, req) {
-    const userAddress = socket.handshake.query.address;
+    const userAddress = socket.handshake.query.address as string;
     const redisKey = `user:${userAddress?.toLowerCase()}`;
-    const session = JSON.parse(await this.redisClient.get(redisKey));
+    const raw = await this.redisClient.get(redisKey);
+    const session = raw ? JSON.parse(raw) : null;
     return { req, socket, session: { user: session, redisClient: this.redisClient } };
   }
 
@@ -140,7 +151,7 @@ export class DMSocketController {
     const blockList = await this.dmSocketService.getBlockedUsersForConversation(req.dmId);
     const dm: any = await DmModel.findById(req.dmId, { _id: 1, conversationType: 1 });
     const userId = session.user._id;
-    let next = true; 
+  let next = true;
     if (blockList.length > 0 && dm.conversationType == 'dm') {
       socket.emit(SocketEvent.error, { msg: 'this chat was blocked' });
       next = false;
@@ -156,18 +167,20 @@ export class DMSocketController {
       });
     }
     if (!next) {
-      return { req: null, socket: null, session: null, blockList: null ,dm:null };
+      return { req: null, socket: null, session: null, blockList: null, dm: null };
     }
 
-    return { req, socket, session, blockList ,dm};
+    return { req, socket, session, blockList, dm };
   }
 
   async listenEvents() {
     this.eventEmitter.on(EventEmitter.tipSend, async payload => {
-      const { senderAddress, receiverAddress, dmId } = payload;
+  const { senderAddress, receiverAddress, dmId } = payload;
 
-      const senderSession = JSON.parse(await this.redisClient.get(`user:${senderAddress?.toLowerCase()}`));
-      const receiverSession = JSON.parse(await this.redisClient.get(`user:${receiverAddress?.toLowerCase()}`));
+  const senderSessionRaw = await this.redisClient.get(`user:${senderAddress?.toLowerCase()}`);
+  const receiverSessionRaw = await this.redisClient.get(`user:${receiverAddress?.toLowerCase()}`);
+  const senderSession = senderSessionRaw ? JSON.parse(senderSessionRaw) : null;
+  const receiverSession = receiverSessionRaw ? JSON.parse(receiverSessionRaw) : null;
 
       const updatedDM = await DmModel.aggregate([
         {
@@ -185,11 +198,11 @@ export class DMSocketController {
         },
       ]);
 
-      if (senderSession?.socketIds) {
-        this.dmNamespace.to(senderSession?.socketIds).emit(SocketEvent.tipUpdate, updatedDM[0]);
+      if (senderSession?.socketIds?.length) {
+        this.dmNamespace.to(senderSession.socketIds).emit(SocketEvent.tipUpdate, updatedDM[0]);
       }
-      if (receiverSession?.socketIds) {
-        this.dmNamespace.to(receiverSession?.socketIds).emit(SocketEvent.tipUpdate, updatedDM[0]);
+      if (receiverSession?.socketIds?.length) {
+        this.dmNamespace.to(receiverSession.socketIds).emit(SocketEvent.tipUpdate, updatedDM[0]);
       }
 
       console.log('tip-updates-sent');
