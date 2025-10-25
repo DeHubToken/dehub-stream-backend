@@ -9,7 +9,7 @@ import cors from 'cors';
 import methodOverride from 'method-override';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { AllExceptionsFilter } from 'common/filters/allexceptions';
-import { SocketIoAdapter } from 'common/adapters/socket-io.adapters';
+// import { SocketIoAdapter } from 'common/adapters/socket-io.adapters';
 import  {config}  from 'config';
 import * as socketIO from 'socket.io';
 import { createServer } from 'http';
@@ -55,7 +55,7 @@ async function bootstrap() {
   });
 
   // Use the Socket.IO adapter for WebSocket connections
-  app.useWebSocketAdapter(new SocketIoAdapter(app));
+  // app.useWebSocketAdapter(new SocketIoAdapter(app));
 
   app.set('view engine', 'ejs');
 
